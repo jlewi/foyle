@@ -1,0 +1,7 @@
+name: foyle
+runtime: go
+description: Agent for troubleshooting and operating software
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: gcp-go

@@ -1,0 +1,7 @@
+name: foyle-dev
+runtime: go
+description: Resources for developing foyle
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: https://www.pulumi.com/ai/api/project/e78f074f-075f-46b9-a774-9a3a97e41815.zip
