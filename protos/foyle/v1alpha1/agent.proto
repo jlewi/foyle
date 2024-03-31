@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+import "foyle/v1alpha1/doc.proto";
+
+option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
+
+message GenerateRequest {
+  Doc doc = 1;
+}
+
+message GenerateResponse {
+  repeated Block blocks = 1;
+}
+
+// Generate completions using AI
+service GenerateService {
+  // Generate generates new cells given an existing document.
+  rpc Generate (GenerateRequest) returns (GenerateResponse) {}
+}
+
+message ExecuteRequest {
+  Block block = 1;
+}
+
+message ExecuteResponse {
+  repeated BlockOutput outputs = 1;
+}
+
+// Execute code and commands
+service ExecuteService {
+  // Execute executes a cell in an existing document.
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse) {}
+}

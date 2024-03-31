@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
+
+// Doc represents a document in the editor.
+message Doc {
+  repeated Block blocks = 1;
+}
+
+// Block represents a block in a document.
+// It is inspired by the VSCode NotebookCellData type
+// https://github.com/microsoft/vscode/blob/98332892fd2cb3c948ced33f542698e20c6279b9/src/vs/workbench/api/common/extHostTypes.ts#L3598
+message Block {
+  // BlockKind is an enum indicating what type of block it is e.g text or output
+  // It maps to VSCode's NotebookCellKind
+  // https://github.com/microsoft/vscode/blob/98332892fd2cb3c948ced33f542698e20c6279b9/src/vs/workbench/api/common/extHostTypes.ts#L3766
+  BlockKind kind = 1;
+  // contents is the actual contents of the block.
+  // Not the outputs of the block.
+  // It corresponds to the value in NotebookCellData
+  string contents = 2;
+
+  // outputs are the output of a block if any.
+  repeated BlockOutput outputs = 3;
+}
+
+enum BlockKind {
+  UNKNOWN_BLOCK_KIND = 0;
+  MARKUP = 1;
+  CODE = 2;
+}
+
+// BlockOutput represents the output of a block.
+// It corresponds to a VSCode NotebookCellOutput
+// https://github.com/microsoft/vscode/blob/98332892fd2cb3c948ced33f542698e20c6279b9/src/vscode-dts/vscode.d.ts#L14835
+message BlockOutput {
+  // items is the output items. Each item is the different representation of the same output data
+  repeated BlockOutputItem items = 1;
+}
+
+// BlockOutputItem represents an item in a block output.
+// It corresponds to a VSCode NotebookCellOutputItem
+// https://github.com/microsoft/vscode/blob/98332892fd2cb3c948ced33f542698e20c6279b9/src/vscode-dts/vscode.d.ts#L14753
+message BlockOutputItem {
+  // mime is the mime type of the output item.
+  string mime = 1;
+  // value of the output item.
+  // We use string data type and not bytes because the JSON representation of bytes is a base64 string.
+  // vscode data uses a byte. We may need to add support for bytes to support non text data data in the future.
+  string text_data = 2;
+}
+
