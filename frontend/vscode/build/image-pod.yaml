@@ -1,0 +1,24 @@
+# This pod is useful for interactively testing out the script to build the image
+apiVersion: v1
+kind: Pod
+metadata:
+  name: image-pod
+spec:
+  securityContext:
+    runAsUser: 0
+  containers:
+    - image: mcr.microsoft.com/devcontainers/typescript-node:18-bookworm
+      name: main
+      command:
+        - tail
+        - -f
+        - /dev/null
+      resources:
+        # Minimize the footprint to keep cost low
+        limits:
+          cpu: "8"
+          memory: 16Gi
+        requests:
+          cpu: "8"
+          memory: 16Gi
+          ephemeral-storage:  10Gi
