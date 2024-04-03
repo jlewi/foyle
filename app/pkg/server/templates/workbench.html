@@ -1,0 +1,87 @@
+<!--
+This html template is based on https://github.com/microsoft/vscode/blob/main/src/vs/code/browser/workbench/workbench.html
+I changed the file to use GoTemplates for variable substitution
+-->
+<!DOCTYPE html>
+<html>
+<head>
+    <script>
+        performance.mark('code/didStartRenderer');
+    </script>
+    <meta charset="utf-8" />
+
+    <!-- Mobile tweaks -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Code">
+    <link rel="apple-touch-icon" href="{{  .WorkbenchWebBaseUrl }}/resources/server/code-192.png" />
+
+    <!-- Disable pinch zooming -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+
+    <!-- Workbench Configuration -->
+    <meta id="vscode-workbench-web-configuration" data-settings="{{ .WorkbenchWebConfiguration}}">
+
+    <!-- Workbench Auth Session -->
+    <meta id="vscode-workbench-auth-session" data-settings="{{ .WorkbenchAuthSession}}">
+
+    <!-- Workbench Icon/Manifest/CSS -->
+    <link rel="icon" href="{{ .WorkbenchWebBaseUrl }}/resources/server/favicon.ico" type="image/x-icon" />
+    <link rel="manifest" href="{{ .WorkbenchWebBaseUrl }}/resources/server/manifest.json" crossorigin="use-credentials" />
+    <link data-name="vs/workbench/workbench.web.main" rel="stylesheet" href="{{ .WorkbenchWebBaseUrl }}/out/vs/workbench/workbench.web.main.css">
+
+</head>
+
+<body aria-label="">
+</body>
+
+<!-- Startup (do not modify order of script tags!) -->
+<script src="{{ .WorkbenchWebBaseUrl }}/out/vs/loader.js"></script>
+<script src="{{ .WorkbenchWebBaseUrl }}/out/vs/webPackagePaths.js"></script>
+<script>
+    baseUrl = new URL('{{ .WorkbenchWebBaseUrl }}', window.location.origin).toString();
+    // Strip the trailing slash from baseUrl because if we don't then we will get "//"
+    // If we don't do this than we get 404s trying to start webWorkerExtensionHostIframe.html
+    baseUrl = baseUrl.replace(/\/$/, '');
+    Object.keys(self.webPackagePaths).map(function (key, index) {
+        self.webPackagePaths[key] = `${baseUrl}/node_modules/${key}/${self.webPackagePaths[key]}`;
+    });
+
+    // Set up nls if the user is not using the default language (English)
+    const nlsConfig = {};
+    // Normalize locale to lowercase because translationServiceUrl is case-sensitive.
+    // ref: https://github.com/microsoft/vscode/issues/187795
+    const locale = localStorage.getItem('vscode.nls.locale') || navigator.language.toLowerCase();
+    if (!locale.startsWith('en')) {
+        nlsConfig['vs/nls'] = {
+            availableLanguages: {
+                '*': locale
+            },
+            translationServiceUrl: '{{ .WorkbenchNLSBaseURL }}'
+        };
+    }
+
+    require.config({
+        // TODO(jeremy):  Should we switch to useing "vscode" rather than out? Should ew make that a template
+        // parameter
+        baseUrl: `${baseUrl}/out`,
+        recordStats: true,
+        trustedTypesPolicy: window.trustedTypes?.createPolicy('amdLoader', {
+            createScriptURL(value) {
+                if(value.startsWith(window.location.origin)) {
+                    return value;
+                }
+                throw new Error(`Invalid script url: ${value}`)
+            }
+        }),
+        paths: self.webPackagePaths,
+        ...nlsConfig
+    });
+</script>
+<script>
+    performance.mark('code/willLoadWorkbenchMain');
+</script>
+<script src="{{ .WorkbenchWebBaseUrl }}/out/vs/workbench/workbench.web.main.nls.js"></script>
+<script src="{{ .WorkbenchWebBaseUrl }}/out/vs/workbench/workbench.web.main.js"></script>
+<script src="{{ .WorkbenchWebBaseUrl }}/out/vs/code/browser/workbench/workbench.js"></script>
+</html>
