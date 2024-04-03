@@ -23,6 +23,9 @@ const (
 	LevelFlagName  = "level"
 	appName        = "foyle"
 	ConfigDir      = "." + appName
+
+	defaultVSCodeImage = "us-west1-docker.pkg.dev/foyle-public/images/vscode-web-assets:latest"
+	defaultFoyleImage  = "us-west1-docker.pkg.dev/foyle-public/images/vscode-extension:latest"
 )
 
 // Config represents the persistent configuration data for Foyle.
@@ -35,6 +38,7 @@ type Config struct {
 
 	Logging Logging      `json:"logging" yaml:"logging"`
 	Server  ServerConfig `json:"server" yaml:"server"`
+	Assets  AssetConfig  `json:"assets" yaml:"assets"`
 }
 
 // ServerConfig configures the server
@@ -44,6 +48,17 @@ type ServerConfig struct {
 
 	// HttpPort is the port for the http service
 	HttpPort int `json:"httpPort" yaml:"httpPort"`
+}
+
+// AssetConfig configures the assets
+type AssetConfig struct {
+	VSCode         Asset `json:"vsCode" yaml:"vsCode"`
+	FoyleExtension Asset `json:"foyleExtension" yaml:"foyleExtension"`
+}
+
+type Asset struct {
+	// URI is the URI of the source for the asset
+	URI string `json:"uri" yaml:"uri"`
 }
 
 type Logging struct {
@@ -68,6 +83,12 @@ func (c *Config) IsValid() []string {
 	return problems
 }
 
+// GetAssetsDir returns the directory where assets are stored.
+func (c *Config) GetAssetsDir() string {
+	// TODO(jeremy): Should we make this configurable?
+	return filepath.Join(c.GetConfigDir(), "assets")
+}
+
 // InitViper function is responsible for reading the configuration file and environment variables, if they are set.
 // The results are stored in viper. To retrieve a configuration, use the GetConfig function.
 // The function accepts a cmd parameter which allows binding to command flags.
@@ -84,6 +105,7 @@ func InitViper(cmd *cobra.Command) error {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	setServerDefaults()
+	setAssetDefaults()
 
 	// We need to attach to the command line flag if it was specified.
 	keyToflagName := map[string]string{
@@ -100,7 +122,7 @@ func InitViper(cmd *cobra.Command) error {
 	}
 
 	// Ensure the path for the config file path is set
-	// Recquired since we use viper to persist the location of the config file so can save to it.
+	// Required since we use viper to persist the location of the config file so can save to it.
 	cfgFile := viper.GetString(ConfigFlagName)
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
@@ -174,6 +196,11 @@ func (c *Config) Write(cfgFile string) error {
 func setServerDefaults() {
 	viper.SetDefault("server.bindAddress", "0.0.0.0")
 	viper.SetDefault("server.httpPort", 8080)
+}
+
+func setAssetDefaults() {
+	viper.SetDefault("assets.vsCode.uri", defaultVSCodeImage)
+	viper.SetDefault("assets.foyleExtension.uri", defaultFoyleImage)
 }
 
 func DefaultConfigFile() string {
