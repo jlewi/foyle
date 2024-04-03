@@ -2,21 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/go-logr/zapr"
-	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-)
 
-package cmd
-
-import (
-"fmt"
-"io"
-
-"github.com/go-logr/zapr"
-"go.uber.org/zap"
-
-"github.com/spf13/cobra"
+	"github.com/spf13/cobra"
 )
 
 // These constants will be set by ldflags.
@@ -45,4 +36,3 @@ func logVersion() {
 	log := zapr.NewLogger(zap.L())
 	log.Info("binary version", "version", version, "commit", commit, "date", date, "builtBy", builtBy)
 }
-
