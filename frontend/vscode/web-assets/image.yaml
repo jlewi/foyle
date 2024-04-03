@@ -1,0 +1,19 @@
+kind: Image
+apiVersion: hydros.dev/v1alpha1
+metadata:
+  name: vscode
+  namespace: foyle
+  labels:
+    env: dev
+spec:
+  image: us-west1-docker.pkg.dev/foyle-public/images/vscode-web-assets
+  source:
+    - uri: https://github.com/jlewi/foyle.git
+      mappings:
+        - src: "frontend/vscode/web-assets/**/*"
+  builder:
+    gcb:
+      project: foyle-public
+      bucket : builds-foyle-public
+      machineType: 'E2_HIGHCPU_8'
+      dockerfile: /frontend/vscode/web-assets/Dockerfile
