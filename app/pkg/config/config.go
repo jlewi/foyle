@@ -2,18 +2,17 @@ package config
 
 import (
 	"fmt"
-	"io/fs"
-	"os"
-	"os/user"
-	"path/filepath"
-	"strings"
-
 	"github.com/go-logr/zapr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
+	"io/fs"
+	"os"
+	"os/user"
+	"path/filepath"
+	"strings"
 )
 
 // Note: The application uses viper for configuration management. Viper merges configurations from various sources
@@ -34,7 +33,17 @@ type Config struct {
 	APIVersion string `json:"apiVersion" yaml:"apiVersion" yamltags:"required"`
 	Kind       string `json:"kind" yaml:"kind" yamltags:"required"`
 
-	Logging Logging `json:"logging" yaml:"logging"`
+	Logging Logging      `json:"logging" yaml:"logging"`
+	Server  ServerConfig `json:"server" yaml:"server"`
+}
+
+// ServerConfig configures the server
+type ServerConfig struct {
+	// BindAddress is the address to bind to. Default is 0.0.0.0
+	BindAddress string `json:"bindAddress" yaml:"bindAddress"`
+
+	// HttpPort is the port for the http service
+	HttpPort int `json:"httpPort" yaml:"httpPort"`
 }
 
 type Logging struct {
@@ -73,6 +82,8 @@ func InitViper(cmd *cobra.Command) error {
 	// Without the replacer overriding with environment variables work
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv() // read in environment variables that match
+
+	setServerDefaults()
 
 	// We need to attach to the command line flag if it was specified.
 	keyToflagName := map[string]string{
@@ -158,6 +169,11 @@ func (c *Config) Write(cfgFile string) error {
 	}
 
 	return yaml.NewEncoder(f).Encode(c)
+}
+
+func setServerDefaults() {
+	viper.SetDefault("server.bindAddress", "0.0.0.0")
+	viper.SetDefault("server.httpPort", 8080)
 }
 
 func DefaultConfigFile() string {
