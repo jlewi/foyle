@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,23 +16,33 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/config"
+	"github.com/jlewi/foyle/app/pkg/executor"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/reflection"
 )
 
 // Server is the main application server for foyle
 type Server struct {
-	config config.Config
-	engine *gin.Engine
-
+	config     config.Config
+	engine     *gin.Engine
+	grpcServer *grpc.Server
 	// builtinExtensionPaths is a list of serving paths to the built in extensions
 	builtinExtensionPaths []string
+
+	executor *executor.Executor
 }
 
 // NewServer creates a new server
 func NewServer(config config.Config) (*Server, error) {
 	s := &Server{
-		config: config,
+		config:   config,
+		executor: &executor.Executor{},
 	}
 
 	if err := s.createGinEngine(); err != nil {
@@ -191,18 +202,55 @@ func (s *Server) setHTMLTemplates(router *gin.Engine) error {
 
 // Run starts the http server
 func (s *Server) Run() error {
+	grpcAddress := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.GRPCPort)
+	grpcLis, err := net.Listen("tcp", grpcAddress)
+	if err != nil {
+		return errors.Wrapf(err, "failed to listen: %v", err)
+	}
+
+	log := zapr.NewLogger(zap.L())
+	go func() {
+		err := s.startGRPCServer(grpcLis)
+		if err != nil {
+			log.Error(err, "GRPC server exited")
+			// TODO(jeremy): Should come up with a better way to do a clean shutdown; i.e stopping the http server
+			os.Exit(1)
+		}
+
+	}()
+
 	address := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
-	trapInterrupt()
-	log.Print("Server listening on http://" + address)
+	log.Info("Starting http server", "address", address)
 	if err := http.ListenAndServe(address, s.engine); err != nil {
-		log.Fatalf("There was an error with the http server: %v", err)
+		log.Error(err, "There was an error with the http server")
 	}
 
 	return nil
 }
 
+// startGRPCServer starts the grpc server.
+// Taking the listener as an argument lets us create tests that inject a listener suitable for tests
+func (s *Server) startGRPCServer(lis net.Listener) error {
+	log := zapr.NewLogger(zap.L())
+
+	s.grpcServer = grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
+
+	v1alpha1.RegisterExecuteServiceServer(s.grpcServer, s.executor)
+
+	// So that gRPC curl can be used to inspect it
+	reflection.Register(s.grpcServer)
+
+	// Support health checks
+	grpc_health_v1.RegisterHealthServer(s.grpcServer, health.NewServer())
+
+	trapInterrupt(s.grpcServer)
+
+	log.Info("Starting grpc service", "address", lis.Addr())
+	return s.grpcServer.Serve(lis)
+}
+
 // trapInterrupt shutdowns the server if the appropriate signals are sent
-func trapInterrupt() {
+func trapInterrupt(s *grpc.Server) {
 	log := zapr.NewLogger(zap.L())
 	sigs := make(chan os.Signal, 10)
 	// Note SIGSTOP and SIGTERM can't be caught
@@ -213,6 +261,8 @@ func trapInterrupt() {
 	go func() {
 		msg := <-sigs
 		log.Info("Received shutdown signal; shutting down the server", "sig", msg)
+		s.GracefulStop()
+		log.Info("GRPC Server shutdown complete")
 	}()
 }
 
