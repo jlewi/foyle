@@ -5,6 +5,10 @@ import "foyle/v1alpha1/doc.proto";
 
 option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
 
+// grpc-gateway
+// https://github.com/grpc-ecosystem/grpc-gateway
+import "google/api/annotations.proto";
+
 message GenerateRequest {
   Doc doc = 1;
 }
@@ -16,7 +20,11 @@ message GenerateResponse {
 // Generate completions using AI
 service GenerateService {
   // Generate generates new cells given an existing document.
-  rpc Generate (GenerateRequest) returns (GenerateResponse) {}
+  rpc Generate (GenerateRequest) returns (GenerateResponse) {
+    option (google.api.http) = {
+      post: "/v1alpha1/generate"
+    };
+  }
 }
 
 message ExecuteRequest {
@@ -30,5 +38,9 @@ message ExecuteResponse {
 // Execute code and commands
 service ExecuteService {
   // Execute executes a cell in an existing document.
-  rpc Execute(ExecuteRequest) returns (ExecuteResponse) {}
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse) {
+    option (google.api.http) = {
+      post: "/v1alpha1/execute"
+    };
+  }
 }
