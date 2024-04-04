@@ -23,7 +23,7 @@ jobs:
         with:
           # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
           # https://github.com/golangci/golangci-lint/releases
-          version: v1.50
+          version: v1.57
           # These options work around the errors in this issue
           # https://github.com/golangci/golangci-lint-action/issues/244
           skip-pkg-cache: true
