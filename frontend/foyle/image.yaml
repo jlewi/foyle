@@ -1,0 +1,19 @@
+kind: Image
+apiVersion: hydros.dev/v1alpha1
+metadata:
+  name: vscode-ext
+  namespace: foyle
+  labels:
+    env: dev
+spec:
+  image: us-west1-docker.pkg.dev/foyle-public/images/foyle-vscode-ext
+  source:
+    - uri: https://github.com/jlewi/foyle.git
+      mappings:
+        - src: "/frontend/foyle/**/*"
+  builder:
+    gcb:
+      project: foyle-public
+      bucket : builds-foyle-public
+      machineType: 'E2_HIGHCPU_8'
+      dockerfile: /frontend/foyle/Dockerfile

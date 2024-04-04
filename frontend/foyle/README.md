@@ -1,6 +1,12 @@
-# foyle README
+# foyle vscode 
 
-This is the README for your extension "foyle". After writing up a brief description, we recommend including the following sections.
+This the vscode extension that is the frontend for foyle.
+
+The extension was initialized using the [vscode extension generator](https://code.visualstudio.com/api/get-started/your-first-extension).
+
+
+
+ ---- 
 
 ## Features
 

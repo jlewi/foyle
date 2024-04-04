@@ -18,8 +18,9 @@ import (
 )
 
 const (
+	// Constants representing subdirectories for different assets
 	vscode    = "vscode"
-	extension = "foyle_extension"
+	extension = "foyle"
 )
 
 // Manager is a struct that manages assets
@@ -49,8 +50,10 @@ func (m *Manager) Download(ctx context.Context) error {
 			source:      m.config.Assets.VSCode.URI,
 			stripPrefix: "assets",
 		},
-		// TODO(jeremy): Uncomment once it actually exists
-		//extension: m.config.Assets.FoyleExtension.URI,
+		extension: {
+			source:      m.config.Assets.FoyleExtension.URI,
+			stripPrefix: "foyle",
+		},
 	}
 
 	if m.downloadDir == "" {
