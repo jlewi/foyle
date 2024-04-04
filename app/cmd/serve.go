@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/jlewi/foyle/app/pkg/application"
 	"os"
+
+	"github.com/jlewi/foyle/app/pkg/application"
 
 	"github.com/jlewi/monogo/helpers"
 	"github.com/spf13/cobra"

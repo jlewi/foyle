@@ -1,0 +1,8 @@
+linters:  
+  enable:    
+    - gofmt    
+    - goimports
+    - staticcheck
+run:
+  # Use skip-dirs if there are any directors that must be skipped
+  skip-dirs: []

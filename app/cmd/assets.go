@@ -3,11 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/jlewi/foyle/app/pkg/application"
 	"github.com/jlewi/foyle/app/pkg/assets"
 	"github.com/jlewi/monogo/helpers"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 // NewAssetsCmd returns a command to download the assets

@@ -2,15 +2,16 @@ package application
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"strings"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/server"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"io"
-	"os"
-	"strings"
 )
 
 // App is a struct to hold values needed across all commands.

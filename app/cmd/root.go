@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 const (
