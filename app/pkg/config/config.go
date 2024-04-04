@@ -49,6 +49,9 @@ type ServerConfig struct {
 
 	// HttpPort is the port for the http service
 	HttpPort int `json:"httpPort" yaml:"httpPort"`
+
+	// GRPCPort is the port for the gRPC service
+	GRPCPort int `json:"grpcPort" yaml:"grpcPort"`
 }
 
 // AssetConfig configures the assets
@@ -197,6 +200,9 @@ func (c *Config) Write(cfgFile string) error {
 func setServerDefaults() {
 	viper.SetDefault("server.bindAddress", "0.0.0.0")
 	viper.SetDefault("server.httpPort", 8080)
+	// gRPC typically uses 50051. If we use that as the default we might end up conflicting with other gRPC services
+	// running by default.
+	viper.SetDefault("server.grpcPort", 9080)
 }
 
 func setAssetDefaults() {
