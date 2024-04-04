@@ -28,4 +28,4 @@ jobs:
           # https://github.com/golangci/golangci-lint-action/issues/244
           skip-pkg-cache: true
           skip-build-cache: true
-        working-directory: app
+          working-directory: app
