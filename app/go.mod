@@ -9,7 +9,7 @@ require (
 	github.com/go-logr/logr v1.3.0
 	github.com/go-logr/zapr v1.3.0
 	github.com/jlewi/foyle/protos/go v0.0.0-00010101000000-000000000000
-	github.com/jlewi/hydros v0.0.5
+	github.com/jlewi/hydros v0.0.6
 	github.com/jlewi/monogo v0.0.0-20240123191147-401afe194d74
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.8.0
