@@ -3,11 +3,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/go-logr/zapr"
-	"github.com/jlewi/foyle/app/pkg/config"
-	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"html/template"
 	"log"
 	"net/http"
@@ -16,6 +11,12 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"github.com/gin-gonic/gin"
+	"github.com/go-logr/zapr"
+	"github.com/jlewi/foyle/app/pkg/config"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 // Server is the main application server for foyle
@@ -181,6 +182,7 @@ func (s *Server) setHTMLTemplates(router *gin.Engine) error {
 func (s *Server) Run() error {
 	address := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
 	log.Print("Server listening on http://" + address)
+	trapInterrupt()
 	if err := http.ListenAndServe(address, s.engine); err != nil {
 		log.Fatalf("There was an error with the http server: %v", err)
 	}

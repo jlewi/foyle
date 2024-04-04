@@ -1,11 +1,12 @@
 package server
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/go-logr/zapr"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"os"
-	"path/filepath"
 )
 
 // findExtensionsInDir returns a list of all the extensions

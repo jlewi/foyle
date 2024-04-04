@@ -3,6 +3,11 @@ package assets
 import (
 	"archive/tar"
 	"context"
+	"io"
+	"net/url"
+	"os"
+	"path/filepath"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -10,10 +15,6 @@ import (
 	"github.com/jlewi/hydros/pkg/images"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"io"
-	"net/url"
-	"os"
-	"path/filepath"
 )
 
 const (
@@ -44,7 +45,7 @@ func (m *Manager) Download(ctx context.Context) error {
 	log := logs.FromContext(ctx)
 	// Map from the name of the asset to the source of the location
 	assets := map[string]asset{
-		vscode: asset{
+		vscode: {
 			source:      m.config.Assets.VSCode.URI,
 			stripPrefix: "assets",
 		},

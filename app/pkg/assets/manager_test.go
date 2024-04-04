@@ -2,10 +2,11 @@ package assets
 
 import (
 	"context"
-	"github.com/jlewi/foyle/app/pkg/config"
-	"go.uber.org/zap"
 	"os"
 	"testing"
+
+	"github.com/jlewi/foyle/app/pkg/config"
+	"go.uber.org/zap"
 )
 
 func Test_Download(t *testing.T) {
