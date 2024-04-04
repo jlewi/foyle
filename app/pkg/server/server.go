@@ -62,6 +62,12 @@ func (s *Server) createGinEngine() error {
 		relativePath: "extensions",
 		root:         filepath.Join(s.config.GetAssetsDir(), "vscode/extensions"),
 	}
+
+	foyleExtMapping := staticMapping{
+		relativePath: "foyle",
+		root:         filepath.Join(s.config.GetAssetsDir(), "foyle"),
+	}
+
 	mappings := []staticMapping{
 		{
 			// TODO(jeremy): Can we change "/out" to "/vscode"? We'd have to update various paths in workbench.html
@@ -73,6 +79,7 @@ func (s *Server) createGinEngine() error {
 			root:         filepath.Join(s.config.GetAssetsDir(), "vscode/resources"),
 		},
 		extensionsMapping,
+		foyleExtMapping,
 	}
 
 	for _, m := range mappings {
@@ -88,6 +95,10 @@ func (s *Server) createGinEngine() error {
 	if err := s.setVSCodeBuiltinExtensionPaths(extensionsMapping); err != nil {
 		return err
 	}
+
+	// Add foyle as an extension.
+	s.builtinExtensionPaths = append(s.builtinExtensionPaths, foyleExtMapping.relativePath)
+
 	// The workbench endpoint serves the workbench.html page which is the main entry point for vscode for web
 	router.GET("/workbench", s.handleGetWorkbench)
 	s.engine = router
@@ -181,8 +192,8 @@ func (s *Server) setHTMLTemplates(router *gin.Engine) error {
 // Run starts the http server
 func (s *Server) Run() error {
 	address := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
-	log.Print("Server listening on http://" + address)
 	trapInterrupt()
+	log.Print("Server listening on http://" + address)
 	if err := http.ListenAndServe(address, s.engine); err != nil {
 		log.Fatalf("There was an error with the http server: %v", err)
 	}
