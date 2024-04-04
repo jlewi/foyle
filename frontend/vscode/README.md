@@ -11,5 +11,3 @@ E2_HIGHCPU_32 machine.
 
 Furthermore, its been a bit of a trial and error process to figure out what assets we actually need to include and
 serve. Caching the assets in a container makes it easier to iterate on determining which assets are actually needed.
-
-Th
