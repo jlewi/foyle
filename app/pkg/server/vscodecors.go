@@ -2,8 +2,9 @@ package server
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"regexp"
+
+	"github.com/pkg/errors"
 )
 
 // vcodeCors is an allow function for CORS requests from the vscode-test-web server
