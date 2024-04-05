@@ -9,6 +9,11 @@ option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
 // https://github.com/grpc-ecosystem/grpc-gateway
 import "google/api/annotations.proto";
 
+
+// IMPORTANT:
+// If you update or add any new methods to this file then you need to update
+// Server.registerGRPCGatewayRoutes to have gin delegate the appropriate requests to the grpc gateway server.
+
 message GenerateRequest {
   Doc doc = 1;
 }
@@ -22,7 +27,7 @@ service GenerateService {
   // Generate generates new cells given an existing document.
   rpc Generate (GenerateRequest) returns (GenerateResponse) {
     option (google.api.http) = {
-      post: "/v1alpha1/generate"
+      post: "/api/v1alpha1/generate"
     };
   }
 }
@@ -40,7 +45,7 @@ service ExecuteService {
   // Execute executes a cell in an existing document.
   rpc Execute(ExecuteRequest) returns (ExecuteResponse) {
     option (google.api.http) = {
-      post: "/v1alpha1/execute"
+      post: "/api/v1alpha1/execute"
     };
   }
 }
