@@ -14,8 +14,56 @@
   "contributes": {
     "commands": [
       {
+        "command": "foyle-notebook.newInteractive",
+        "title": "New Interactive Foyle Document"
+      },
+      {
+        "command": "foyle.generate",
+        "title": "Foyle generate a completion"
+      },
+      {
         "command": "foyle.helloWorld",
-        "title": "Hello World"
+        "title": "Foyle HelloWorld"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "foyle.generate",
+        "key": "win+;",
+        "mac": "cmd+;",
+        "when": "resourceExtname==.foyle"
+      }
+    ],
+    "configuration": {
+      "title": "Foyle",
+      "properties": {
+        "foyle-notebook.address": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "The address of the Foyle. This should in the form {protocol}://{host}:{port}."
+        }
+      }
+    },
+    "notebooks": [
+      {
+        "type": "foyle-notebook",
+        "displayName": "Foyle Notebook",
+        "selector": [
+          {
+            "filenamePattern": "*.{foyle}"
+          }
+        ]
+      }
+    ],
+    "languages": [
+      {
+        "id": "foyle-notebook",
+        "aliases": [
+          "Foyle Notebook"
+        ],
+        "filenamePatterns": [
+          "*.foyle-notebook.txt"
+        ]
       }
     ]
   },
@@ -27,23 +75,28 @@
     "watch-web": "webpack --watch",
     "package-web": "webpack --mode production --devtool hidden-source-map",
     "lint": "eslint src --ext ts",
-    "run-in-browser": "vscode-test-web --browserType=chromium --extensionDevelopmentPath=. ."
+    "run-in-browser": "vscode-test-web --verbose --browserType=chromium --extensionDevelopmentPath=. ."
   },
   "devDependencies": {
-    "@types/vscode": "^1.87.0",
-    "@types/mocha": "^10.0.6",
     "@types/assert": "^1.5.10",
-    "eslint": "^8.56.0",
+    "@types/mocha": "^10.0.6",
+    "@types/vscode": "^1.87.0",
+    "@types/webpack-env": "^1.18.4",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
     "@typescript-eslint/parser": "^7.0.2",
-    "mocha": "^10.3.0",
-    "typescript": "^5.3.3",
     "@vscode/test-web": "^0.0.52",
-    "ts-loader": "^9.5.1",
-    "webpack": "^5.90.3",
-    "webpack-cli": "^5.1.4",
-    "@types/webpack-env": "^1.18.4",
     "assert": "^2.1.0",
-    "process": "^0.11.10"
+    "eslint": "^8.56.0",
+    "mocha": "^10.3.0",
+    "process": "^0.11.10",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.90.3",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "@bufbuild/buf": "^1.30.0",
+    "@bufbuild/protobuf": "^1.8.0",
+    "@bufbuild/protoc-gen-es": "^1.8.0"
   }
 }

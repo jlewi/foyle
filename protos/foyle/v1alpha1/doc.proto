@@ -17,13 +17,22 @@ message Block {
   // It maps to VSCode's NotebookCellKind
   // https://github.com/microsoft/vscode/blob/98332892fd2cb3c948ced33f542698e20c6279b9/src/vs/workbench/api/common/extHostTypes.ts#L3766
   BlockKind kind = 1;
+
+  // language is a string identifying the language. 
+  // It maps to languageId
+  // https://github.com/microsoft/vscode/blob/98332892fd2cb3c948ced33f542698e20c6279b9/src/vs/workbench/api/common/extHostTypes.ts#L3623
+  string language = 2;
+
   // contents is the actual contents of the block.
   // Not the outputs of the block.
   // It corresponds to the value in NotebookCellData
-  string contents = 2;
+  string contents = 3;
 
   // outputs are the output of a block if any.
-  repeated BlockOutput outputs = 3;
+  repeated BlockOutput outputs = 4;
+
+  // IDs of any traces associated with this block.
+  repeated string trace_ids = 6;
 }
 
 enum BlockKind {

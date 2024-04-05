@@ -16,3 +16,12 @@ plugins:
     out: go/
     opt:
       - paths=source_relative
+  - plugin: es
+    opt:
+      - target=ts
+      # see
+      # https://github.com/bufbuild/protobuf-es/tree/main/packages/protoc-gen-es#import_extensionjs
+      # By default buf generates imports with js extensions which doesn't work with our vscode extension
+      # because our vscode extension is relying on transpilation from typescript to js.
+      - import_extension=none
+    out: ../frontend/foyle/src/gen

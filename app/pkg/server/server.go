@@ -64,6 +64,7 @@ func NewServer(config config.Config) (*Server, error) {
 type staticMapping struct {
 	relativePath string
 	root         string
+	middleWare   []gin.HandlerFunc
 }
 
 // createGinEngine sets up the gin engine which is a router
@@ -72,6 +73,7 @@ func (s *Server) createGinEngine() error {
 	log.Info("Setting up server")
 
 	router := gin.Default()
+
 	router.GET("/healthz", s.healthCheck)
 
 	// Serve the static assets for vscode.
@@ -80,8 +82,26 @@ func (s *Server) createGinEngine() error {
 
 	vsCodeRPath := "/out"
 	extensionsMapping := staticMapping{
-		relativePath: "extensions",
+		relativePath: extensionsRPath,
 		root:         filepath.Join(s.config.GetAssetsDir(), "vscode/extensions"),
+		// corsForVSCodeStaticAssets is a hack to deal with
+		// https://github.com/microsoft/vscode-discussions/discussions/985.
+		// Concretely per that issue, webviews fetch resources from vscode.cdn.net. I probably need to figure out a better
+		// long term solution; e.g. do we host those somewhere else? In the interim we configure CORS to allow requests from
+		// vscode.cdn.net but only to static assets.
+		middleWare: []gin.HandlerFunc{
+			cors.New(cors.Config{
+				AllowMethods:  []string{"PUT", "PATCH"},
+				AllowHeaders:  []string{"Origin"},
+				ExposeHeaders: []string{"Content-Length"},
+				AllowOriginFunc: func(origin string) bool {
+					// Allow requests from vscode-cdn.net
+					return strings.HasSuffix(origin, ".vscode-cdn.net")
+				},
+				AllowCredentials: false,
+				MaxAge:           12 * time.Hour,
+			}),
+		},
 	}
 
 	foyleExtMapping := staticMapping{
@@ -105,7 +125,11 @@ func (s *Server) createGinEngine() error {
 
 	for _, m := range mappings {
 		log.Info("Adding vscode static assets", "relativePath", m.relativePath, "root", m.root)
-		router.Static(m.relativePath, m.root)
+		group := router.Group(m.relativePath)
+		if m.middleWare != nil {
+			group.Use(m.middleWare...)
+		}
+		group.Static("/", m.root)
 	}
 
 	if err := s.setHTMLTemplates(router); err != nil {
@@ -159,7 +183,6 @@ func (s *Server) createGinEngine() error {
 			corsConfig.AllowOriginFunc = corsFunc.allowOrigin
 		}
 		corsMiddleWare := cors.New(corsConfig)
-
 		router.Use(corsMiddleWare)
 	}
 	s.engine = router
@@ -347,6 +370,9 @@ func (s *Server) registerGRPCGatewayRoutes() error {
 	// we need to configure the gin server to delegate to the gateway mux for the appropriate routes.
 	// There currently doesn't seem to be anyway to do this programmatically. So if we add new routes we'd
 	// have to update the code here.
+	// TODO(jeremy): Actually can we do this with the group method? https://gin-gonic.com/docs/examples/grouping-routes/
+	// e.g.
+	// api := router.Group("/api", handleFunc)
 	pathPrefix := "/api/v1alpha1"
 
 	type method struct {
