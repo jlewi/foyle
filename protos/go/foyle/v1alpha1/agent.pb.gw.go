@@ -117,7 +117,7 @@ func RegisterGenerateServiceHandlerServer(ctx context.Context, mux *runtime.Serv
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/.GenerateService/Generate", runtime.WithHTTPPathPattern("/v1alpha1/generate"))
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/.GenerateService/Generate", runtime.WithHTTPPathPattern("/api/v1alpha1/generate"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -151,7 +151,7 @@ func RegisterExecuteServiceHandlerServer(ctx context.Context, mux *runtime.Serve
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/.ExecuteService/Execute", runtime.WithHTTPPathPattern("/v1alpha1/execute"))
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/.ExecuteService/Execute", runtime.WithHTTPPathPattern("/api/v1alpha1/execute"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -215,7 +215,7 @@ func RegisterGenerateServiceHandlerClient(ctx context.Context, mux *runtime.Serv
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/.GenerateService/Generate", runtime.WithHTTPPathPattern("/v1alpha1/generate"))
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/.GenerateService/Generate", runtime.WithHTTPPathPattern("/api/v1alpha1/generate"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -235,7 +235,7 @@ func RegisterGenerateServiceHandlerClient(ctx context.Context, mux *runtime.Serv
 }
 
 var (
-	pattern_GenerateService_Generate_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1alpha1", "generate"}, ""))
+	pattern_GenerateService_Generate_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1alpha1", "generate"}, ""))
 )
 
 var (
@@ -286,7 +286,7 @@ func RegisterExecuteServiceHandlerClient(ctx context.Context, mux *runtime.Serve
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/.ExecuteService/Execute", runtime.WithHTTPPathPattern("/v1alpha1/execute"))
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/.ExecuteService/Execute", runtime.WithHTTPPathPattern("/api/v1alpha1/execute"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -306,7 +306,7 @@ func RegisterExecuteServiceHandlerClient(ctx context.Context, mux *runtime.Serve
 }
 
 var (
-	pattern_ExecuteService_Execute_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1alpha1", "execute"}, ""))
+	pattern_ExecuteService_Execute_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1alpha1", "execute"}, ""))
 )
 
 var (

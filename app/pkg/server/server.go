@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -15,13 +16,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/zapr"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/executor"
+	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
@@ -36,6 +42,7 @@ type Server struct {
 	builtinExtensionPaths []string
 
 	executor *executor.Executor
+	conn     *grpc.ClientConn
 }
 
 // NewServer creates a new server
@@ -62,7 +69,7 @@ func (s *Server) createGinEngine() error {
 	log.Info("Setting up server")
 
 	router := gin.Default()
-	router.GET("/healthz", healthCheck)
+	router.GET("/healthz", s.healthCheck)
 
 	// Serve the static assets for vscode.
 	// There should be several directories located in ${ASSETS_DIR}/vscode
@@ -112,6 +119,7 @@ func (s *Server) createGinEngine() error {
 
 	// The workbench endpoint serves the workbench.html page which is the main entry point for vscode for web
 	router.GET("/workbench", s.handleGetWorkbench)
+
 	s.engine = router
 	return nil
 }
@@ -219,6 +227,9 @@ func (s *Server) Run() error {
 
 	}()
 
+	if err := s.registerGRPCGatewayRoutes(); err != nil {
+		return err
+	}
 	address := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
 	log.Info("Starting http server", "address", address)
 	if err := http.ListenAndServe(address, s.engine); err != nil {
@@ -249,6 +260,72 @@ func (s *Server) startGRPCServer(lis net.Listener) error {
 	return s.grpcServer.Serve(lis)
 }
 
+// registerGRPCGateway starts the gRPC gateway which provides a REST proxy to the grpc server.
+func (s *Server) registerGRPCGatewayRoutes() error {
+	// TODO(jeremy): I think we could use a ctx with Cancel and then potentially trigger cancel to shutdown the
+	// connection.
+	ctx := context.Background()
+
+	// Create a connection to the gRPC server
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+
+	log := zapr.NewLogger(zap.L())
+
+	grpcServerEndpoint := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.GRPCPort)
+	log.Info("Dialing grpc server", "endpoint", grpcServerEndpoint)
+	conn, err := grpc.DialContext(ctx, grpcServerEndpoint, opts...)
+	if err != nil {
+		return err
+	}
+	go func() {
+		<-ctx.Done()
+		if err := conn.Close(); err != nil {
+			grpclog.Errorf("failed to close connection to the gRPC server: %v", err)
+		}
+	}()
+	s.conn = conn
+	log.Info("Connected to grpc server", "connectionState", conn.GetState())
+
+	// TODO(jeremy): Should we add a handler for openapi spec; e.g.
+	// https://github.com/grpc-ecosystem/grpc-gateway/blob/10d49ec19ecab090aa3318245e3fe0d5db666c3f/examples/internal/gateway/main.go#L51C2-L51C49
+
+	gwMux := runtime.NewServeMux()
+
+	if err := v1alpha1.RegisterExecuteServiceHandler(ctx, gwMux, conn); err != nil {
+		return err
+	}
+
+	// Configure gin to delegate to the grpc gateway
+	handleFunc := func(c *gin.Context) {
+		log.V(logs.Debug).Info("Delegating request to grpc gateway")
+		gwMux.ServeHTTP(c.Writer, c.Request)
+	}
+
+	// N.B since we want to to server our grpc gateway on the same port as our gin server
+	// we need to configure the gin server to delegate to the gateway mux for the appropriate routes.
+	// There currently doesn't seem to be anyway to do this programmatically. So if we add new routes we'd
+	// have to update the code here.
+	pathPrefix := "/api/v1alpha1"
+
+	type method struct {
+		Method string
+		Path   string
+	}
+
+	methods := []method{
+		{Method: http.MethodPost, Path: "execute"},
+		{Method: http.MethodPost, Path: "generate"},
+	}
+
+	for _, m := range methods {
+		fullPath := pathPrefix + "/" + m.Path
+		log.Info("configuring gin to delegate to the grpc gateway", "path", fullPath, "methods", m.Method)
+		s.engine.Handle(m.Method, fullPath, handleFunc)
+	}
+
+	return nil
+}
+
 // trapInterrupt shutdowns the server if the appropriate signals are sent
 func trapInterrupt(s *grpc.Server) {
 	log := zapr.NewLogger(zap.L())
@@ -266,6 +343,18 @@ func trapInterrupt(s *grpc.Server) {
 	}()
 }
 
-func healthCheck(ctx *gin.Context) {
-	ctx.String(http.StatusOK, "foyle is healthy")
+func (s *Server) healthCheck(ctx *gin.Context) {
+	// TODO(jeremy): We should return the version
+	connState := s.conn.GetState()
+	d := gin.H{
+		"server":              "foyle",
+		"status":              "healthy",
+		"grpcConnectionState": connState.String(),
+	}
+	code := http.StatusOK
+	if connState != connectivity.Ready {
+		d["status"] = "unhealthy"
+		code = http.StatusServiceUnavailable
+	}
+	ctx.JSON(code, d)
 }
