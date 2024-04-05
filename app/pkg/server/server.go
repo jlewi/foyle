@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"html/template"
 	"log"
 	"net"
@@ -14,6 +16,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/zapr"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -120,6 +123,45 @@ func (s *Server) createGinEngine() error {
 	// The workbench endpoint serves the workbench.html page which is the main entry point for vscode for web
 	router.GET("/workbench", s.handleGetWorkbench)
 
+	if s.config.Server.CORS != nil {
+		log.Info("Setting up CORS", "config", s.config.Server.CORS)
+
+		for _, origin := range s.config.Server.CORS.AllowedOrigins {
+			// We can't allow wildcard or untrusted domains because the server can execute commands via Execute
+			// So we rely on CORS to make sure its only coming from a trusted source
+			origin := strings.TrimSpace(origin)
+			if origin == "*" {
+				return errors.New("wildcard is currently not allowed for origins in CORS configuration")
+			}
+			if origin == "" {
+				return errors.New("empty string is currently not allowed for origins in CORS configuration")
+			}
+		}
+
+		corsConfig := cors.Config{
+			AllowOrigins:     s.config.Server.CORS.AllowedOrigins,
+			AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
+			AllowHeaders:     s.config.Server.CORS.AllowedHeaders,
+			ExposeHeaders:    []string{"Content-Length"},
+			AllowCredentials: false,
+			MaxAge:           12 * time.Hour,
+		}
+
+		if s.config.Server.CORS.VSCodeTestServerPort != nil {
+			if *s.config.Server.CORS.VSCodeTestServerPort <= 0 {
+				return errors.New("VSCodeTestServerPort must be a positive integer")
+			}
+			corsFunc, err := NewVscodeCors(*s.config.Server.CORS.VSCodeTestServerPort)
+			if err != nil {
+				return err
+			}
+			log.Info("Adding allowed origin for VSCode test server", "port", *s.config.Server.CORS.VSCodeTestServerPort, "regex", corsFunc.match.String())
+			corsConfig.AllowOriginFunc = corsFunc.allowOrigin
+		}
+		corsMiddleWare := cors.New(corsConfig)
+
+		router.Use(corsMiddleWare)
+	}
 	s.engine = router
 	return nil
 }

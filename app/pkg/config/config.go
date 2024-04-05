@@ -52,6 +52,24 @@ type ServerConfig struct {
 
 	// GRPCPort is the port for the gRPC service
 	GRPCPort int `json:"grpcPort" yaml:"grpcPort"`
+
+	// CORS contains the CORS configuration
+	CORS *CorsConfig `json:"cors,omitempty" yaml:"cors,omitempty"`
+}
+
+type CorsConfig struct {
+	// AllowedOrigins is a list of origins allowed to make cross-origin requests.
+	AllowedOrigins []string `json:"allowedOrigins" yaml:"allowedOrigins"`
+	// AllowedHeaders is a list of headers which are allowed
+	AllowedHeaders []string `json:"allowedHeaders" yaml:"allowedHeaders"`
+
+	// VSCodeTestServerPort is the port of the VSCode test server
+	// This will be a value like http://localhost:3000. This enables special CORS handling because
+	// the vscode-test-web server generates a random prefix so the server name will be something like
+	// http://v--19cf5ppcsqee9rrkfifq1ajc8b7nv2t96593a6n6bn95st339ul8.localhost:3000
+	// Setting VSCodeTestServerPort origin will allow the server to accept requests from the test server. It should
+	// Only be used during development
+	VSCodeTestServerPort *int `json:"vsCodeTestServerPort" yaml:"vsCodeTestServerPort"`
 }
 
 // AssetConfig configures the assets
