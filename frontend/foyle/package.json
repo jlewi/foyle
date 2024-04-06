@@ -37,10 +37,15 @@
     "configuration": {
       "title": "Foyle",
       "properties": {
-        "foyle-notebook.address": {
+        "foyle-notebook.agent-address": {
           "type": "string",
           "default": "http://localhost:8080",
-          "description": "The address of the Foyle. This should in the form {protocol}://{host}:{port}."
+          "description": "The address of the Foyle Agent. The agent generates completions. This should in the form {protocol}://{host}:{port}."
+        },
+        "foyle-notebook.executor-address": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "The address of the Foyle Executor. The executor executes shell commands. This should in the form {protocol}://{host}:{port}."
         }
       }
     },

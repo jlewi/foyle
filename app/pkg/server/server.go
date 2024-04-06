@@ -20,6 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/zapr"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/executor"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -44,6 +45,7 @@ type Server struct {
 	// builtinExtensionPaths is a list of serving paths to the built in extensions
 	builtinExtensionPaths []string
 
+	agent    *agent.Agent
 	executor *executor.Executor
 	conn     *grpc.ClientConn
 }
@@ -53,6 +55,7 @@ func NewServer(config config.Config) (*Server, error) {
 	s := &Server{
 		config:   config,
 		executor: &executor.Executor{},
+		agent:    &agent.Agent{},
 	}
 
 	if err := s.createGinEngine(); err != nil {
@@ -324,6 +327,7 @@ func (s *Server) startGRPCServer(lis net.Listener) error {
 	s.grpcServer = grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 
 	v1alpha1.RegisterExecuteServiceServer(s.grpcServer, s.executor)
+	v1alpha1.RegisterGenerateServiceServer(s.grpcServer, s.agent)
 
 	// So that gRPC curl can be used to inspect it
 	reflection.Register(s.grpcServer)
@@ -369,6 +373,10 @@ func (s *Server) registerGRPCGatewayRoutes() error {
 	gwMux := runtime.NewServeMux()
 
 	if err := v1alpha1.RegisterExecuteServiceHandler(ctx, gwMux, conn); err != nil {
+		return err
+	}
+
+	if err := v1alpha1.RegisterGenerateServiceHandler(ctx, gwMux, conn); err != nil {
 		return err
 	}
 
