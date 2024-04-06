@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { Controller } from './controller';
 import {FoyleClient} from './client';
 import { Serializer } from './serializer';
-
+import * as generate from './generate';
 // Create a client for the backend.
 const client = new FoyleClient;
 
@@ -49,6 +49,9 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage('Hello World from foyle in a web extension host!');
 	});
 
+	// Here's where we register the command that will generate a completion using the AI model
+	// You can set a keybinding for this command in the package.json file
+  context.subscriptions.push(vscode.commands.registerCommand("foyle.generate", generate.generateCompletion));
 	context.subscriptions.push(disposable);
 }
 

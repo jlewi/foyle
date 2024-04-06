@@ -4,6 +4,8 @@ This the vscode extension that is the frontend for foyle.
 
 The extension was initialized using the [vscode extension generator](https://code.visualstudio.com/api/get-started/your-first-extension).
 
+see [vscode_apis.md](vscode_apis.md) for explanation of the vscode apis.
+
 ## Developer Guide
 
 * In vscode for web you can go to the extensions tab and search for "@builtin" to see if the extension is loaded

@@ -2,6 +2,8 @@ import * as vscode from "vscode";
 import * as docpb from "../gen/foyle/v1alpha1/doc_pb";
 import * as constants from "./constants";
 import * as metadata from "./metadata";
+import * as converters from "./converters";
+
 export class Serializer implements vscode.NotebookSerializer {
   // extensionPath should be the http path on which the extension is served
   private readonly extensionPath: string;
@@ -28,40 +30,7 @@ export class Serializer implements vscode.NotebookSerializer {
     let cells: vscode.NotebookCellData[] = [];
 
     for (let block of doc.blocks) {
-      let kind = vscode.NotebookCellKind.Markup;
-      if (block.kind === docpb.BlockKind.CODE) { 
-        kind = vscode.NotebookCellKind.Code;
-      }
-      let language = block.language;
-      if (language === "" && kind === vscode.NotebookCellKind.Code) {
-        // Default to the bash language
-        language = constants.bashLang;
-
-        if (language !== constants.bashLang) {
-          console.log(`Unsupported language: ${language}`);
-        }
-      }
-
-      let newCell = new vscode.NotebookCellData(
-        kind,
-        block.contents,
-        language             
-      );
-
-      newCell.metadata = metadata.getCellMetadata(block);
-      newCell.outputs = [];
-      for (let output of block.outputs) {
-        let items: vscode.NotebookCellOutputItem[] = [];
-        for (let item of output.items) {
-          if (item.textData !== "") {
-            const text = new TextEncoder().encode(item.textData);            
-            items.push(new vscode.NotebookCellOutputItem(text, item.mime));          
-          } else {
-            console.log("Unknown output type");
-          }
-        }
-        newCell.outputs.push(new vscode.NotebookCellOutput(items));
-      }
+      let newCell = converters.blockToCellData(block);
       cells.push(newCell);
     }
 
@@ -78,38 +47,9 @@ export class Serializer implements vscode.NotebookSerializer {
     doc.blocks = [];
     
     for (const cell of data.cells) {
-      let block = new docpb.Block();
-      block.contents = cell.value;
-      block.language = cell.languageId;
-      if (cell.kind === vscode.NotebookCellKind.Code) {
-        block.kind = docpb.BlockKind.CODE;
-      } else {
-        block.kind = docpb.BlockKind.MARKUP;
-      }
-
-      if (cell.metadata !== undefined) {
-        metadata.setBlockFromMeta(block, cell.metadata);
-      }
-      
-      let cellOutputs: vscode.NotebookCellOutput[] = [];
-      if (cell.outputs !== undefined) {
-        cellOutputs = cell.outputs;
-      }
-      for (const output of cellOutputs) {
-        let outBlock = new docpb.BlockOutput();
-        outBlock.items = [];
-        for (const item of output.items) {
-          let outItem = new docpb.BlockOutputItem();
-          outItem.textData = new TextDecoder().decode(item.data);
-          outItem.mime = item.mime;
-          outBlock.items.push(outItem);
-        }
-        block.outputs.push(outBlock);
-      }
+      let block = converters.cellDataToBlock(cell);
       doc.blocks.push(block);
     }        
-
-    //const json = JSON.stringify(doc.toJsonString, undefined, "  ");
     
     const json = doc.toJsonString({prettySpaces: 2});
     console.log("serialized string length is: " + json.length);
