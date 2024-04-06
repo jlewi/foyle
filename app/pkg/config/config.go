@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-logr/zapr"
 	"github.com/pkg/errors"
@@ -55,6 +56,13 @@ type ServerConfig struct {
 
 	// CORS contains the CORS configuration
 	CORS *CorsConfig `json:"cors,omitempty" yaml:"cors,omitempty"`
+
+	// HttpMaxReadTimeout is the max read duration.
+	// Ref: https://blog.cloudflare.com/the-complete-guide-to-golang-net-http-timeouts
+	HttpMaxReadTimeout time.Duration `json:"httpMaxReadTimeout" yaml:"httpMaxReadTimeout"`
+
+	// HttpMaxWriteTimeout is the max write duration.
+	HttpMaxWriteTimeout time.Duration `json:"httpMaxWriteTimeout" yaml:"httpMaxWriteTimeout"`
 }
 
 type CorsConfig struct {
@@ -221,6 +229,11 @@ func setServerDefaults() {
 	// gRPC typically uses 50051. If we use that as the default we might end up conflicting with other gRPC services
 	// running by default.
 	viper.SetDefault("server.grpcPort", 9080)
+
+	// See https://blog.cloudflare.com/the-complete-guide-to-golang-net-http-timeouts
+	// If we start using really slow models we may need to bump these to avoid timeouts.
+	viper.SetDefault("server.httpMaxWriteTimeout", 1*time.Minute)
+	viper.SetDefault("server.httpMaxReadTimeout", 1*time.Minute)
 }
 
 func setAssetDefaults() {

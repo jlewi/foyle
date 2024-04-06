@@ -297,7 +297,19 @@ func (s *Server) Run() error {
 	}
 	address := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
 	log.Info("Starting http server", "address", address)
-	if err := http.ListenAndServe(address, s.engine); err != nil {
+
+	hServer := &http.Server{
+		WriteTimeout: s.config.Server.HttpMaxWriteTimeout,
+		ReadTimeout:  s.config.Server.HttpMaxReadTimeout,
+		Handler:      s.engine,
+	}
+
+	lis, err := net.Listen("tcp", address)
+
+	if err != nil {
+		return errors.Wrapf(err, "Could not start listener")
+	}
+	if err := hServer.Serve(lis); err != nil {
 		log.Error(err, "There was an error with the http server")
 	}
 
