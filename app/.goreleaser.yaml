@@ -1,4 +1,14 @@
 # Check the documentation at https://goreleaser.com
+#
+# To verify LDFlags
+#  1. Run a snapshot build
+#     goreleaser release --snapshot --clean 
+#
+#  2. Check the version on the newly built binary
+#     ./dist/foyle_darwin_arm64/foyle version
+#
+#     It should be something like 
+#     foyle 0.0.1-next, commit 416e3d5610d5bc21f9dcd82bd1f17c58a13457ca, built at 2024-04-06T23:39:07Z by goreleaser
 builds:
   - binary: foyle
     main: .

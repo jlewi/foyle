@@ -12,6 +12,7 @@
 #
 # This will trigger a release from that branch.
 #
+# N.B. You also need a .goreleaser.yaml file to actually configure goreleaser.
 name: goreleaser
 
 # n.b. uncomment to debug in presubmit
