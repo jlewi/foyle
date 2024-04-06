@@ -1,0 +1,53 @@
+# Documentation
+# https://goreleaser.com/ci/actions/
+#
+# To test the workflow in a presubmit
+#   1. Push to a branch and create a PR
+#   2. Create a new release in GitHub
+#      * Mark it as a pre-release
+#      * Create the release from the branch you pushed
+#      
+#      Using the CLI something like
+# gh release create v0.0.1-pre1 -p --target=jlewi/foyle --title="goreleaser test" --notes="goreleaser test"
+#
+# This will trigger a release from that branch.
+#
+# N.B. You also need a .goreleaser.yaml file to actually configure goreleaser.
+name: goreleaser
+
+# n.b. uncomment to debug in presubmit
+on:
+  push:
+    # run only against tags    
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+  # packages: write
+  # issues: write
+
+jobs:
+  goreleaser:
+    # We can use macos-latest to run on macos but we shouldn't need to do this because
+    # Its pure go so we can cross-compile for mac on ubuntu.
+    runs-on: ubuntu-latest    
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - run: git fetch --force --tags
+      - uses: actions/setup-go@v4
+        with:
+          go-version: stable
+      # More assembly might be required: Docker logins, GPG, etc. It all depends
+      # on your needs.
+      - uses: goreleaser/goreleaser-action@v4
+        with:
+          # either 'goreleaser' (default) or 'goreleaser-pro':
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+          workdir: ./app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
