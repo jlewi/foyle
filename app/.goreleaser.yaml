@@ -1,0 +1,57 @@
+# Check the documentation at https://goreleaser.com
+builds:
+  - binary: foyle
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+
+    goarch:
+      - amd64
+      - arm64
+
+    # Custom ldflags templates.
+    # Default is `-s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser`.
+    ldflags:
+      - "-s -w -X github.com/jlewi/foyle/cmd.version={{.Version}} -X github.com/jlewi/foyle/cmd.commit={{.Commit}} -X github.com/jlewi/foyle/cmd.date={{.Date}} -X github.com/jlewi/foyle/cmd.builtBy=goreleaser"
+archives:
+  # https://goreleaser.com/customization/archive/?h=archives
+  - id: "binary"
+    # Setting format to binary uploads the binaries directly rather than wrapping in an archive
+    # This is convenient because you can just download the binary rather than needing to do download and unpack the binary.
+    format: binary
+  - format: tar.gz
+    # this name template makes the OS and Arch compatible with the results of uname.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    # use zip for windows archives
+    format_overrides:
+    - goos: windows
+      format: zip
+    # https://goreleaser.com/customization/archive/?h=archives#packaging-only-the-binaries
+    # This is a trick to ensure only the binaries get packaged in the archive and not the readme.
+    files:
+      - none*
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+# The lines beneath this are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
