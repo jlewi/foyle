@@ -16,7 +16,7 @@ builds:
     # Custom ldflags templates.
     # Default is `-s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser`.
     ldflags:
-      - "-s -w -X github.com/jlewi/foyle/cmd.version={{.Version}} -X github.com/jlewi/foyle/cmd.commit={{.Commit}} -X github.com/jlewi/foyle/cmd.date={{.Date}} -X github.com/jlewi/foyle/cmd.builtBy=goreleaser"
+      - "-s -w -X github.com/jlewi/foyle/app/cmd.version={{.Version}} -X github.com/jlewi/foyle/app/cmd.commit={{.Commit}} -X github.com/jlewi/foyle/app/cmd.date={{.Date}} -X github.com/jlewi/foyle/app/cmd.builtBy=goreleaser"
 archives:
   # https://goreleaser.com/customization/archive/?h=archives
   - id: "binary"
