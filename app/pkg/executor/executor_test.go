@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/jlewi/foyle/app/pkg/testutil"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )
 
@@ -54,7 +56,7 @@ func Test_Executor(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to execute: %v", err)
 			}
-			if d := cmp.Diff(c.expected, resp, cmpopts.IgnoreUnexported(v1alpha1.ExecuteResponse{}), cmpopts.IgnoreUnexported(v1alpha1.BlockOutput{}), cmpopts.IgnoreUnexported(v1alpha1.BlockOutputItem{})); d != "" {
+			if d := cmp.Diff(c.expected, resp, testutil.BlockComparer, cmpopts.IgnoreUnexported(v1alpha1.ExecuteResponse{})); d != "" {
 				t.Errorf("Unexpected response (-want +got):\n%v", d)
 			}
 		})
