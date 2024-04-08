@@ -329,6 +329,11 @@ github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsT
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/subosito/gotenv v1.6.0 h1:9NlTDc1FTs4qu0DDq7AEtTPNw6SVm7uBMsUCUjABIf8=
 github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSWPKKo0FU=
+github.com/timtadh/data-structures v0.6.1 h1:76eDpwngj2rEi9r/qvdH6YL7wMXGsoFFzhEylo/IacA=
+github.com/timtadh/data-structures v0.6.1/go.mod h1:uYUnI1cQi/5yMCc7s23I+x8Mn8BCMf4WgK+7/4QSEk4=
+github.com/timtadh/getopt v1.0.0/go.mod h1:L3EL6YN2G0eIAhYBo9b7SB9d/kEQmdnwthIlMJfj210=
+github.com/timtadh/lexmachine v0.2.3 h1:ZqlfHnfMcAygtbNM5Gv7jQf8hmM8LfVzDjfCrq235NQ=
+github.com/timtadh/lexmachine v0.2.3/go.mod h1:oK1NW+93fQSIF6s+J6sXBFWsCPCFbNmrwKV1i0aqvW0=
 github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS4MhqMhdFk5YI=
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65EE=

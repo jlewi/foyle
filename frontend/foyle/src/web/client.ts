@@ -15,9 +15,10 @@ export class FoyleClient {
         // Include a default so that address is always well defined
         const address = config.get<string>("executor-address", "http://localhost:8080"); 
 
+        const body = request.toJsonString();        
         return fetch(address + "/api/v1alpha1/execute", {
             method: 'POST',
-            body: request.toJsonString(),
+            body: body,
             headers: { 'Content-Type': 'application/json' },
         })
         .then(response => response.json())
