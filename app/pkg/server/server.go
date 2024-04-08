@@ -24,6 +24,7 @@ import (
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/executor"
 	"github.com/jlewi/foyle/app/pkg/logs"
+	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -56,10 +57,22 @@ func NewServer(config config.Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	oaiClient, err := oai.NewClient(config)
+
+	if err != nil {
+		return nil, err
+	}
+
+	a, err := agent.NewAgent(config, oaiClient)
+	if err != nil {
+		return nil, err
+	}
+
 	s := &Server{
 		config:   config,
 		executor: e,
-		agent:    &agent.Agent{},
+		agent:    a,
 	}
 
 	if err := s.createGinEngine(); err != nil {
