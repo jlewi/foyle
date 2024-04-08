@@ -66,7 +66,7 @@ export class Controller {
 }
 
 async function callExecute(cell: vscode.NotebookCell, client: client.FoyleClient): Promise<vscode.NotebookCellOutput[]> {
-  console.log("callExecute called"); 
+  console.log(`callExecute called ${cell.document.getText()}`); 
 
   const request = new agentpb.ExecuteRequest();
 

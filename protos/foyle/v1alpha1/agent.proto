@@ -28,6 +28,7 @@ service GenerateService {
   rpc Generate (GenerateRequest) returns (GenerateResponse) {
     option (google.api.http) = {
       post: "/api/v1alpha1/generate"
+      body: "*"
     };
   }
 }
@@ -46,6 +47,7 @@ service ExecuteService {
   rpc Execute(ExecuteRequest) returns (ExecuteResponse) {
     option (google.api.http) = {
       post: "/api/v1alpha1/execute"
+      body: "*"
     };
   }
 }

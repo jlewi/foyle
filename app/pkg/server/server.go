@@ -52,9 +52,13 @@ type Server struct {
 
 // NewServer creates a new server
 func NewServer(config config.Config) (*Server, error) {
+	e, err := executor.NewExecutor()
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{
 		config:   config,
-		executor: &executor.Executor{},
+		executor: e,
 		agent:    &agent.Agent{},
 	}
 
