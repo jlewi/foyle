@@ -41,6 +41,7 @@ type Config struct {
 	Logging Logging      `json:"logging" yaml:"logging"`
 	Server  ServerConfig `json:"server" yaml:"server"`
 	Assets  AssetConfig  `json:"assets" yaml:"assets"`
+	OpenAI  OpenAIConfig `json:"openai" yaml:"openai"`
 }
 
 // ServerConfig configures the server
@@ -63,6 +64,11 @@ type ServerConfig struct {
 
 	// HttpMaxWriteTimeout is the max write duration.
 	HttpMaxWriteTimeout time.Duration `json:"httpMaxWriteTimeout" yaml:"httpMaxWriteTimeout"`
+}
+
+type OpenAIConfig struct {
+	// APIKeyFile is the path to the file containing the API key
+	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
 }
 
 type CorsConfig struct {

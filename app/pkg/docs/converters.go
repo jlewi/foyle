@@ -67,6 +67,7 @@ func MarkdownToBlocks(mdText string) ([]*v1alpha1.Block, error) {
 			if err := renderer.Render(&sb, source, node); err != nil {
 				return ast.WalkStop, err
 			}
+
 			newBlock := &v1alpha1.Block{
 				Kind:     v1alpha1.BlockKind_MARKUP,
 				Contents: sb.String(),
