@@ -2,9 +2,10 @@ package agent
 
 import (
 	"context"
+	"strings"
+
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
-	"strings"
 
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
