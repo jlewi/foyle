@@ -26,8 +26,8 @@ const (
 	appName        = "foyle"
 	ConfigDir      = "." + appName
 
-	defaultVSCodeImage = "us-west1-docker.pkg.dev/foyle-public/images/vscode-web-assets:latest"
-	defaultFoyleImage  = "us-west1-docker.pkg.dev/foyle-public/images/foyle-vscode-ext:latest"
+	defaultVSCodeImage = "ghcr.io/jlewi/vscode-web-assets:latest"
+	defaultFoyleImage  = "ghcr.io/jlewi/foyle-vscode-ext:latest"
 )
 
 // Config represents the persistent configuration data for Foyle.
