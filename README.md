@@ -88,16 +88,6 @@ TODO(jeremy): We should ask people try it out but first we need it to be working
 for people to try out.
 -->
 
-## FAQ
-
-### Why not use the Jupyter Kernel?
-
-The Jupyter kernel creates a dependency on the python tool chain. If you aren't already using Python this can be a 
-hassle. Requiring a python environment is an unnecessary dependency if all we want to do is create a simple server to 
-execute shell commands. 
-
-If users want to execute python code they can still do it by invoking `python` in the cell.
-
 ## References
 
 1. [VSCode Notebook API](https://code.visualstudio.com/api/extension-guides/notebook)
