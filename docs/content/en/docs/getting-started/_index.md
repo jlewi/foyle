@@ -8,6 +8,12 @@ weight: 2
 
 1. Download the latest release from the [releases page](https://github.com/jlewi/foyle/releases)
 
+1. On Mac you may need to remove the quarantine attribute from the binary
+
+   ```bash
+   xattr -d com.apple.quarantine /path/to/foyle
+   ```
+
 ## Setup
 
 1. Download the static assets for foyle
