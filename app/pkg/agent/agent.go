@@ -76,7 +76,7 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 			},
 		}
 		request := openai.ChatCompletionRequest{
-			Model:       openai.GPT3Dot5Turbo0125,
+			Model:       oai.DefaultModel,
 			Messages:    messages,
 			MaxTokens:   2000,
 			Temperature: temperature,

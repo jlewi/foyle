@@ -42,6 +42,8 @@ type Config struct {
 	Server  ServerConfig `json:"server" yaml:"server"`
 	Assets  AssetConfig  `json:"assets" yaml:"assets"`
 	OpenAI  OpenAIConfig `json:"openai" yaml:"openai"`
+	// AzureOpenAI contains configuration for Azure OpenAI. A non nil value means use Azure OpenAI.
+	AzureOpenAI *AzureOpenAIConfig `json:"azureOpenAI,omitempty" yaml:"azureOpenAI,omitempty"`
 }
 
 // ServerConfig configures the server
@@ -69,6 +71,31 @@ type ServerConfig struct {
 type OpenAIConfig struct {
 	// APIKeyFile is the path to the file containing the API key
 	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
+}
+
+type AzureOpenAIConfig struct {
+	// APIKeyFile is the path to the file containing the API key
+	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
+
+	// BaseURL is the baseURL for the API.
+	// This can be obtained using the Azure CLI with the command:
+	// az cognitiveservices account show \
+	//    --name <myResourceName> \
+	//    --resource-group  <myResourceGroupName> \
+	//    | jq -r .properties.endpoint
+	BaseURL string `json:"baseURL" yaml:"baseURL"`
+
+	// Deployments is a list of Azure deployments of various models.
+	Deployments []AzureDeployment `json:"deployments" yaml:"deployments"`
+}
+
+type AzureDeployment struct {
+	// Deployment is the Azure Deployment name
+	Deployment string `json:"deployment" yaml:"deployment"`
+
+	// Model is the OpenAI name for this model
+	// This is used to map OpenAI models to Azure deployments
+	Model string `json:"model" yaml:"model"`
 }
 
 type CorsConfig struct {

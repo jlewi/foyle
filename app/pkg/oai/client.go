@@ -1,7 +1,11 @@
 package oai
 
 import (
+	"net/url"
 	"strings"
+
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/jlewi/foyle/app/pkg/config"
@@ -10,18 +14,18 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+const (
+	DefaultModel = openai.GPT3Dot5Turbo0125
+
+	// AzureOpenAIVersion is the version of the Azure OpenAI API to use.
+	// For a list of versions see:
+	// https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#chat-completions
+	AzureOpenAIVersion = "2024-02-01"
+)
+
 // NewClient helper function to create a new OpenAI client from  a config
 func NewClient(cfg config.Config) (*openai.Client, error) {
-	if cfg.OpenAI.APIKeyFile == "" {
-		return nil, errors.New("OpenAI APIKeyFile is required")
-	}
-	apiKeyBytes, err := files.Read(cfg.OpenAI.APIKeyFile)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not read OpenAI APIKeyFile: %v", cfg.OpenAI.APIKeyFile)
-	}
-	// make sure there is no leading or trailing whitespace
-	apiKey := strings.TrimSpace(string(apiKeyBytes))
-
+	log := zapr.NewLogger(zap.L())
 	// ************************************************************************
 	// Setup middleware
 	// ************************************************************************
@@ -32,9 +36,99 @@ func NewClient(cfg config.Config) (*openai.Client, error) {
 	retryClient := retryablehttp.NewClient()
 	httpClient := retryClient.StandardClient()
 
-	clientCfg := openai.DefaultConfig(apiKey)
-	clientCfg.HTTPClient = httpClient
-	client := openai.NewClientWithConfig(clientCfg)
+	var clientConfig openai.ClientConfig
+	if cfg.AzureOpenAI != nil {
+		var clientErr error
+		clientConfig, clientErr = buildAzureConfig(cfg)
+
+		if clientErr != nil {
+			return nil, clientErr
+		}
+	} else {
+		log.Info("Configuring OpenAI client")
+		apiKey, err := readAPIKey(cfg.OpenAI.APIKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		clientConfig = openai.DefaultConfig(apiKey)
+	}
+	clientConfig.HTTPClient = httpClient
+	client := openai.NewClientWithConfig(clientConfig)
 
 	return client, nil
+}
+
+// buildAzureConfig helper function to create a new Azure OpenAI client config
+func buildAzureConfig(cfg config.Config) (openai.ClientConfig, error) {
+	apiKey, err := readAPIKey(cfg.AzureOpenAI.APIKeyFile)
+	if err != nil {
+		return openai.ClientConfig{}, err
+	}
+	u, err := url.Parse(cfg.AzureOpenAI.BaseURL)
+	if err != nil {
+		return openai.ClientConfig{}, errors.Wrapf(err, "could not parse Azure OpenAI BaseURL: %v", cfg.AzureOpenAI.BaseURL)
+	}
+
+	if u.Scheme != "https" {
+		return openai.ClientConfig{}, errors.Errorf("Azure BaseURL %s is not valid; it must use the scheme https", cfg.AzureOpenAI.BaseURL)
+	}
+
+	// Check that all required models are deployed
+	required := map[string]bool{
+		DefaultModel: true,
+	}
+
+	for _, d := range cfg.AzureOpenAI.Deployments {
+		delete(required, d.Model)
+	}
+
+	if len(required) > 0 {
+		models := make([]string, 0, len(required))
+		for m := range required {
+			models = append(models, m)
+		}
+		return openai.ClientConfig{}, errors.Errorf("Missing Azure deployments for for OpenAI models %v; update AzureOpenAIConfig.deployments in your configuration to specify deployments for these models ", strings.Join(models, ", "))
+	}
+	log := zapr.NewLogger(zap.L())
+	log.Info("Configuring Azure OpenAI", "baseURL", cfg.AzureOpenAI.BaseURL, "deployments", cfg.AzureOpenAI.Deployments)
+	clientConfig := openai.DefaultAzureConfig(apiKey, cfg.AzureOpenAI.BaseURL)
+	clientConfig.APIVersion = AzureOpenAIVersion
+	mapper := AzureModelMapper{
+		modelToDeployment: make(map[string]string),
+	}
+	for _, m := range cfg.AzureOpenAI.Deployments {
+		mapper.modelToDeployment[m.Model] = m.Deployment
+	}
+	clientConfig.AzureModelMapperFunc = mapper.Map
+
+	return clientConfig, nil
+}
+
+// AzureModelMapper maps OpenAI models to Azure deployments
+type AzureModelMapper struct {
+	modelToDeployment map[string]string
+}
+
+// Map maps an OpenAI model to an Azure deployment
+func (m AzureModelMapper) Map(model string) string {
+	log := zapr.NewLogger(zap.L())
+	deployment, ok := m.modelToDeployment[model]
+	if !ok {
+		log.Error(errors.Errorf("No AzureAI deployment found for model %v", model), "missing deployment", "model", model)
+		return "missing-deployment"
+	}
+	return deployment
+}
+
+func readAPIKey(apiKeyFile string) (string, error) {
+	if apiKeyFile == "" {
+		return "", errors.New("APIKeyFile is required")
+	}
+	apiKeyBytes, err := files.Read(apiKeyFile)
+	if err != nil {
+		return "", errors.Wrapf(err, "could not read APIKeyFile: %v", apiKeyFile)
+	}
+	// make sure there is no leading or trailing whitespace
+	apiKey := strings.TrimSpace(string(apiKeyBytes))
+	return apiKey, nil
 }
