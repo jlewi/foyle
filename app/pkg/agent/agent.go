@@ -4,6 +4,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -34,11 +37,18 @@ type Agent struct {
 }
 
 func NewAgent(cfg config.Config, client *openai.Client) (*Agent, error) {
+	if cfg.Agent == nil {
+		return nil, errors.New("Configuration is missing AgentConfig; configuration must define the agent field.")
+	}
+
+	log := zapr.NewLogger(zap.L())
+	log.Info("Creating agent", "config", cfg.Agent)
 	return &Agent{
 		client: client,
 		config: cfg,
 	}, nil
 }
+
 func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v1alpha1.GenerateResponse, error) {
 	blocks, err := a.completeWithRetries(ctx, req)
 
@@ -76,7 +86,7 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 			},
 		}
 		request := openai.ChatCompletionRequest{
-			Model:       oai.DefaultModel,
+			Model:       a.config.GetModel(),
 			Messages:    messages,
 			MaxTokens:   2000,
 			Temperature: temperature,
