@@ -38,12 +38,18 @@ type Config struct {
 	APIVersion string `json:"apiVersion" yaml:"apiVersion" yamltags:"required"`
 	Kind       string `json:"kind" yaml:"kind" yamltags:"required"`
 
-	Logging Logging      `json:"logging" yaml:"logging"`
-	Server  ServerConfig `json:"server" yaml:"server"`
-	Assets  AssetConfig  `json:"assets" yaml:"assets"`
-	OpenAI  OpenAIConfig `json:"openai" yaml:"openai"`
+	Logging Logging       `json:"logging" yaml:"logging"`
+	Server  ServerConfig  `json:"server" yaml:"server"`
+	Assets  AssetConfig   `json:"assets" yaml:"assets"`
+	Agent   *AgentConfig  `json:"agent,omitempty" yaml:"agent,omitempty"`
+	OpenAI  *OpenAIConfig `json:"openai,omitempty" yaml:"openai,omitempty"`
 	// AzureOpenAI contains configuration for Azure OpenAI. A non nil value means use Azure OpenAI.
 	AzureOpenAI *AzureOpenAIConfig `json:"azureOpenAI,omitempty" yaml:"azureOpenAI,omitempty"`
+}
+
+type AgentConfig struct {
+	// Model is the name of the model to use to generate completions
+	Model string `json:"model" yaml:"model"`
 }
 
 // ServerConfig configures the server
@@ -71,6 +77,9 @@ type ServerConfig struct {
 type OpenAIConfig struct {
 	// APIKeyFile is the path to the file containing the API key
 	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
+
+	// BaseURL is the baseURL for the API.
+	BaseURL string `json:"baseURL" yaml:"baseURL"`
 }
 
 type AzureOpenAIConfig struct {
@@ -163,10 +172,11 @@ func InitViper(cmd *cobra.Command) error {
 	// make home directory the first search path
 	viper.AddConfigPath("$HOME/." + appName)
 
-	// Without the replacer overriding with environment variables work
+	// Without the replacer overriding with environment variables doesn't work
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv() // read in environment variables that match
 
+	setAgentDefaults()
 	setServerDefaults()
 	setAssetDefaults()
 
@@ -272,6 +282,10 @@ func setServerDefaults() {
 func setAssetDefaults() {
 	viper.SetDefault("assets.vsCode.uri", defaultVSCodeImage)
 	viper.SetDefault("assets.foyleExtension.uri", defaultFoyleImage)
+}
+
+func setAgentDefaults() {
+	viper.SetDefault("agent.model", DefaultModel)
 }
 
 func DefaultConfigFile() string {

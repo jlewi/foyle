@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	DefaultModel = openai.GPT3Dot5Turbo0125
 
 	// AzureOpenAIVersion is the version of the Azure OpenAI API to use.
 	// For a list of versions see:
@@ -46,11 +45,27 @@ func NewClient(cfg config.Config) (*openai.Client, error) {
 		}
 	} else {
 		log.Info("Configuring OpenAI client")
-		apiKey, err := readAPIKey(cfg.OpenAI.APIKeyFile)
-		if err != nil {
-			return nil, err
+		if cfg.OpenAI == nil {
+			return nil, errors.New("OpenAI configuration is required")
+		}
+
+		apiKey := ""
+		if cfg.OpenAI.APIKeyFile != "" {
+			var err error
+			apiKey, err = readAPIKey(cfg.OpenAI.APIKeyFile)
+			if err != nil {
+				return nil, err
+			}
+		}
+		// If baseURL is customized then we could be using a custom endpoint that may not require an API key
+		if apiKey == "" && cfg.OpenAI.BaseURL == "" {
+			return nil, errors.New("OpenAI APIKeyFile is required when using OpenAI")
 		}
 		clientConfig = openai.DefaultConfig(apiKey)
+		if cfg.OpenAI.BaseURL != "" {
+			log.Info("Using custom OpenAI BaseURL", "baseURL", cfg.OpenAI.BaseURL)
+			clientConfig.BaseURL = cfg.OpenAI.BaseURL
+		}
 	}
 	clientConfig.HTTPClient = httpClient
 	client := openai.NewClientWithConfig(clientConfig)
@@ -75,7 +90,7 @@ func buildAzureConfig(cfg config.Config) (openai.ClientConfig, error) {
 
 	// Check that all required models are deployed
 	required := map[string]bool{
-		DefaultModel: true,
+		config.DefaultModel: true,
 	}
 
 	for _, d := range cfg.AzureOpenAI.Deployments {
