@@ -36,13 +36,30 @@ func NewSetConfigCmd() *cobra.Command {
 				}
 
 				pieces := strings.Split(args[0], "=")
-				if len(pieces) < 2 {
-					return errors.New("Invalid usage; set expects an argument in the form <NAME>=<VALUE>")
-				}
 				cfgName := pieces[0]
-				cfgValue := pieces[1]
-				viper.Set(cfgName, cfgValue)
-				fConfig := config.GetConfig()
+
+				var fConfig *config.Config
+				switch cfgName {
+				case "azureOpenAI.deployments":
+					if len(pieces) != 3 {
+						return errors.New("Invalid argument; argument is not in the form azureOpenAI.deployments=<model>=<deployment>")
+					}
+
+					d := config.AzureDeployment{
+						Model:      pieces[1],
+						Deployment: pieces[2],
+					}
+
+					fConfig = config.GetConfig()
+					config.SetAzureDeployment(fConfig, d)
+				default:
+					if len(pieces) < 2 {
+						return errors.New("Invalid usage; set expects an argument in the form <NAME>=<VALUE>")
+					}
+					cfgValue := pieces[1]
+					viper.Set(cfgName, cfgValue)
+					fConfig = config.GetConfig()
+				}
 
 				file := viper.ConfigFileUsed()
 				if file == "" {
