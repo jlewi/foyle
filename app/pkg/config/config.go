@@ -137,6 +137,13 @@ type Logging struct {
 	Level string `json:"level" yaml:"level"`
 }
 
+func (c *Config) GetModel() string {
+	if c.Agent == nil || c.Agent.Model == "" {
+		return DefaultModel
+	}
+
+	return c.Agent.Model
+}
 func (c *Config) GetLogLevel() string {
 	if c.Logging.Level == "" {
 		return "info"
