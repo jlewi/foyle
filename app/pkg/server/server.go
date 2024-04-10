@@ -43,12 +43,14 @@ type Server struct {
 	config     config.Config
 	engine     *gin.Engine
 	grpcServer *grpc.Server
+	hServer    *http.Server
 	// builtinExtensionPaths is a list of serving paths to the built in extensions
 	builtinExtensionPaths []string
 
-	agent    *agent.Agent
-	executor *executor.Executor
-	conn     *grpc.ClientConn
+	agent            *agent.Agent
+	executor         *executor.Executor
+	conn             *grpc.ClientConn
+	shutdownComplete chan bool
 }
 
 // NewServer creates a new server
@@ -301,6 +303,9 @@ func (s *Server) Run() error {
 		return errors.Wrapf(err, "failed to listen: %v", err)
 	}
 
+	s.shutdownComplete = make(chan bool, 1)
+	trapInterrupt(s)
+
 	log := zapr.NewLogger(zap.L())
 	go func() {
 		err := s.startGRPCServer(grpcLis)
@@ -324,16 +329,50 @@ func (s *Server) Run() error {
 		Handler:      s.engine,
 	}
 
+	s.hServer = hServer
+
 	lis, err := net.Listen("tcp", address)
 
 	if err != nil {
 		return errors.Wrapf(err, "Could not start listener")
 	}
-	if err := hServer.Serve(lis); err != nil {
-		log.Error(err, "There was an error with the http server")
+	go func() {
+		if err := hServer.Serve(lis); err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				log.Error(err, "There was an error with the http server")
+			}
+		}
+	}()
+
+	// Wait for the shutdown to complete
+	// We use a channel to signal when the shutdown method has completed and then return.
+	// This is necessary because shutdown() is running in a different go function from hServer.Serve. So if we just
+	// relied on hServer.Serve to return and then returned from Run we might still be in the middle of calling shutdown.
+	// That's because shutdown calls hServer.Shutdown which causes hserver.Serve to return.
+	<-s.shutdownComplete
+	return nil
+}
+
+func (s *Server) shutdown() {
+	log := zapr.NewLogger(zap.L())
+	log.Info("Shutting down the Foyle server")
+
+	// Shutdown the grpc server
+	if s.grpcServer != nil {
+		s.grpcServer.GracefulStop()
+		log.Info("GRPC Server shutdown complete")
 	}
 
-	return nil
+	if s.hServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		if err := s.hServer.Shutdown(ctx); err != nil {
+			log.Error(err, "Error shutting down http server")
+		}
+		log.Info("HTTP Server shutdown complete")
+	}
+	log.Info("Shutdown complete")
+	s.shutdownComplete <- true
 }
 
 // startGRPCServer starts the grpc server.
@@ -351,8 +390,6 @@ func (s *Server) startGRPCServer(lis net.Listener) error {
 
 	// Support health checks
 	grpc_health_v1.RegisterHealthServer(s.grpcServer, health.NewServer())
-
-	trapInterrupt(s.grpcServer)
 
 	log.Info("Starting grpc service", "address", lis.Addr())
 	return s.grpcServer.Serve(lis)
@@ -432,7 +469,7 @@ func (s *Server) registerGRPCGatewayRoutes() error {
 }
 
 // trapInterrupt shutdowns the server if the appropriate signals are sent
-func trapInterrupt(s *grpc.Server) {
+func trapInterrupt(s *Server) {
 	log := zapr.NewLogger(zap.L())
 	sigs := make(chan os.Signal, 10)
 	// Note SIGSTOP and SIGTERM can't be caught
@@ -442,9 +479,8 @@ func trapInterrupt(s *grpc.Server) {
 
 	go func() {
 		msg := <-sigs
-		log.Info("Received shutdown signal; shutting down the server", "sig", msg)
-		s.GracefulStop()
-		log.Info("GRPC Server shutdown complete")
+		log.Info("Received signal", "signal", msg)
+		s.shutdown()
 	}()
 }
 
