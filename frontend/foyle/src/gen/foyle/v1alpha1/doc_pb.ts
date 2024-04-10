@@ -120,6 +120,13 @@ export class Block extends Message<Block> {
    */
   traceIds: string[] = [];
 
+  /**
+   * ID of the block.
+   *
+   * @generated from field: string id = 7;
+   */
+  id = "";
+
   constructor(data?: PartialMessage<Block>) {
     super();
     proto3.util.initPartial(data, this);
@@ -133,6 +140,7 @@ export class Block extends Message<Block> {
     { no: 3, name: "contents", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 4, name: "outputs", kind: "message", T: BlockOutput, repeated: true },
     { no: 6, name: "trace_ids", kind: "scalar", T: 9 /* ScalarType.STRING */, repeated: true },
+    { no: 7, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): Block {
@@ -161,9 +169,16 @@ export class Block extends Message<Block> {
  */
 export class BlockOutput extends Message<BlockOutput> {
   /**
+   * ID of the block.
+   *
+   * @generated from field: string id = 1;
+   */
+  id = "";
+
+  /**
    * items is the output items. Each item is the different representation of the same output data
    *
-   * @generated from field: repeated BlockOutputItem items = 1;
+   * @generated from field: repeated BlockOutputItem items = 2;
    */
   items: BlockOutputItem[] = [];
 
@@ -175,7 +190,8 @@ export class BlockOutput extends Message<BlockOutput> {
   static readonly runtime: typeof proto3 = proto3;
   static readonly typeName = "BlockOutput";
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
-    { no: 1, name: "items", kind: "message", T: BlockOutputItem, repeated: true },
+    { no: 1, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "items", kind: "message", T: BlockOutputItem, repeated: true },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): BlockOutput {
