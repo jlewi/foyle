@@ -7,6 +7,7 @@ export type CellMetadata = { [key: string]: any };
 export function getCellMetadata(block: docpb.Block): CellMetadata {  
   return {
     "traceIds": block.traceIds,
+    "id": block.id,
   };
 }
 
@@ -16,5 +17,8 @@ export function getCellMetadata(block: docpb.Block): CellMetadata {
 export function setBlockFromMeta(block: docpb.Block, meta: CellMetadata) {  
   if (meta.hasOwnProperty("traceIds")) {
     block.traceIds = meta["traceIds"];
+  }
+  if (meta.hasOwnProperty("id")) {
+    block.id = meta["id"];
   }
 }

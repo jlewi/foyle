@@ -35,14 +35,12 @@ message Block {
    ...
     string block_id = 7;
 }
-
-message BlockOutput {
-    ...
-    string block_id = 8;
-}
 ```
 
-We will also attach a block id to the `BlockOutput` proto. This will allow us to keep track of outputs as well.
+As of right now, we don't attach a block id to the `BlockOutput` proto because
+
+1. We don't have an immediate need for it
+2. Since `BlockOutput` is a child of a `Block` it is already linked to an id
 
 ### Backend
 
