@@ -22,4 +22,6 @@ FROM scratch
 
 COPY --from=build /foyle/package.json /foyle/package.json
 COPY --from=build /foyle/package.nls.json /foyle/package.nls.json
+# version.json gets builts in build.sh
+COPY --from=build /foyle/version.json /foyle/version.json
 COPY --from=build /foyle/dist /foyle/dist
