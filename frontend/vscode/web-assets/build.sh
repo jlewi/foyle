@@ -13,3 +13,11 @@ echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.bashrc
 
 cd ${DIR}
 /usr/local/go/bin/go run . --vscode=/vscode --out=/assets
+
+cat > /assets/version.json <<EOF
+{
+  "version": "$VERSION",
+  "date": "$DATE",
+  "commit": "$COMMIT"
+}
+EOF
