@@ -3,16 +3,17 @@ package application
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+
 	"github.com/honeycombio/honeycomb-opentelemetry-go"
 	"github.com/honeycombio/otel-config-go/otelconfig"
 	"github.com/jlewi/hydros/pkg/files"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/trace"
-	"io"
-	"net/http"
-	"os"
-	"strings"
 
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/config"
@@ -74,7 +75,10 @@ func (a *App) SetupOTEL() error {
 		tracerProvider := trace.NewTracerProvider()
 		otel.SetTracerProvider(tracerProvider)
 		a.otelShutdownFn = func() {
-			tracerProvider.Shutdown(context.Background())
+			if err := tracerProvider.Shutdown(context.Background()); err != nil {
+				log := zapr.NewLogger(zap.L())
+				log.Error(err, "Error shutting down tracer provider")
+			}
 		}
 	}
 

@@ -3,10 +3,11 @@ package executor
 import (
 	"context"
 	"fmt"
-	"github.com/go-logr/logr"
-	"go.opentelemetry.io/otel/trace"
 	"strings"
 	"time"
+
+	"github.com/go-logr/logr"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/go-cmd/cmd"
 	"github.com/jlewi/foyle/app/pkg/logs"

@@ -1,8 +1,9 @@
 package docs
 
 import (
-	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"testing"
+
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )
 
 func Test_SetBlockIds(t *testing.T) {

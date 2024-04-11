@@ -2,9 +2,10 @@ package agent
 
 import (
 	"context"
+	"strings"
+
 	"github.com/go-logr/logr"
 	"go.opentelemetry.io/otel/trace"
-	"strings"
 
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
