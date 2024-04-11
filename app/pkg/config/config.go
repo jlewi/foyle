@@ -25,9 +25,6 @@ const (
 	LevelFlagName  = "level"
 	appName        = "foyle"
 	ConfigDir      = "." + appName
-
-	defaultVSCodeImage = "ghcr.io/jlewi/vscode-web-assets:latest"
-	defaultFoyleImage  = "ghcr.io/jlewi/foyle-vscode-ext:latest"
 )
 
 // Config represents the persistent configuration data for Foyle.
@@ -40,7 +37,7 @@ type Config struct {
 
 	Logging Logging       `json:"logging" yaml:"logging"`
 	Server  ServerConfig  `json:"server" yaml:"server"`
-	Assets  AssetConfig   `json:"assets" yaml:"assets"`
+	Assets  *AssetConfig  `json:"assets,omitempty" yaml:"assets,omitempty"`
 	Agent   *AgentConfig  `json:"agent,omitempty" yaml:"agent,omitempty"`
 	OpenAI  *OpenAIConfig `json:"openai,omitempty" yaml:"openai,omitempty"`
 	// AzureOpenAI contains configuration for Azure OpenAI. A non nil value means use Azure OpenAI.
@@ -124,8 +121,8 @@ type CorsConfig struct {
 
 // AssetConfig configures the assets
 type AssetConfig struct {
-	VSCode         Asset `json:"vsCode" yaml:"vsCode"`
-	FoyleExtension Asset `json:"foyleExtension" yaml:"foyleExtension"`
+	VSCode         *Asset `json:"vsCode,omitempty" yaml:"vsCode,omitempty"`
+	FoyleExtension *Asset `json:"foyleExtension,omitempty" yaml:"foyleExtension,omitempty"`
 }
 
 type Asset struct {
@@ -185,7 +182,6 @@ func InitViper(cmd *cobra.Command) error {
 
 	setAgentDefaults()
 	setServerDefaults()
-	setAssetDefaults()
 
 	// We need to attach to the command line flag if it was specified.
 	keyToflagName := map[string]string{
@@ -284,11 +280,6 @@ func setServerDefaults() {
 	// If we start using really slow models we may need to bump these to avoid timeouts.
 	viper.SetDefault("server.httpMaxWriteTimeout", 1*time.Minute)
 	viper.SetDefault("server.httpMaxReadTimeout", 1*time.Minute)
-}
-
-func setAssetDefaults() {
-	viper.SetDefault("assets.vsCode.uri", defaultVSCodeImage)
-	viper.SetDefault("assets.foyleExtension.uri", defaultFoyleImage)
 }
 
 func setAgentDefaults() {

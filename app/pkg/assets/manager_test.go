@@ -2,12 +2,46 @@ package assets
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/jlewi/foyle/app/pkg/config"
 	"go.uber.org/zap"
 )
+
+func Test_ResolveImage(t *testing.T) {
+	type testCase struct {
+		image    string
+		tag      string
+		expected string
+	}
+
+	cases := []testCase{
+		{
+			image:    "ghcr.io/jlewi/vscode-web-assets",
+			tag:      "1234",
+			expected: "ghcr.io/jlewi/vscode-web-assets:1234",
+		},
+		{
+			image:    "ghcr.io/jlewi/vscode-web-assets:abcd",
+			tag:      "1234",
+			expected: "ghcr.io/jlewi/vscode-web-assets:abcd",
+		},
+	}
+
+	for i, c := range cases {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			actual, err := resolveTag(c.image, c.tag)
+			if err != nil {
+				t.Fatalf("Error resolving tag; %v", err)
+			}
+			if actual != c.expected {
+				t.Errorf("Expected %v; got %v", c.expected, actual)
+			}
+		})
+	}
+}
 
 func Test_Download(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") != "" {
@@ -35,7 +69,7 @@ func Test_Download(t *testing.T) {
 		t.Fatalf("Error creating manager; %v", err)
 	}
 
-	if err := m.Download(context.Background()); err != nil {
+	if err := m.Download(context.Background(), "latest"); err != nil {
 		t.Fatalf("Error downloading assets; %v", err)
 	}
 }
