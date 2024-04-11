@@ -3,6 +3,8 @@ package executor
 import (
 	"context"
 	"fmt"
+	"github.com/go-logr/logr"
+	"go.opentelemetry.io/otel/trace"
 	"strings"
 	"time"
 
@@ -31,7 +33,12 @@ func NewExecutor() (*Executor, error) {
 }
 
 func (e *Executor) Execute(ctx context.Context, req *v1alpha1.ExecuteRequest) (*v1alpha1.ExecuteResponse, error) {
+	span := trace.SpanFromContext(ctx)
 	log := logs.FromContext(ctx)
+	log = log.WithValues("traceId", span.SpanContext().TraceID())
+	ctx = logr.NewContext(ctx, log)
+
+	log.Info("Executor.Execute", "blockId", req.GetBlock().GetId())
 
 	if req.GetBlock() == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Block is required")
