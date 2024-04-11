@@ -4,7 +4,7 @@ metadata:
   name: vscode-ext
   namespace: foyle
   labels:
-    env: dev
+    env: release
 spec:
   image: us-west1-docker.pkg.dev/foyle-public/images/foyle-vscode-ext
   source:
