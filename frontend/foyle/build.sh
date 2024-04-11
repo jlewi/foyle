@@ -5,7 +5,7 @@ set -ex
 yarn
 yarn package-web
 
-cat > dist/version.json <<EOF
+cat > version.json <<EOF
 {
   "version": "$VERSION",
   "date": "$DATE",
