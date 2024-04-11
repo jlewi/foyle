@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-logr/zapr"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/hydros/pkg/files"
@@ -21,6 +22,9 @@ const (
 	// Constants representing subdirectories for different assets
 	vscode    = "vscode"
 	extension = "foyle"
+
+	defaultVSCodeImage = "ghcr.io/jlewi/vscode-web-assets"
+	defaultFoyleImage  = "ghcr.io/jlewi/foyle-vscode-ext"
 )
 
 // Manager is a struct that manages assets
@@ -42,18 +46,29 @@ type asset struct {
 }
 
 // Download downloads the assets
-func (m *Manager) Download(ctx context.Context) error {
+func (m *Manager) Download(ctx context.Context, tag string) error {
 	log := logs.FromContext(ctx)
+
 	// Map from the name of the asset to the source of the location
-	assets := map[string]asset{
+	assets := map[string]*asset{
 		vscode: {
-			source:      m.config.Assets.VSCode.URI,
+			source:      defaultVSCodeImage,
 			stripPrefix: "assets",
 		},
 		extension: {
-			source:      m.config.Assets.FoyleExtension.URI,
+			source:      defaultFoyleImage,
 			stripPrefix: "foyle",
 		},
+	}
+
+	// If any assets are specified in the config file then the should override the defaults
+	if m.config.Assets != nil {
+		if m.config.Assets.VSCode != nil && m.config.Assets.VSCode.URI != "" {
+			assets[vscode].source = m.config.Assets.VSCode.URI
+		}
+		if m.config.Assets.FoyleExtension != nil && m.config.Assets.FoyleExtension.URI != "" {
+			assets[extension].source = m.config.Assets.FoyleExtension.URI
+		}
 	}
 
 	if m.downloadDir == "" {
@@ -90,6 +105,12 @@ func (m *Manager) Download(ctx context.Context) error {
 		if uri == "" {
 			return errors.Errorf("Asset %s has an empty source", name)
 		}
+
+		uri, err = resolveTag(uri, tag)
+		if err != nil {
+			return errors.Wrapf(err, "Error resolving tag for asset %v", name)
+		}
+
 		// TODO(jeremy): Should we check if its an empty directory
 		if _, err := os.Stat(assetDir); err == nil {
 			log.Info("Asset already exists", "assetDir", assetDir, "name", name, "source", source)
@@ -188,4 +209,13 @@ func unpackTarball(srcTarball string, dest string, stripPrefix string) error {
 			return errors.Wrapf(err, "Error closing file %v", destPath)
 		}
 	}
+}
+
+// resolveTag checks if repo has a tag and if not it adds the tag specified by tag
+func resolveTag(repo string, tag string) (string, error) {
+	ref, err := name.ParseReference(repo, name.WithDefaultTag(tag))
+	if err != nil {
+		return "", errors.Wrapf(err, "Error parsing reference %v", repo)
+	}
+	return ref.Name(), nil
 }

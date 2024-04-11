@@ -10,12 +10,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	commitNotSet = "none"
+)
+
 // These constants will be set by ldflags.
 // They can be set by goreleaser
 // https://goreleaser.com/cookbooks/using-main.version/?h=using+main.version
 var (
 	version = "dev"
-	commit  = "none"
+	commit  = commitNotSet
 	date    = "unknown"
 	builtBy = "unknown"
 )
