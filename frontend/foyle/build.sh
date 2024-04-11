@@ -4,3 +4,12 @@
 set -ex
 yarn
 yarn package-web
+
+cat > version.json <<EOF
+{
+  "version": "$VERSION",
+  "date": "$DATE",
+  "commit": "$COMMIT"
+}
+EOF
+
