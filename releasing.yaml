@@ -1,12 +1,14 @@
 # Release foyle resources
 # https://github.com/jlewi/hydros/blob/main/docs/continuous_delivery.md
+#
+# A repoconfig will apply all the hydros resources that much the selector
 apiVersion: hydros.dev/v1alpha1
 kind: RepoConfig
 metadata:
   name: foyle
   namespace: foyle
 spec:
-  repo: https://github.com/jlewi/foyle.git
+  repo: https://github.com/jlewi/foyle.git?ref=jlewi/releasing
   gitHubAppConfig:
     appID: 315982
     privateKey: gcpsecretmanager:///projects/foyle-dev/secrets/foyle-ghapp-key/versions/latest
