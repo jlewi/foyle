@@ -8,10 +8,8 @@ metadata:
   name: foyle
   namespace: foyle
 spec:
+  # TODO(jeremy): Update this to main after testing it out.
   repo: https://github.com/jlewi/foyle.git?ref=jlewi/releasing
-  gitHubAppConfig:
-    appID: 315982
-    privateKey: gcpsecretmanager:///projects/foyle-dev/secrets/foyle-ghapp-key/versions/latest
   globs:
     - "**/*.yaml"
   selectors:
