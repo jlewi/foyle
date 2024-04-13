@@ -88,6 +88,15 @@ TODO(jeremy): We should ask people try it out but first we need it to be working
 for people to try out.
 -->
 
+## Cutting a release
+
+Foyle use's [hydros](https://github.com/jlewi/hydros).
+
+```bash
+hydros apply releasing.yaml
+```
+
+
 ## References
 
 1. [VSCode Notebook API](https://code.visualstudio.com/api/extension-guides/notebook)

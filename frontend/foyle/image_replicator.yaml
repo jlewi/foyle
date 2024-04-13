@@ -1,0 +1,11 @@
+apiVersion: hydros.dev/v1alpha1
+kind: ReplicatedImage
+metadata:
+  name: replicated-image-sample
+  labels:
+    env: release
+spec:
+  source:
+    repository: "us-west1-docker.pkg.dev/foyle-public/images/foyle-vscode-ext"
+  destinations:
+    - "ghcr.io/jlewi/foyle-vscode-ext"

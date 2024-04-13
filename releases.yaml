@@ -1,0 +1,11 @@
+# This release automatically creates a GitHubReleaser r
+apiVersion: hydros.dev/v1alpha1
+kind: GitHubReleaser
+metadata:
+  name: foyle
+  namespace: foyle
+  labels:
+    env: release
+spec:
+  org: jlewi
+  repo: foyle
