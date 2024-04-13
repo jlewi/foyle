@@ -133,7 +133,8 @@ type Asset struct {
 }
 
 type Logging struct {
-	Level string `json:"level" yaml:"level"`
+	Level  string `json:"level,omitempty" yaml:"level,omitempty"`
+	LogDir string `json:"logDir,omitempty" yaml:"logDir,omitempty"`
 }
 
 type TelemetryConfig struct {
@@ -152,6 +153,15 @@ func (c *Config) GetModel() string {
 
 	return c.Agent.Model
 }
+
+func (c *Config) GetLogDir() string {
+	if c.Logging.LogDir != "" {
+		return c.Logging.LogDir
+	}
+
+	return filepath.Join(c.GetConfigDir(), "logs")
+}
+
 func (c *Config) GetLogLevel() string {
 	if c.Logging.Level == "" {
 		return "info"
