@@ -33,6 +33,9 @@ message Block {
 
   // IDs of any traces associated with this block.
   repeated string trace_ids = 6;
+
+  // ID of the block.
+  string id = 7;
 }
 
 enum BlockKind {

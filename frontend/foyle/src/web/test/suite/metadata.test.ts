@@ -13,18 +13,21 @@ suite('Metadata Test Suite', () => {
             }
         }
 
-        // No traceids
+        // No traceid or block id
         const block1 = new docpb.Block();
         
         const meta1 = {            
             "traceIds": [],
+            "id": "",
         };
 
         // Some traces
         const block2 = new docpb.Block();
         block2.traceIds = ["a", "b"];      
+        block2.id = "block2";
         const meta2 = {            
             "traceIds": ["a", "b"],
+            "id": "block2",
         };
 
         const testCases: TestCase[] = [
@@ -56,9 +59,11 @@ suite('Metadata Test Suite', () => {
         // With traceids
         const meta2 = {
           "traceIds": ["a", "b"],
+          "id": "block2",
         };
         const block2 = new docpb.Block();
         block2.traceIds = ["a", "b"];
+        block2.id = "block2";
         
 
         const testCases: TestCase[] = [

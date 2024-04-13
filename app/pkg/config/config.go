@@ -42,6 +42,8 @@ type Config struct {
 	OpenAI  *OpenAIConfig `json:"openai,omitempty" yaml:"openai,omitempty"`
 	// AzureOpenAI contains configuration for Azure OpenAI. A non nil value means use Azure OpenAI.
 	AzureOpenAI *AzureOpenAIConfig `json:"azureOpenAI,omitempty" yaml:"azureOpenAI,omitempty"`
+
+	Telemetry *TelemetryConfig `json:"telemetry,omitempty" yaml:"telemetry,omitempty"`
 }
 
 type AgentConfig struct {
@@ -134,6 +136,15 @@ type Logging struct {
 	Level string `json:"level" yaml:"level"`
 }
 
+type TelemetryConfig struct {
+	Honeycomb *HoneycombConfig `json:"honeycomb,omitempty" yaml:"honeycomb,omitempty"`
+}
+
+type HoneycombConfig struct {
+	// APIKeyFile is the Honeycomb API key
+	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
+}
+
 func (c *Config) GetModel() string {
 	if c.Agent == nil || c.Agent.Model == "" {
 		return DefaultModel
@@ -163,6 +174,19 @@ func (c *Config) IsValid() []string {
 func (c *Config) GetAssetsDir() string {
 	// TODO(jeremy): Should we make this configurable?
 	return filepath.Join(c.GetConfigDir(), "assets")
+}
+
+func (c *Config) UseHoneycomb() bool {
+	if c.Telemetry == nil {
+		return false
+	}
+	if c.Telemetry.Honeycomb == nil {
+		return false
+	}
+	if c.Telemetry.Honeycomb.APIKeyFile == "" {
+		return false
+	}
+	return true
 }
 
 // InitViper function is responsible for reading the configuration file and environment variables, if they are set.

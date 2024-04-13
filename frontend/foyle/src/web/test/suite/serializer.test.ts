@@ -36,11 +36,13 @@ function createTestCase(): SerializationTestCase {
     let cell1 =new vscode.NotebookCellData(vscode.NotebookCellKind.Markup, "a markdown cell", "");
     cell1.metadata = {
         "traceIds": ["a", "b"],
+        "id": "",
     };
 
     let cell2 = new vscode.NotebookCellData(vscode.NotebookCellKind.Code, "echo hello world", bashLang);
     cell2.metadata = {
         "traceIds": [],
+        "id": "",
     };
 
     const data = new vscode.NotebookData([

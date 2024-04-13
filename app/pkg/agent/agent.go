@@ -4,6 +4,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/go-logr/logr"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
@@ -50,15 +53,29 @@ func NewAgent(cfg config.Config, client *openai.Client) (*Agent, error) {
 }
 
 func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v1alpha1.GenerateResponse, error) {
-	blocks, err := a.completeWithRetries(ctx, req)
+	span := trace.SpanFromContext(ctx)
+	log := logs.FromContext(ctx)
+	log = log.WithValues("traceId", span.SpanContext().TraceID())
+	ctx = logr.NewContext(ctx, log)
 
+	blocks, err := a.completeWithRetries(ctx, req)
 	if err != nil {
 		// TODO(jeremy): Should we set a status code?
 		return nil, err
 	}
+
+	// Attach block ids to any blocks generated.
+	blockIds, err := docs.SetBlockIds(blocks)
+	if err != nil {
+		log.Error(err, "Agent.Generate, failed to set block ids", "blocks", blocks, "blockIds", blockIds)
+	} else {
+		log.Info("Agent.Generate returning blocks", "blockIds", blockIds)
+	}
+
 	resp := &v1alpha1.GenerateResponse{
 		Blocks: blocks,
 	}
+
 	return resp, nil
 }
 

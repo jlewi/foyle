@@ -1,10 +1,19 @@
 package application
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
+
+	"github.com/honeycombio/honeycomb-opentelemetry-go"
+	"github.com/honeycombio/otel-config-go/otelconfig"
+	"github.com/jlewi/hydros/pkg/files"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/config"
@@ -17,8 +26,9 @@ import (
 // App is a struct to hold values needed across all commands.
 // Intent is to simplify initialization across commands.
 type App struct {
-	Config *config.Config
-	Out    io.Writer
+	Config         *config.Config
+	Out            io.Writer
+	otelShutdownFn func()
 }
 
 // NewApp creates a new application. You should call one more setup/Load functions to properly set it up.
@@ -44,6 +54,80 @@ func (a *App) LoadConfig(cmd *cobra.Command) error {
 	}
 	a.Config = cfg
 
+	return nil
+}
+
+// SetupOTEL sets up OpenTelemetry. Call this function if you want to enable OpenTelemetry.
+func (a *App) SetupOTEL() error {
+	log := zapr.NewLogger(zap.L())
+	if a.Config == nil {
+		return errors.New("config shouldn't be nil; did you forget to call LoadConfig?")
+	}
+
+	if a.Config.UseHoneycomb() {
+		if err := a.useHoneycomb(); err != nil {
+			return errors.Wrap(err, "Could not configure Honeycomb")
+		}
+	} else {
+		log.Info("Using default tracer provider")
+		// We need to configure a tracer provider so that traces and spans get set even though we aren't actually
+		// sending them anywhere.
+		tracerProvider := trace.NewTracerProvider()
+		otel.SetTracerProvider(tracerProvider)
+		a.otelShutdownFn = func() {
+			if err := tracerProvider.Shutdown(context.Background()); err != nil {
+				log := zapr.NewLogger(zap.L())
+				log.Error(err, "Error shutting down tracer provider")
+			}
+		}
+	}
+
+	// Set ottlhttp.DefaultClient to use a transport that will report metrics.
+	// For other clients I think we need to use
+	// otelhttp.NewTransport and configure the transport.
+	otelhttp.DefaultClient = &http.Client{
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+	}
+
+	return nil
+}
+
+// useHoneycomb configures OTEL to export metrics to Honeycomb
+func (a *App) useHoneycomb() error {
+	log := zapr.NewLogger(zap.L())
+	log.Info("Configuring Honeycomb")
+
+	key, err := files.Read(a.Config.Telemetry.Honeycomb.APIKeyFile)
+	if err != nil {
+		return errors.Wrapf(err, "Could not read secret: %v", a.Config.Telemetry.Honeycomb.APIKeyFile)
+	}
+
+	// Enable multi-span attributes
+	bsp := honeycomb.NewBaggageSpanProcessor()
+
+	opts := []otelconfig.Option{
+		otelconfig.WithSpanProcessor(bsp),
+		honeycomb.WithApiKey(string(key)),
+	}
+
+	serviceName := "foyle"
+	// The environment variable OTEL_SERVICE_NAME is the default for the honeycomb dataset.
+	// https://docs.honeycomb.io/getting-data-in/opentelemetry/go-distro/
+	// This will default to unknown. We don't want to use "unknown" as the default value so we override it.
+	if os.Getenv("OTEL_SERVICE_NAME") != "" {
+		serviceName = os.Getenv("OTEL_SERVICE_NAME")
+		log.Info("environment variable OTEL_SERVICE_NAME is set", "service", serviceName)
+	}
+	log.Info("Setting OTEL_SERVICE_NAME service name", "service", serviceName)
+
+	opts = append(opts, otelconfig.WithServiceName(serviceName))
+
+	// Configure Honeycomb
+	otelShutdown, err := otelconfig.ConfigureOpenTelemetry(opts...)
+	if err != nil {
+		return errors.Wrapf(err, "error setting up open telemetry")
+	}
+	a.otelShutdownFn = otelShutdown
 	return nil
 }
 
@@ -100,6 +184,12 @@ func (a *App) Shutdown() error {
 	// that sends the logs somewhere explicitly.
 	l := zap.L()
 	log := zapr.NewLogger(l)
+
+	if a.otelShutdownFn != nil {
+		log.Info("Shutting down open telemetry")
+		a.otelShutdownFn()
+	}
+
 	log.Info("Shutting down the application")
 	return nil
 }

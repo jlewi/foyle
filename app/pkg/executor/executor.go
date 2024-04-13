@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/go-cmd/cmd"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
@@ -31,7 +34,12 @@ func NewExecutor() (*Executor, error) {
 }
 
 func (e *Executor) Execute(ctx context.Context, req *v1alpha1.ExecuteRequest) (*v1alpha1.ExecuteResponse, error) {
+	span := trace.SpanFromContext(ctx)
 	log := logs.FromContext(ctx)
+	log = log.WithValues("traceId", span.SpanContext().TraceID())
+	ctx = logr.NewContext(ctx, log)
+
+	log.Info("Executor.Execute", "blockId", req.GetBlock().GetId())
 
 	if req.GetBlock() == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Block is required")

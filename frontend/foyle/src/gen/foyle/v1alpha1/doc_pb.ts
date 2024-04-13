@@ -120,6 +120,13 @@ export class Block extends Message<Block> {
    */
   traceIds: string[] = [];
 
+  /**
+   * ID of the block.
+   *
+   * @generated from field: string id = 7;
+   */
+  id = "";
+
   constructor(data?: PartialMessage<Block>) {
     super();
     proto3.util.initPartial(data, this);
@@ -133,6 +140,7 @@ export class Block extends Message<Block> {
     { no: 3, name: "contents", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 4, name: "outputs", kind: "message", T: BlockOutput, repeated: true },
     { no: 6, name: "trace_ids", kind: "scalar", T: 9 /* ScalarType.STRING */, repeated: true },
+    { no: 7, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): Block {
