@@ -4,9 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"go.uber.org/zap/zapcore"
 
 	"github.com/honeycombio/honeycomb-opentelemetry-go"
 	"github.com/honeycombio/otel-config-go/otelconfig"
@@ -135,32 +140,104 @@ func (a *App) SetupLogging() error {
 	if a.Config == nil {
 		return errors.New("Config is nil; call LoadConfig first")
 	}
-	cfg := a.Config
-	// Use a non-json configuration configuration
-	c := zap.NewDevelopmentConfig()
 
-	// Use the keys used by cloud logging
-	// https://cloud.google.com/logging/docs/structured-logging
-	c.EncoderConfig.LevelKey = "severity"
-	c.EncoderConfig.TimeKey = "time"
-	c.EncoderConfig.MessageKey = "message"
-
-	lvl := cfg.GetLogLevel()
-	zapLvl := zap.NewAtomicLevel()
-
-	if err := zapLvl.UnmarshalText([]byte(lvl)); err != nil {
-		return errors.Wrapf(err, "Could not convert level %v to ZapLevel", lvl)
-	}
-
-	c.Level = zapLvl
-	newLogger, err := c.Build()
+	// TODO(jeremy): We don't need to create JSON logs for random commands; e.g. `foyle version` or
+	// `foyle assets download`
+	// Configure encoder for JSON format
+	jsonCore, err := a.createCoreLoggerForFiles()
 	if err != nil {
-		panic(fmt.Sprintf("Failed to initialize zap logger; error %v", err))
+		return errors.Wrap(err, "Could not create core logger for files")
 	}
+
+	consoleCore, err := a.createCoreForConsole()
+	if err != nil {
+		return errors.Wrap(err, "Could not create core logger for console")
+	}
+
+	// Create a multi-core logger with different encodings
+	core := zapcore.NewTee(
+		jsonCore,
+		consoleCore,
+	)
+
+	// Create the logger
+	newLogger := zap.New(core)
 
 	zap.ReplaceGlobals(newLogger)
 
 	return nil
+}
+
+func (a *App) createCoreForConsole() (zapcore.Core, error) {
+	// Configure encoder for non-JSON format (console-friendly)
+	c := zap.NewDevelopmentEncoderConfig()
+
+	// Use the keys used by cloud logging
+	// https://cloud.google.com/logging/docs/structured-logging
+	c.LevelKey = "severity"
+	c.TimeKey = "time"
+	c.MessageKey = "message"
+
+	lvl := a.Config.GetLogLevel()
+	zapLvl := zap.NewAtomicLevel()
+
+	if err := zapLvl.UnmarshalText([]byte(lvl)); err != nil {
+		return nil, errors.Wrapf(err, "Could not convert level %v to ZapLevel", lvl)
+	}
+
+	encoder := zapcore.NewConsoleEncoder(c)
+	core := zapcore.NewCore(encoder, zapcore.AddSync(os.Stderr), zapLvl)
+	return core, nil
+}
+
+// createCoreLoggerForFiles creates a core logger that writes logs to files. These logs are always written in JSON
+// format. Their purpose is to capture AI traces that we use for retraining. Since these are supposed to be machine
+// readable they are always written in JSON format.
+func (a *App) createCoreLoggerForFiles() (zapcore.Core, error) {
+	// Configure encoder for JSON format
+	c := zap.NewProductionEncoderConfig()
+	// Use the keys used by cloud logging
+	// https://cloud.google.com/logging/docs/structured-logging
+	c.LevelKey = "severity"
+	c.TimeKey = "time"
+	c.MessageKey = "message"
+
+	jsonEncoder := zapcore.NewJSONEncoder(c)
+
+	if _, err := os.Stat(a.Config.GetLogDir()); os.IsNotExist(err) {
+		// Logger won't be setup yet so we can't use it.
+		fmt.Fprintf(os.Stdout, "Creating log directory %s\n", a.Config.GetLogLevel())
+		err := os.MkdirAll(a.Config.GetLogDir(), 0755)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not create log directory %s", a.Config.GetLogDir())
+		}
+	}
+
+	// We need to set a unique file name for the logs as a way of dealing with log rotation.
+	name := fmt.Sprintf("foyle.logs.%s.json", time.Now().Format("2006-01-02T15:04:05"))
+	logFile := filepath.Join(a.Config.GetLogDir(), name)
+
+	fmt.Fprintf(os.Stdout, "Writing logs to %s\n", logFile)
+
+	oFile, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not open log file %s", logFile)
+	}
+	zapLvl := zap.NewAtomicLevel()
+
+	if err := zapLvl.UnmarshalText([]byte(a.Config.GetLogLevel())); err != nil {
+		return nil, errors.Wrapf(err, "Could not convert level %v to ZapLevel", a.Config.GetLogLevel())
+	}
+
+	// Force log level to be at least info. Because info is the level at which we capture the logs we need for
+	// tracing.
+	if zapLvl.Level() > zapcore.InfoLevel {
+		zapLvl.SetLevel(zapcore.InfoLevel)
+	}
+
+	core := zapcore.NewCore(jsonEncoder, zapcore.AddSync(oFile), zapLvl)
+
+	return core, nil
 }
 
 // SetupServer sets up the server
@@ -191,5 +268,15 @@ func (a *App) Shutdown() error {
 	}
 
 	log.Info("Shutting down the application")
+	// Flush the logs
+	if err := l.Sync(); err != nil {
+		// N.B. I don't understand why but calling sync appears to cause an error complaining about calling sync
+		// on /dev/stderr so we just filter that out to avoid spam.
+		pathErr := &fs.PathError{}
+
+		if !errors.As(err, &pathErr) {
+			return err
+		}
+	}
 	return nil
 }
