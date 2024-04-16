@@ -309,62 +309,29 @@ func combineExecuteTrace(ctx context.Context, entries []*LogEntry) (*ExecuteTrac
 			trace.TraceID = e.TraceID()
 		}
 		if trace.Request == nil {
-			raw, ok := e.Get("request")
-			if ok {
-				v, ok := raw.(*v1alpha1.ExecuteRequest)
-				if ok {
-					trace.Request = v
-					trace.StartTime = e.Time()
+			raw := e.Request()
+			if raw != nil {
+				request := &v1alpha1.ExecuteRequest{}
+				if err := protojson.Unmarshal([]byte(raw), request); err != nil {
+					return nil, err
 				}
+
+				trace.Request = request
+				trace.StartTime = e.Time()
 			}
 		}
 		if trace.Response == nil {
-			raw, ok := e.Get("response")
-			if ok {
-				v, ok := raw.(*v1alpha1.ExecuteResponse)
-				if ok {
-					trace.Response = v
-					trace.EndTime = e.Time()
+			raw := e.Response()
+			if raw != nil {
+				v := &v1alpha1.ExecuteResponse{}
+				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
+					return nil, err
 				}
+				trace.Response = v
+				trace.EndTime = e.Time()
 			}
 		}
 	}
 
 	return trace, nil
 }
-
-//func combineEntriesForBlock(ctx context.Context, bid string, entries []*LogEntry) (*BlockLog, error) {
-//	e := &BlockLog{}
-//	log := logs.FromContext(ctx).WithValues("blockId", bid)
-//	log.Info("Combining entries for block", "numEntries", len(entries))
-//
-//	// First sort the entries by timestamp. This way if we have multiple executions for the same block the final
-//	// output will be the last one in the list of entries
-//	// Combine the entries.
-//	sort.Slice(entries, func(i, j int) bool {
-//		return entries[i].Time < entries[j].Time
-//	})
-//
-//	for _, logEntry := range entries {
-//		switch logEntry.Message {
-//		case "OpenAI:CreateChatCompletion":
-//			if logEntry.Request == nil {
-//				log.Info("Log entry is missing CreateChatCompletionRequest")
-//				continue
-//			}
-//			if e.Doc == nil {
-//				e.Doc = logEntry.Request.GetDoc()
-//			} else {
-//				log.Info("Request already set")
-//			}
-//		case "OpenAI:CreateChatCompletion response":
-//			if logEntry.Re == nil {
-//
-//			}
-//		default:
-//			log.V(1).Info("Ignoring log entry", "message", e.Message)
-//		}
-//	}
-//
-//	return combined, nil
-//}

@@ -246,10 +246,65 @@ func Test_CombineGenerateEntries(t *testing.T) {
 			}
 			trace, err := combineGenerateTrace(context.Background(), entries)
 			if err != nil {
-				t.Fatalf("combineEntriesForTrace failed: %+v", err)
+				t.Fatalf("combineGenerateTrace failed: %+v", err)
 			}
 			if trace == nil {
-				t.Fatalf("combineEntriesForTrace should have returned non nil response")
+				t.Fatalf("combineGenerateTrace should have returned non nil response")
+			}
+
+			// Assert the trace has a request and a response
+			if trace.Request == nil {
+				t.Errorf("Expected trace to have a request")
+			}
+			if trace.Response == nil {
+				t.Errorf("Expected trace to have a response")
+			}
+		})
+	}
+}
+
+func Test_CombineExecuteEntries(t *testing.T) {
+	type testCase struct {
+		name      string
+		linesFile string
+	}
+
+	cases := []testCase{
+		{
+			name:      "basic",
+			linesFile: "execute_traces_lines.jsonl",
+		},
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current working directory: %v", err)
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			entries := make([]*LogEntry, 0, 10)
+			testFile, err := os.Open(filepath.Join(cwd, "test_data", c.linesFile))
+			if err != nil {
+				t.Fatalf("Failed to open test file: %v", err)
+			}
+			d := json.NewDecoder(testFile)
+			for {
+				e := &LogEntry{}
+				err := d.Decode(e)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					t.Fatalf("Failed to unmarshal log entry: %v", err)
+				}
+				entries = append(entries, e)
+			}
+			trace, err := combineExecuteTrace(context.Background(), entries)
+			if err != nil {
+				t.Fatalf("combineExecuteTrace failed: %+v", err)
+			}
+			if trace == nil {
+				t.Fatalf("combineExecuteTrace should have returned non nil response")
 			}
 
 			// Assert the trace has a request and a response
