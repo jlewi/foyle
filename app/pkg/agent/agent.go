@@ -58,7 +58,7 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 	log = log.WithValues("traceId", span.SpanContext().TraceID())
 	ctx = logr.NewContext(ctx, log)
 
-	log.Info("Agent:generate", "request", req)
+	log.Info("Agent.Generate", "request", req)
 	blocks, err := a.completeWithRetries(ctx, req)
 	if err != nil {
 		// TODO(jeremy): Should we set a status code?

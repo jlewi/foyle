@@ -75,16 +75,6 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outFile string) 
 
 	sort.Strings(jsonFiles)
 
-	// We want to link information about how a block was generated with how it was executed.
-	// We do this by iterating over all the log entries and building the following maps
-	// 1. traceId -> []*LogEntry
-	// 2. blockId -> {
-	//      executeTraceIds: []string
-	//      generateTraceId: string
-	//  }
-	//  Given the above entries we can then iterate over the blocks and for each block we can lookup its traces
-	//   and process all the entries associated with that trace.
-
 	// Entries is a mapping from a traceId to a list of logEntries associated with that entry.
 	traceEntries := make(map[string][]*LogEntry)
 
@@ -100,10 +90,11 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outFile string) 
 		for {
 			entry := &LogEntry{}
 			err := d.Decode(entry)
-			if err != io.EOF {
-				break
-			}
+
 			if err != nil {
+				if err == io.EOF {
+					break
+				}
 				log.Error(err, "Error decoding log entry")
 				continue
 			}
@@ -262,17 +253,18 @@ func combineEntriesForTrace(ctx context.Context, entries []*LogEntry) (Trace, er
 	})
 
 	// Loop through the entries until we identify the message that tells us what kind of trace it is.
-
 	for _, logEntry := range entries {
-		switch logEntry.Message() {
-		case "Agent:Generate":
+		function := logEntry.Function()
+		if strings.HasSuffix(function, "agent.(*Agent).Generate") {
 			return combineGenerateTrace(ctx, entries)
-		case "Executor.Execute":
+		}
+
+		if strings.HasSuffix(function, "executor.(*Executor).Execute") {
 			return combineExecuteTrace(ctx, entries)
 		}
 	}
 
-	return nil, nil
+	return nil, errors.New("Failed to identify trace type")
 }
 
 func combineGenerateTrace(ctx context.Context, entries []*LogEntry) (*GenerateTrace, error) {

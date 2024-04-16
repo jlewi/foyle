@@ -18,6 +18,17 @@ func (L *LogEntry) Get(field string) (interface{}, bool) {
 	return v, ok
 }
 
+func (L *LogEntry) Function() string {
+	v, ok := (*L)["function"]
+	if !ok {
+		return ""
+	}
+	if v, ok := v.(string); ok {
+		return v
+	}
+	return ""
+}
+
 func (L *LogEntry) Message() string {
 	v, ok := (*L)["message"]
 	if !ok {

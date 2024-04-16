@@ -2,11 +2,16 @@ package analyze
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jlewi/foyle/app/pkg/testutil"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"go.uber.org/zap"
+	"io"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -143,5 +148,62 @@ func Test_BuildBlockLog(t *testing.T) {
 				t.Errorf("Unexpected diff:\n%s", d)
 			}
 		})
+	}
+}
+
+func Test_Analyzer(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current working directory: %v", err)
+	}
+
+	c := zap.NewDevelopmentConfig()
+	log, err := c.Build()
+	if err != nil {
+		t.Fatalf("Failed to create logger: %v", err)
+	}
+	zap.ReplaceGlobals(log)
+
+	test_dir := filepath.Join(cwd, "test_data")
+
+	a, err := NewAnalyzer()
+	if err != nil {
+		t.Fatalf("Failed to create analyzer: %v", err)
+	}
+
+	oFile, err := os.CreateTemp("", "output.json")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	name := oFile.Name()
+	if err := oFile.Close(); err != nil {
+		t.Fatalf("Failed to close file: %v", err)
+	}
+
+	if err := a.Analyze(context.Background(), test_dir, name); err != nil {
+		t.Fatalf("Analyze failed: %v", err)
+	}
+	t.Logf("Output written to: %s", name)
+
+	actual := make([]*BlockLog, 0, 10)
+	f, err := os.Open(name)
+	if err != nil {
+		t.Fatalf("Failed to open output file: %v", err)
+	}
+	d := json.NewDecoder(f)
+
+	for {
+		var b BlockLog
+		if err := d.Decode(&b); err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Errorf("Failed to decode block log: %v", err)
+		}
+		actual = append(actual, &b)
+	}
+
+	if len(actual) != 1 {
+		t.Errorf("Expected 1 block log but got: %v", len(actual))
 	}
 }

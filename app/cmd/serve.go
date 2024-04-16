@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 	"os"
 
 	"github.com/jlewi/foyle/app/pkg/application"
@@ -33,8 +35,10 @@ func NewServeCmd() *cobra.Command {
 				defer helpers.DeferIgnoreError(app.Shutdown)
 
 				logVersion()
-
+				log := zapr.NewLogger(zap.L())
+				log.Info("Starting server")
 				return s.Run()
+
 			}()
 
 			if err != nil {

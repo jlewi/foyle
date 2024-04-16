@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,12 +27,15 @@ import (
 	"go.uber.org/zap"
 )
 
+type logCloser func()
+
 // App is a struct to hold values needed across all commands.
 // Intent is to simplify initialization across commands.
 type App struct {
 	Config         *config.Config
 	Out            io.Writer
 	otelShutdownFn func()
+	logClosers     []logCloser
 }
 
 // NewApp creates a new application. You should call one more setup/Load functions to properly set it up.
@@ -162,7 +164,8 @@ func (a *App) SetupLogging() error {
 
 	// Create the logger
 	newLogger := zap.New(core)
-
+	// Record the caller of the log message
+	newLogger = newLogger.WithOptions(zap.AddCaller())
 	zap.ReplaceGlobals(newLogger)
 
 	return nil
@@ -185,8 +188,17 @@ func (a *App) createCoreForConsole() (zapcore.Core, error) {
 		return nil, errors.Wrapf(err, "Could not convert level %v to ZapLevel", lvl)
 	}
 
+	oFile, closer, err := zap.Open("stderr")
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not create writer for stderr")
+	}
+	if a.logClosers == nil {
+		a.logClosers = []logCloser{}
+	}
+	a.logClosers = append(a.logClosers, closer)
+
 	encoder := zapcore.NewConsoleEncoder(c)
-	core := zapcore.NewCore(encoder, zapcore.AddSync(os.Stderr), zapLvl)
+	core := zapcore.NewCore(encoder, zapcore.AddSync(oFile), zapLvl)
 	return core, nil
 }
 
@@ -201,6 +213,8 @@ func (a *App) createCoreLoggerForFiles() (zapcore.Core, error) {
 	c.LevelKey = "severity"
 	c.TimeKey = "time"
 	c.MessageKey = "message"
+	// We attach the function key to the logs because that is useful for identifying the function that generated the log.
+	c.FunctionKey = "function"
 
 	jsonEncoder := zapcore.NewJSONEncoder(c)
 
@@ -219,10 +233,15 @@ func (a *App) createCoreLoggerForFiles() (zapcore.Core, error) {
 
 	fmt.Fprintf(os.Stdout, "Writing logs to %s\n", logFile)
 
-	oFile, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	oFile, closer, err := zap.Open(logFile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not open log file %s", logFile)
 	}
+	if a.logClosers == nil {
+		a.logClosers = []logCloser{}
+	}
+	a.logClosers = append(a.logClosers, closer)
+
 	zapLvl := zap.NewAtomicLevel()
 
 	if err := zapLvl.UnmarshalText([]byte(a.Config.GetLogLevel())); err != nil {
@@ -269,14 +288,17 @@ func (a *App) Shutdown() error {
 
 	log.Info("Shutting down the application")
 	// Flush the logs
-	if err := l.Sync(); err != nil {
-		// N.B. I don't understand why but calling sync appears to cause an error complaining about calling sync
-		// on /dev/stderr so we just filter that out to avoid spam.
-		pathErr := &fs.PathError{}
-
-		if !errors.As(err, &pathErr) {
-			return err
-		}
+	for _, closer := range a.logClosers {
+		closer()
 	}
+	//if err := l.Sync(); err != nil {
+	//	// N.B. I don't understand why but calling sync appears to cause an error complaining about calling sync
+	//	// on /dev/stderr so we just filter that out to avoid spam.
+	//	pathErr := &fs.PathError{}
+	//
+	//	if !errors.As(err, &pathErr) {
+	//		return err
+	//	}
+	//}
 	return nil
 }
