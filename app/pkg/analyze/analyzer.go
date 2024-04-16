@@ -276,8 +276,13 @@ func combineGenerateTrace(ctx context.Context, entries []*LogEntry) (*GenerateTr
 		if trace.Request == nil {
 			requestRaw, ok := e.Get("request")
 			if ok {
-				request, ok := requestRaw.(*v1alpha1.GenerateRequest)
+				raw, ok := requestRaw.(string)
 				if ok {
+					request := &v1alpha1.GenerateRequest{}
+					if err := json.Unmarshal([]byte(raw), request); err != nil {
+						return nil, err
+					}
+
 					trace.Request = request
 					trace.StartTime = e.Time()
 				}

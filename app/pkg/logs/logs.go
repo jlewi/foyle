@@ -2,6 +2,9 @@ package logs
 
 import (
 	"context"
+	"encoding/json"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
@@ -24,4 +27,14 @@ func FromContext(ctx context.Context) logr.Logger {
 		return zapr.NewLogger(zap.L())
 	}
 	return l
+}
+
+// ZapPB is a helper function to log a protobuf message as a field in a zap logger.
+// See: https://stackoverflow.com/questions/68411821/correctly-log-protobuf-messages-as-unescaped-json-with-zap-logger
+func ZapPB(name string, m proto.Message) zap.Field {
+	b, err := protojson.Marshal(m)
+	if err != nil {
+		return zap.Error(err)
+	}
+	return zap.Any(name, json.RawMessage(b))
 }
