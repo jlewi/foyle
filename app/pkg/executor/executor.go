@@ -39,7 +39,7 @@ func (e *Executor) Execute(ctx context.Context, req *v1alpha1.ExecuteRequest) (*
 	log = log.WithValues("traceId", span.SpanContext().TraceID())
 	ctx = logr.NewContext(ctx, log)
 
-	log.Info("Executor.Execute", "blockId", req.GetBlock().GetId())
+	log.Info("Executor.Execute", "blockId", req.GetBlock().GetId(), "request", req)
 
 	if req.GetBlock() == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Block is required")
