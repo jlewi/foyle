@@ -24,3 +24,11 @@ func FromContext(ctx context.Context) logr.Logger {
 	}
 	return l
 }
+
+func ZapFromLogr(log logr.Logger) *zap.Logger {
+	u, ok := log.GetSink().(zapr.Underlier)
+	if !ok {
+		return zap.L()
+	}
+	return u.GetUnderlying()
+}

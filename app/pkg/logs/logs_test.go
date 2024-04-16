@@ -2,6 +2,7 @@ package logs
 
 import (
 	"encoding/json"
+	"github.com/go-logr/zapr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jlewi/foyle/app/pkg/testutil"
@@ -26,12 +27,16 @@ func Test_ZapPB(t *testing.T) {
 		t.Fatalf("Failed to close file: %v", err)
 	}
 
+	t.Logf("Output writing to: %s", outputName)
 	c.OutputPaths = []string{"stdout", outputName}
-	log, err := c.Build()
+	logger, err := c.Build()
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
 	}
 
+	// We need to AllowZapFields to ensure the protobuf message is logged as a JSON object.
+	// N.B. This breaks the implementation agnosticism of logr.
+	log := zapr.NewLoggerWithOptions(logger, zapr.AllowZapFields(true))
 	request := &v1alpha1.ExecuteResponse{
 		Outputs: []*v1alpha1.BlockOutput{
 			{
@@ -44,9 +49,9 @@ func Test_ZapPB(t *testing.T) {
 		},
 	}
 	log.Info("Test_ZapPB", zap.Object("req", request))
-	if err := log.Sync(); err != nil {
-		t.Logf("Ignoring sync logger: %v", err)
-	}
+	//if err := log.Sync(); err != nil {
+	//	t.Logf("Ignoring sync logger: %v", err)
+	//}
 
 	// Make sure we can decode it
 	file, err := os.Open(outputName)

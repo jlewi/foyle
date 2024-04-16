@@ -1,7 +1,10 @@
 package analyze
 
 import (
+	"encoding/json"
+	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -16,6 +19,40 @@ type LogEntry map[string]interface{}
 func (L *LogEntry) Get(field string) (interface{}, bool) {
 	v, ok := (*L)[field]
 	return v, ok
+}
+
+func (L *LogEntry) Request() []byte {
+	v, ok := (*L)["request"]
+	if !ok {
+		return nil
+	}
+	if v, ok := v.(map[string]interface{}); ok {
+		b, err := json.Marshal(v)
+		if err != nil {
+			log := zapr.NewLogger(zap.L())
+			log.Error(err, "Failed to marshal request")
+			return nil
+		}
+		return b
+	}
+	return nil
+}
+
+func (L *LogEntry) Response() []byte {
+	v, ok := (*L)["response"]
+	if !ok {
+		return nil
+	}
+	if v, ok := v.(map[string]interface{}); ok {
+		b, err := json.Marshal(v)
+		if err != nil {
+			log := zapr.NewLogger(zap.L())
+			log.Error(err, "Failed to marshal response")
+			return nil
+		}
+		return b
+	}
+	return nil
 }
 
 func (L *LogEntry) Function() string {
