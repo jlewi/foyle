@@ -39,8 +39,8 @@ func (e *Executor) Execute(ctx context.Context, req *v1alpha1.ExecuteRequest) (*
 	log := logs.FromContext(ctx)
 	log = log.WithValues("traceId", span.SpanContext().TraceID())
 	ctx = logr.NewContext(ctx, log)
-	zLog := logs.ZapFromLogr(log)
-	zLog.Info("Executor.Execute", zap.String("blockId", req.GetBlock().GetId()), zap.Object("request", req))
+
+	log.Info("Executor.Execute", "blockId", req.GetBlock().GetId(), zap.Object("request", req))
 
 	if req.GetBlock() == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Block is required")
@@ -58,7 +58,7 @@ func (e *Executor) Execute(ctx context.Context, req *v1alpha1.ExecuteRequest) (*
 	result := e.executeInstructions(ctx, instructions)
 	resp := resultToProto(result)
 
-	zLog.Info("Executed instructions", zap.Object("instructions", instructions), zap.Object("response", resp))
+	log.Info("Executed instructions", "instructions", instructions, zap.Object("response", resp))
 	return resp, nil
 }
 
