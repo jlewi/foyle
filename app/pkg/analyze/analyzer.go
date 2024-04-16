@@ -8,6 +8,7 @@ import (
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/encoding/protojson"
 	"io"
 	"os"
 	"path/filepath"
@@ -277,7 +278,7 @@ func combineGenerateTrace(ctx context.Context, entries []*LogEntry) (*GenerateTr
 			raw := e.Request()
 			if raw != nil {
 				request := &v1alpha1.GenerateRequest{}
-				if err := json.Unmarshal([]byte(raw), request); err != nil {
+				if err := protojson.Unmarshal([]byte(raw), request); err != nil {
 					return nil, err
 				}
 
@@ -289,7 +290,7 @@ func combineGenerateTrace(ctx context.Context, entries []*LogEntry) (*GenerateTr
 			raw := e.Response()
 			if raw != nil {
 				v := &v1alpha1.GenerateResponse{}
-				if err := json.Unmarshal([]byte(raw), v); err != nil {
+				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
 					return nil, err
 				}
 				trace.Response = v
