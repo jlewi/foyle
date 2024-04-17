@@ -24,6 +24,10 @@
       {
         "command": "foyle.helloWorld",
         "title": "Foyle HelloWorld"
+      },
+      {
+        "command": "foyle.printCell",
+        "title": "Foyle Print Cell Metadata"
       }
     ],
     "keybindings": [
