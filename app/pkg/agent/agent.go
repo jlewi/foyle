@@ -58,6 +58,7 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 	log = log.WithValues("traceId", span.SpanContext().TraceID())
 	ctx = logr.NewContext(ctx, log)
 
+	log.Info("Agent.Generate", zap.Object("request", req))
 	blocks, err := a.completeWithRetries(ctx, req)
 	if err != nil {
 		// TODO(jeremy): Should we set a status code?
@@ -65,6 +66,9 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 	}
 
 	// Attach block ids to any blocks generated.
+	// N.B. This is kind of a last resort to make sure all blocks have an ID set. In general, we want to set blockIds
+	// earlier in the processing pipeline so that any log messages involving blocks has block ids set. BlockIDs
+	// should get set in parseResponse. When block Ids are first set.
 	blockIds, err := docs.SetBlockIds(blocks)
 	if err != nil {
 		log.Error(err, "Agent.Generate, failed to set block ids", "blocks", blocks, "blockIds", blockIds)
@@ -76,6 +80,7 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 		Blocks: blocks,
 	}
 
+	log.Info("Agent.Generate returning response", zap.Object("response", resp))
 	return resp, nil
 }
 
@@ -155,6 +160,11 @@ func (a *Agent) parseResponse(ctx context.Context, resp *openai.ChatCompletionRe
 			}
 			allBlocks = append(allBlocks, b)
 			continue
+		}
+
+		// Set block ids
+		if _, err := docs.SetBlockIds(blocks); err != nil {
+			return nil, errors.Wrapf(err, "Failed to set block ids")
 		}
 
 		allBlocks = append(allBlocks, blocks...)

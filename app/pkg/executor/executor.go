@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/go-logr/logr"
 	"go.opentelemetry.io/otel/trace"
 
@@ -39,7 +41,7 @@ func (e *Executor) Execute(ctx context.Context, req *v1alpha1.ExecuteRequest) (*
 	log = log.WithValues("traceId", span.SpanContext().TraceID())
 	ctx = logr.NewContext(ctx, log)
 
-	log.Info("Executor.Execute", "blockId", req.GetBlock().GetId())
+	log.Info("Executor.Execute", "blockId", req.GetBlock().GetId(), zap.Object("request", req))
 
 	if req.GetBlock() == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Block is required")
@@ -57,7 +59,7 @@ func (e *Executor) Execute(ctx context.Context, req *v1alpha1.ExecuteRequest) (*
 	result := e.executeInstructions(ctx, instructions)
 	resp := resultToProto(result)
 
-	log.Info("Executed instructions", "instructions", instructions, "result", resp)
+	log.Info("Executed instructions", "instructions", instructions, zap.Object("response", resp))
 	return resp, nil
 }
 

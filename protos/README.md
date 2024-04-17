@@ -46,6 +46,28 @@ More documentation can be found [here](https://github.com/bufbuild/protobuf-es/b
 We [grpc-gateway](https://grpc-ecosystem.github.io/grpc-gateway/) to generate RESTful services from our grpc services.
 
 
+## Zap Marshalers
+
+We use [zap marshalers](https://pkg.go.dev/go.uber.org/zap#hdr-JSON) to generate MarshalLogObject methods for our types.
+We can then log protos doing
+
+```go
+logger.Info("message", zap.Object("proto", proto))
+```
+
+This ensures the proto is logged in the json encoding of the proto. If we don't then I'm not sure what the schema is
+
+See also [This SO](https://stackoverflow.com/questions/68411821/correctly-log-protobuf-messages-as-unescaped-json-with-zap-logger)
+
+To install the plugin
+
+```bash
+go install github.com/kazegusuri/go-proto-zap-marshaler/protoc-gen-zap-marshaler@latest
+```
+
+Ensure the plugin is in your path; otherwise buf won't be able to find it.
+
+
 ## TODO GRPC-connect
 
 We should look into [connect-rpc](https://connectrpc.com/). That might simplify things

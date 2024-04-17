@@ -25,3 +25,6 @@ plugins:
       # because our vscode extension is relying on transpilation from typescript to js.
       - import_extension=none
     out: ../frontend/foyle/src/gen
+  - name: zap-marshaler
+    out: go/
+    opt: paths=source_relative

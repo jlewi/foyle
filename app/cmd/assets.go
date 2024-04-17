@@ -39,7 +39,7 @@ func NewAssetsDownloadCmd() *cobra.Command {
 				if err := app.LoadConfig(cmd); err != nil {
 					return err
 				}
-				if err := app.SetupLogging(); err != nil {
+				if err := app.SetupLogging(false); err != nil {
 					return err
 				}
 				defer helpers.DeferIgnoreError(app.Shutdown)
