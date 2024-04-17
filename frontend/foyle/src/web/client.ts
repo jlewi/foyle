@@ -15,7 +15,8 @@ export class FoyleClient {
         // Include a default so that address is always well defined
         const address = config.get<string>("executor-address", "http://localhost:8080"); 
 
-        const body = request.toJsonString();        
+        const body = request.toJsonString();
+        console.log(`Sending request ${body}`);
         return fetch(address + "/api/v1alpha1/execute", {
             method: 'POST',
             body: body,
@@ -42,6 +43,7 @@ export class FoyleClient {
        })
        .then(response => response.json())
        .then(data => {
+           console.log(`Generate response  ${data}`);
            const resp = agentpb.GenerateResponse.fromJson(data);
            return resp;
        });                

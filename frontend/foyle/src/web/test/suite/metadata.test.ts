@@ -41,6 +41,18 @@ suite('Metadata Test Suite', () => {
         }
     });
 
+    test('test setBlockFromMeta-undefined', () => {
+        // This test case was trying to reproduce the error in the browser that 
+        // "meta.hasOwnProperty is not a function"
+        
+        // No traceids
+        const meta1 = Object.create(null);        
+        const actual = new docpb.Block();
+        metadata.setBlockFromMeta(actual, meta1);
+            
+        
+    });
+
     test('test setBlockFromMeta', () => {
         class TestCase {
             meta: metadata.CellMetadata;
