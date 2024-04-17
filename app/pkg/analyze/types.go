@@ -2,10 +2,11 @@ package analyze
 
 import (
 	"encoding/json"
+	"time"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"go.uber.org/zap"
-	"time"
 )
 
 // LogEntry represents a log entry.

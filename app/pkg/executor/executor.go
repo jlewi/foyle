@@ -3,9 +3,10 @@ package executor
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/go-logr/logr"
 	"go.opentelemetry.io/otel/trace"

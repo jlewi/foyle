@@ -1,11 +1,12 @@
 package docs
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"go.uber.org/zap"
-	"strconv"
-	"strings"
 )
 
 // GetExitCode returns the exit code from a block output if the block represents the exit code

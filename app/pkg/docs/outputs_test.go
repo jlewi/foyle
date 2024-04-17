@@ -2,8 +2,9 @@ package docs
 
 import (
 	"fmt"
-	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"testing"
+
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )
 
 func Test_GetExitCode(t *testing.T) {

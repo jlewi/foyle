@@ -3,17 +3,18 @@ package analyze
 import (
 	"context"
 	"encoding/json"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/jlewi/foyle/app/pkg/testutil"
-	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"go.uber.org/zap"
 	"io"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/jlewi/foyle/app/pkg/testutil"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"go.uber.org/zap"
 )
 
 func timeMustParse(layoutString, value string) time.Time {
@@ -209,13 +210,13 @@ func Test_Analyzer(t *testing.T) {
 		"48d530be-254a-493f-8cf4-20627078f830": true,
 	}
 
-	for id, _ := range expectedBlocks {
+	for id := range expectedBlocks {
 		if _, ok := actual[id]; !ok {
 			t.Errorf("Missing block log for id ID: %v", id)
 		}
 	}
 
-	for id, _ := range actual {
+	for id := range actual {
 		if _, ok := expectedBlocks[id]; !ok {
 			t.Errorf("Unexpected block log for id ID: %v", id)
 		}

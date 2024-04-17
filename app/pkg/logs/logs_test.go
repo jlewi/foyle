@@ -2,6 +2,9 @@ package logs
 
 import (
 	"encoding/json"
+	"os"
+	"testing"
+
 	"github.com/go-logr/zapr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -9,8 +12,6 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
-	"os"
-	"testing"
 )
 
 // This is a test to demonstrate how to log a protobuf message using zap and the generated protobuf code.

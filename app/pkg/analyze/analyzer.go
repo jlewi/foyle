@@ -4,17 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
-	"io"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 )
 
 const (

@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
-	"os"
 
 	"github.com/jlewi/foyle/app/pkg/application"
 
