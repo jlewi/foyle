@@ -45,7 +45,7 @@ func Test_GetExitCode(t *testing.T) {
 					},
 				},
 			},
-			expectedCode: 1,
+			expectedCode: noExitCode,
 			expectedOk:   false,
 		},
 	}

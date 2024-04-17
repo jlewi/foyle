@@ -9,6 +9,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	noExitCode = -783
+)
+
 // GetExitCode returns the exit code from a block output if the block represents the exit code
 // The function returns the exit code and a boolean indicating if the block represents the exit code.
 // N.B. Keep this in sync with resultsToProto in executor.go
@@ -32,5 +36,5 @@ func GetExitCode(b *v1alpha1.BlockOutput) (int, bool) {
 			return code, true
 		}
 	}
-	return -1, false
+	return noExitCode, false
 }
