@@ -204,16 +204,9 @@ func Test_Analyzer(t *testing.T) {
 	}
 
 	expectedBlocks := map[string]bool{
-		"10b11f2d-7c8d-4d58-bedc-7e2dd51a85dc": true,
-		"8594d742-39d7-473b-b4ad-901ff362fdb3": true,
-		"f1662328-e884-418c-a084-95dfb1a3f7fc": true,
-		"4feb6219-d050-4630-8ceb-d08ec149b60d": true,
-		"3893a0b6-8c84-49ca-a38c-fbf6d7adfcde": true,
-		"fd276a6f-f379-4f9c-9779-0ed07819d0f5": true,
-		"d507ce35-af59-4f92-8dec-6c37d7b26647": true,
-		"c885c6ba-598c-4fb1-8014-3cf8a330614c": true,
-		"b56bb6bf-f631-4917-be48-ceeaf8797c41": true,
-		"6e42f6f9-d394-41be-8baa-d7f8b41c0e11": true,
+		"9557680b-e08c-4d1d-b098-6dcd03e0e108": true,
+		"23706965-8e3b-440d-ba1a-1e1cc035fbd4": true,
+		"48d530be-254a-493f-8cf4-20627078f830": true,
 	}
 
 	for id, _ := range expectedBlocks {
@@ -226,6 +219,24 @@ func Test_Analyzer(t *testing.T) {
 		if _, ok := expectedBlocks[id]; !ok {
 			t.Errorf("Unexpected block log for id ID: %v", id)
 		}
+	}
+
+	// This is a block that was generated via the AI and then executed so run some additional checks
+	block := actual["23706965-8e3b-440d-ba1a-1e1cc035fbd4"]
+	if block.GenTraceID == "" {
+		t.Errorf("Expected GenTraceID to be set")
+	}
+	if len(block.ExecTraceIDs) == 0 {
+		t.Errorf("Expected ExecTraceIDs to be set")
+	}
+	if block.Doc == nil {
+		t.Errorf("Expected Doc to be set")
+	}
+	if block.GeneratedBlock == nil {
+		t.Errorf("Expected GeneratedBlock to be set")
+	}
+	if block.ExecutedBlock == nil {
+		t.Errorf("Expected ExecutedBlock to be set")
 	}
 }
 
