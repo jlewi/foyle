@@ -7,6 +7,7 @@ import (
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 	"io"
@@ -33,11 +34,11 @@ func NewAnalyzer() (*Analyzer, error) {
 // Analyze analyzes the logs.
 func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outFile string) error {
 	// Should we support appending to the output file
-	oFile, err := os.OpenFile(outFile, os.O_CREATE, 0644)
+	oFile, err := os.Create(outFile)
 	if err != nil {
 		return err
 	}
-	defer oFile.Close()
+	defer helpers.DeferIgnoreError(oFile.Close)
 
 	log := logs.FromContext(ctx)
 	log.Info("Analyzing logs", "logsDir", logsDir, "outFile", outFile)

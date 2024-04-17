@@ -164,7 +164,7 @@ func Test_Analyzer(t *testing.T) {
 	}
 	zap.ReplaceGlobals(log)
 
-	test_dir := filepath.Join(cwd, "test_data")
+	test_dir := filepath.Join(cwd, "test_data", "logs")
 
 	a, err := NewAnalyzer()
 	if err != nil {
@@ -185,13 +185,13 @@ func Test_Analyzer(t *testing.T) {
 	}
 	t.Logf("Output written to: %s", name)
 
-	actual := make([]*BlockLog, 0, 10)
 	f, err := os.Open(name)
 	if err != nil {
 		t.Fatalf("Failed to open output file: %v", err)
 	}
 	d := json.NewDecoder(f)
 
+	actual := map[string]*BlockLog{}
 	for {
 		var b BlockLog
 		if err := d.Decode(&b); err != nil {
@@ -200,11 +200,32 @@ func Test_Analyzer(t *testing.T) {
 			}
 			t.Errorf("Failed to decode block log: %v", err)
 		}
-		actual = append(actual, &b)
+		actual[b.ID] = &b
 	}
 
-	if len(actual) != 1 {
-		t.Errorf("Expected 1 block log but got: %v", len(actual))
+	expectedBlocks := map[string]bool{
+		"10b11f2d-7c8d-4d58-bedc-7e2dd51a85dc": true,
+		"8594d742-39d7-473b-b4ad-901ff362fdb3": true,
+		"f1662328-e884-418c-a084-95dfb1a3f7fc": true,
+		"4feb6219-d050-4630-8ceb-d08ec149b60d": true,
+		"3893a0b6-8c84-49ca-a38c-fbf6d7adfcde": true,
+		"fd276a6f-f379-4f9c-9779-0ed07819d0f5": true,
+		"d507ce35-af59-4f92-8dec-6c37d7b26647": true,
+		"c885c6ba-598c-4fb1-8014-3cf8a330614c": true,
+		"b56bb6bf-f631-4917-be48-ceeaf8797c41": true,
+		"6e42f6f9-d394-41be-8baa-d7f8b41c0e11": true,
+	}
+
+	for id, _ := range expectedBlocks {
+		if _, ok := actual[id]; !ok {
+			t.Errorf("Missing block log for id ID: %v", id)
+		}
+	}
+
+	for id, _ := range actual {
+		if _, ok := expectedBlocks[id]; !ok {
+			t.Errorf("Unexpected block log for id ID: %v", id)
+		}
 	}
 }
 
