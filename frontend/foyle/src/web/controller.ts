@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { promisify } from 'util';
 import * as constants from './constants';
+import * as converters from './converters';
 import * as client from './client';
 import * as agentpb from "../gen/foyle/v1alpha1/agent_pb";
 import * as docpb from "../gen/foyle/v1alpha1/doc_pb";
@@ -66,14 +67,17 @@ export class Controller {
 }
 
 async function callExecute(cell: vscode.NotebookCell, client: client.FoyleClient): Promise<vscode.NotebookCellOutput[]> {
+  if (cell.metadata.hasOwnProperty("id")) {
+    console.log(`callExecute called on block id = ${cell.metadata["id"]}`);
+  } else {
+    console.log(`callExecute called on block without id`);
+  }
   console.log(`callExecute called ${cell.document.getText()}`); 
 
   const request = new agentpb.ExecuteRequest();
 
-  request.block = new docpb.Block();  
-  request.block.kind = docpb.BlockKind.CODE;
-  request.block.contents = cell.document.getText();  
-
+  request.block = converters.cellDataToBlock(converters.cellToCellData(cell));
+  
   return client.Execute(request).then((response) => {
     let output: vscode.NotebookCellOutput[] = [];
 
