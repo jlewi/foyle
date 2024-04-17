@@ -61,6 +61,9 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outDir string) (
 	}
 
 	traces, blocks, err := buildTraces(ctx, jsonFiles, results)
+	if err != nil {
+		return results, err
+	}
 
 	err = buildBlockLogs(ctx, traces, blocks, results.BlockLogs[0])
 
