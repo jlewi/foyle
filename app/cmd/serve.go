@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-
 	"github.com/jlewi/foyle/app/pkg/application"
 
 	"github.com/jlewi/monogo/helpers"
@@ -36,8 +33,6 @@ func NewServeCmd() *cobra.Command {
 				defer helpers.DeferIgnoreError(app.Shutdown)
 
 				logVersion()
-				log := zapr.NewLogger(zap.L())
-				log.Info("Starting server")
 				return s.Run()
 
 			}()

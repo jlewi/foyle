@@ -294,14 +294,5 @@ func (a *App) Shutdown() error {
 	for _, closer := range a.logClosers {
 		closer()
 	}
-	//if err := l.Sync(); err != nil {
-	//	// N.B. I don't understand why but calling sync appears to cause an error complaining about calling sync
-	//	// on /dev/stderr so we just filter that out to avoid spam.
-	//	pathErr := &fs.PathError{}
-	//
-	//	if !errors.As(err, &pathErr) {
-	//		return err
-	//	}
-	//}
 	return nil
 }
