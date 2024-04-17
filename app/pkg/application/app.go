@@ -138,17 +138,20 @@ func (a *App) useHoneycomb() error {
 	return nil
 }
 
-func (a *App) SetupLogging() error {
+func (a *App) SetupLogging(logToFile bool) error {
 	if a.Config == nil {
 		return errors.New("Config is nil; call LoadConfig first")
 	}
 
-	// TODO(jeremy): We don't need to create JSON logs for random commands; e.g. `foyle version` or
+	cores := make([]zapcore.Core, 0, 2)
 	// `foyle assets download`
 	// Configure encoder for JSON format
-	jsonCore, err := a.createCoreLoggerForFiles()
-	if err != nil {
-		return errors.Wrap(err, "Could not create core logger for files")
+	if logToFile {
+		jsonCore, err := a.createCoreLoggerForFiles()
+		if err != nil {
+			return errors.Wrap(err, "Could not create core logger for files")
+		}
+		cores = append(cores, jsonCore)
 	}
 
 	consoleCore, err := a.createCoreForConsole()
@@ -156,11 +159,10 @@ func (a *App) SetupLogging() error {
 		return errors.Wrap(err, "Could not create core logger for console")
 	}
 
+	cores = append(cores, consoleCore)
+
 	// Create a multi-core logger with different encodings
-	core := zapcore.NewTee(
-		jsonCore,
-		consoleCore,
-	)
+	core := zapcore.NewTee(cores...)
 
 	// Create the logger
 	newLogger := zap.New(core)
@@ -218,18 +220,19 @@ func (a *App) createCoreLoggerForFiles() (zapcore.Core, error) {
 
 	jsonEncoder := zapcore.NewJSONEncoder(c)
 
-	if _, err := os.Stat(a.Config.GetLogDir()); os.IsNotExist(err) {
+	logDir := filepath.Join(a.Config.GetLogDir(), "raw")
+	if _, err := os.Stat(logDir); os.IsNotExist(err) {
 		// Logger won't be setup yet so we can't use it.
-		fmt.Fprintf(os.Stdout, "Creating log directory %s\n", a.Config.GetLogLevel())
-		err := os.MkdirAll(a.Config.GetLogDir(), 0755)
+		fmt.Fprintf(os.Stdout, "Creating log directory %s\n", logDir)
+		err := os.MkdirAll(logDir, 0755)
 		if err != nil {
-			return nil, errors.Wrapf(err, "could not create log directory %s", a.Config.GetLogDir())
+			return nil, errors.Wrapf(err, "could not create log directory %s", logDir)
 		}
 	}
 
 	// We need to set a unique file name for the logs as a way of dealing with log rotation.
 	name := fmt.Sprintf("foyle.logs.%s.json", time.Now().Format("2006-01-02T15:04:05"))
-	logFile := filepath.Join(a.Config.GetLogDir(), name)
+	logFile := filepath.Join(logDir, name)
 
 	fmt.Fprintf(os.Stdout, "Writing logs to %s\n", logFile)
 

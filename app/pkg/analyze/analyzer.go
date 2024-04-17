@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -32,52 +33,43 @@ func NewAnalyzer() (*Analyzer, error) {
 	return &Analyzer{}, nil
 }
 
+type ResultFiles struct {
+	BlockLogs      []string
+	GenerateTraces []string
+	ExecuteTraces  []string
+}
+
 // Analyze analyzes the logs.
-func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outFile string) error {
-	// Should we support appending to the output file
-	oFile, err := os.Create(outFile)
-	if err != nil {
-		return err
-	}
-	defer helpers.DeferIgnoreError(oFile.Close)
-
+func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outDir string) (ResultFiles, error) {
 	log := logs.FromContext(ctx)
-	log.Info("Analyzing logs", "logsDir", logsDir, "outFile", outFile)
-	paths := map[string]bool{}
+	log.Info("Analyzing logs", "logsDir", logsDir, "outDir", outDir)
 
-	if _, err := os.Stat(logsDir); err != nil && os.IsNotExist(err) {
-		return fmt.Errorf("Analyze invoked for non-existent path: %v", logsDir)
+	results := initResultFiles(outDir)
+
+	if _, err := os.Stat(logsDir); os.IsNotExist(err) {
+		// Logger won't be setup yet so we can't use it.
+		log.Info("Creating output directory", "dir", outDir)
+		err := os.MkdirAll(outDir, 0755)
+		if err != nil {
+			return results, errors.Wrapf(err, "could not create log directory %s", outDir)
+		}
 	}
 
-	// Walk the directory and add all JSON files.
-	walkErr := filepath.Walk(logsDir,
-		func(path string, info os.FileInfo, walkErr error) error {
-			// Skip non YAML files
-			ext := strings.ToLower(filepath.Ext(info.Name()))
-
-			if ext != ".json" && ext != ".jsonl" {
-				return nil
-			}
-			p, err := filepath.EvalSymlinks(path)
-			if err != nil {
-				log.Error(err, "Failed to evaluate symlink", "path", path)
-				return err
-			}
-			paths[p] = true
-			return nil
-		})
-
-	if walkErr != nil {
-		return walkErr
+	jsonFiles, err := findLogFiles(ctx, logsDir)
+	if err != nil {
+		return results, err
 	}
 
-	jsonFiles := []string{}
-	for p := range paths {
-		jsonFiles = append(jsonFiles, p)
-	}
+	traces, blocks, err := buildTraces(ctx, jsonFiles, results)
 
-	sort.Strings(jsonFiles)
+	err = buildBlockLogs(ctx, traces, blocks, results.BlockLogs[0])
 
+	return results, err
+}
+
+// buildTraces creates a map of all the traces and initializes the blocks.
+func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFiles) (map[string]Trace, map[string]*BlockLog, error) {
+	log := logs.FromContext(ctx)
 	// Entries is a mapping from a traceId to a list of logEntries associated with that entry.
 	traceEntries := make(map[string][]*LogEntry)
 
@@ -98,7 +90,7 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outFile string) 
 				if err == io.EOF {
 					break
 				}
-				log.Error(err, "Error decoding log entry")
+				log.Error(err, "Error decoding log entry", "path", p)
 				continue
 			}
 
@@ -122,6 +114,22 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outFile string) 
 	// Build a map of the blocks
 	blocks := make(map[string]*BlockLog)
 
+	// Create encoders to write the traces
+	genFile, err := os.Create(resultFiles.GenerateTraces[0])
+	if err != nil {
+		return nil, nil, err
+	}
+	defer helpers.DeferIgnoreError(genFile.Close)
+
+	execFile, err := os.Create(resultFiles.ExecuteTraces[0])
+	if err != nil {
+		return nil, nil, err
+	}
+	defer helpers.DeferIgnoreError(execFile.Close)
+
+	genEnc := json.NewEncoder(genFile)
+	execEnc := json.NewEncoder(execFile)
+
 	// Now combine all the entries for each trace
 	for tid, items := range traceEntries {
 		log.Info("Combining entries for trace", "traceId", tid, "numEntries", len(items))
@@ -131,6 +139,8 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outFile string) 
 			continue
 		}
 		traces[tid] = trace
+
+		var enc *json.Encoder
 
 		// Update the blocks associated with this trace
 		switch t := trace.(type) {
@@ -149,6 +159,7 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outFile string) 
 				}
 				block.GenTraceID = tid
 			}
+			enc = genEnc
 		case *ExecuteTrace:
 			bid := t.Request.GetBlock().GetId()
 			if bid == "" {
@@ -165,12 +176,89 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outFile string) 
 				block.ExecTraceIDs = make([]string, 0, 10)
 			}
 			block.ExecTraceIDs = append(block.ExecTraceIDs, tid)
+			enc = execEnc
 		default:
 			log.Error(fmt.Errorf("Unknown trace type"), "Unknown trace type", "trace", t)
+		}
+
+		if enc != nil {
+			if err := enc.Encode(trace); err != nil {
+				log.Error(err, "Error writing trace to output file")
+			}
+		}
+	}
+
+	return traces, blocks, nil
+}
+
+func findLogFiles(ctx context.Context, logsDir string) ([]string, error) {
+	log := logs.FromContext(ctx)
+	jsonFiles := []string{}
+	paths := map[string]bool{}
+
+	if _, err := os.Stat(logsDir); err != nil && os.IsNotExist(err) {
+		return jsonFiles, fmt.Errorf("Analyze invoked for non-existent path: %v", logsDir)
+	}
+
+	// Walk the directory and add all JSON files.
+	walkErr := filepath.Walk(logsDir,
+		func(path string, info os.FileInfo, walkErr error) error {
+			// Skip non YAML files
+			ext := strings.ToLower(filepath.Ext(info.Name()))
+
+			if ext != ".json" && ext != ".jsonl" {
+				return nil
+			}
+			p, err := filepath.EvalSymlinks(path)
+			if err != nil {
+				log.Error(err, "Failed to evaluate symlink", "path", path)
+				return err
+			}
+			paths[p] = true
+			return nil
+		})
+
+	if walkErr != nil {
+		return jsonFiles, walkErr
+	}
+
+	for p := range paths {
+		jsonFiles = append(jsonFiles, p)
+	}
+
+	sort.Strings(jsonFiles)
+
+	return jsonFiles, nil
+}
+
+func initResultFiles(outDir string) ResultFiles {
+	stamp := time.Now().Format("2006-01-02T15:04:05")
+	return ResultFiles{
+		BlockLogs:      []string{filepath.Join(outDir, fmt.Sprintf("blocks.logs.%s.jsonl", stamp))},
+		GenerateTraces: []string{filepath.Join(outDir, fmt.Sprintf("traces.generate.%s.jsonl", stamp))},
+		ExecuteTraces:  []string{filepath.Join(outDir, fmt.Sprintf("traces.execute.%s.jsonl", stamp))},
+	}
+}
+
+func buildBlockLogs(ctx context.Context, traces map[string]Trace, blocks map[string]*BlockLog, outFile string) error {
+	log := logs.FromContext(ctx)
+
+	oDir := filepath.Dir(outFile)
+	if _, err := os.Stat(oDir); os.IsNotExist(err) {
+		log.Info("Creating directory for block logs", "dir", oDir)
+		err := os.MkdirAll(oDir, 0755)
+		if err != nil {
+			return errors.Wrapf(err, "could not log directory %s", oDir)
 		}
 	}
 
 	// Now we can process each block and write the combined entries to the output file.
+	oFile, err := os.Create(outFile)
+	if err != nil {
+		return err
+	}
+	defer helpers.DeferIgnoreError(oFile.Close)
+
 	enc := json.NewEncoder(oFile)
 	for bid, blockLog := range blocks {
 		log.Info("Combining entries for block", "blockId", bid)
@@ -183,7 +271,6 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outFile string) 
 			log.Error(err, "Error writing example to output file")
 		}
 	}
-
 	return nil
 }
 

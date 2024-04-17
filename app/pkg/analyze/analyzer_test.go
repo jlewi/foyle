@@ -164,28 +164,26 @@ func Test_Analyzer(t *testing.T) {
 	}
 	zap.ReplaceGlobals(log)
 
-	test_dir := filepath.Join(cwd, "test_data", "logs")
+	testDir := filepath.Join(cwd, "test_data", "logs")
 
 	a, err := NewAnalyzer()
 	if err != nil {
 		t.Fatalf("Failed to create analyzer: %v", err)
 	}
 
-	oFile, err := os.CreateTemp("", "output.json")
+	oDir, err := os.MkdirTemp("", "processedLogs")
 	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	name := oFile.Name()
-	if err := oFile.Close(); err != nil {
-		t.Fatalf("Failed to close file: %v", err)
+		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
-	if err := a.Analyze(context.Background(), test_dir, name); err != nil {
+	resultFiles, err := a.Analyze(context.Background(), testDir, oDir)
+	if err != nil {
 		t.Fatalf("Analyze failed: %v", err)
 	}
-	t.Logf("Output written to: %s", name)
+	t.Logf("Output written to: %s", oDir)
 
-	f, err := os.Open(name)
+	// Check the blocks
+	f, err := os.Open(resultFiles.BlockLogs[0])
 	if err != nil {
 		t.Fatalf("Failed to open output file: %v", err)
 	}
@@ -237,6 +235,60 @@ func Test_Analyzer(t *testing.T) {
 	}
 	if block.ExecutedBlock == nil {
 		t.Errorf("Expected ExecutedBlock to be set")
+	}
+
+	// Check the traces
+	checkGenTracesFiles(t, resultFiles.GenerateTraces[0])
+	checkExecuteTracesFiles(t, resultFiles.ExecuteTraces[0])
+}
+
+func checkGenTracesFiles(t *testing.T, path string) {
+	// Check the generate traces
+	genFile, err := os.Open(path)
+	if err != nil {
+		t.Errorf("Failed to open output file: %v", err)
+		return
+	}
+	traces := make([]*GenerateTrace, 0, 10)
+	d := json.NewDecoder(genFile)
+	for {
+		trace := &GenerateTrace{}
+		if err := d.Decode(trace); err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Errorf("Failed to decode generate trace: %v", err)
+		}
+		traces = append(traces, trace)
+	}
+
+	if len(traces) == 0 {
+		t.Errorf("Expected to find some generate traces")
+	}
+}
+
+func checkExecuteTracesFiles(t *testing.T, path string) {
+	// Check the generate traces
+	genFile, err := os.Open(path)
+	if err != nil {
+		t.Errorf("Failed to open output file: %v", err)
+		return
+	}
+	traces := make([]*ExecuteTrace, 0, 10)
+	d := json.NewDecoder(genFile)
+	for {
+		trace := &ExecuteTrace{}
+		if err := d.Decode(trace); err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Errorf("Failed to decode execute trace: %v", err)
+		}
+		traces = append(traces, trace)
+	}
+
+	if len(traces) == 0 {
+		t.Errorf("Expected to find some execute traces")
 	}
 }
 

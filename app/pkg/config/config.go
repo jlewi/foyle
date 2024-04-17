@@ -162,6 +162,14 @@ func (c *Config) GetLogDir() string {
 	return filepath.Join(c.GetConfigDir(), "logs")
 }
 
+func (c *Config) GetRawLogDir() string {
+	return filepath.Join(c.GetLogDir(), "raw")
+}
+
+func (c *Config) GetProcessedLogDir() string {
+	return filepath.Join(c.GetLogDir(), "processed")
+}
+
 func (c *Config) GetLogLevel() string {
 	if c.Logging.Level == "" {
 		return "info"

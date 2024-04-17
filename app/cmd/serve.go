@@ -23,7 +23,7 @@ func NewServeCmd() *cobra.Command {
 				if err := app.LoadConfig(cmd); err != nil {
 					return err
 				}
-				if err := app.SetupLogging(); err != nil {
+				if err := app.SetupLogging(true); err != nil {
 					return err
 				}
 				if err := app.SetupOTEL(); err != nil {
