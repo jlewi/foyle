@@ -5,6 +5,7 @@ import { Controller } from './controller';
 import {FoyleClient} from './client';
 import { Serializer } from './serializer';
 import * as generate from './generate';
+import * as debug from './debug';
 // Create a client for the backend.
 const client = new FoyleClient;
 
@@ -52,6 +53,8 @@ export function activate(context: vscode.ExtensionContext) {
 	// Here's where we register the command that will generate a completion using the AI model
 	// You can set a keybinding for this command in the package.json file
   context.subscriptions.push(vscode.commands.registerCommand("foyle.generate", generate.generateCompletion));
+
+	context.subscriptions.push(vscode.commands.registerCommand("foyle.printCell", debug.printCell));
 	context.subscriptions.push(disposable);
 }
 

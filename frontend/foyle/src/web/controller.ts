@@ -66,6 +66,11 @@ export class Controller {
 }
 
 async function callExecute(cell: vscode.NotebookCell, client: client.FoyleClient): Promise<vscode.NotebookCellOutput[]> {
+  if (cell.metadata.hasOwnProperty("id")) {
+    console.log(`callExecute called on block id = ${cell.metadata["id"]}`);
+  } else {
+    console.log(`callExecute called on block without id`);
+  }
   console.log(`callExecute called ${cell.document.getText()}`); 
 
   const request = new agentpb.ExecuteRequest();
