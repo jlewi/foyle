@@ -29,17 +29,8 @@ export function setBlockFromMeta(block: docpb.Block, meta: CellMetadata) {
   if (Object.keys(meta).length === 0) {
     console.log("meta is an empty object");
   }
-  if (meta.constructor !== Object) {
-    console.log("Meta is not a plain object");
-  }
-  console.log("Meta is not undefined and is a plain object");
-  if (Array.isArray(meta)) {
-    console.log("meta is array");
-    return;
-  }
-  console.log("Type of meta: ", typeof meta);  
-  console.log("Value of meta: ", JSON.stringify(meta, null, 2));
-  console.log("setBlockFromMetdata meta not null");
+  // TODO(https://github.com/jlewi/foyle/issues/56). Would calling Object
+  // on meta fix the issue?
   if (meta.hasOwnProperty("traceIds")) {
     block.traceIds = meta["traceIds"];
     console.log("setBlockFromMetdata setting traceId");
