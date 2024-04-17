@@ -12,7 +12,7 @@ import (
 // GetExitCode returns the exit code from a block output if the block represents the exit code
 // The function returns the exit code and a boolean indicating if the block represents the exit code.
 // N.B. Keep this in sync with resultsToProto in executor.go
-func GetExitCode(b v1alpha1.BlockOutput) (int, bool) {
+func GetExitCode(b *v1alpha1.BlockOutput) (int, bool) {
 	log := zapr.NewLogger(zap.L())
 	for _, oi := range b.Items {
 		if oi.GetTextData() == "" {

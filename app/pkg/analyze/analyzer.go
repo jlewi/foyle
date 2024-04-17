@@ -238,7 +238,7 @@ func buildBlockLog(ctx context.Context, block *BlockLog, traces map[string]Trace
 		block.ExecutedBlock = lastTrace.Request.GetBlock()
 		block.ExitCode = unsetExitCode
 		for _, o := range lastTrace.Response.GetOutputs() {
-			exitCode, ok := docs.GetExitCode(*o)
+			exitCode, ok := docs.GetExitCode(o)
 			if ok {
 				block.ExitCode = exitCode
 				break

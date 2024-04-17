@@ -26,7 +26,6 @@ func timeMustParse(layoutString, value string) time.Time {
 }
 
 func shuffle(in []string) []string {
-	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(in), func(i, j int) { in[i], in[j] = in[j], in[i] })
 	return in
 }
