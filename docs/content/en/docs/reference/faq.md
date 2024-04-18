@@ -16,3 +16,7 @@ If users want to execute python code they can still do it by invoking `python` i
 * [k8sgpt.ai](https://k8sgpt.ai/) Tool to scan your K8s clusters and explain issues and potential fixes.
 * [Honeycomb Query Assitant](https://www.honeycomb.io/blog/introducing-query-assistant)
 * [Fiberplane](https://docs.fiberplane.com/docs/notebooks) Offer collaborative notebooks for incidement management and post-mortems
+* [Kubecost](https://kubecost.com/) Offers a Jupyter notebook interface for analyzing Kubernetes cost data.
+* [k9s](https://k9scli.io/) Offers a terminal based UI for interacting with Kubernetes.
+* [Waveterm](https://github.com/wavetermdev/waveterm) AI Open Source Terminal
+* [warp.dev](https://warp.dev/) AI based terminal which now supports notebooks
