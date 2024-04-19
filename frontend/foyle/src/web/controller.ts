@@ -20,12 +20,8 @@ export class Controller {
   private client: client.FoyleClient;
   private readonly _controller: vscode.NotebookController;
   private _executionOrder = 0;    
-  constructor(client: client.FoyleClient, isInteractive?: boolean) {
-    this.client = client;
-    if (isInteractive) {
-      this.id = "foyle-notebook-interactive-kernel";
-      this.notebookType = "interactive";
-    }
+  constructor(client: client.FoyleClient) {
+    this.client = client;    
     this._controller = vscode.notebooks.createNotebookController(
       this.id,
       this.notebookType,
