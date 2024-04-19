@@ -23,8 +23,9 @@ export function activate(context: vscode.ExtensionContext) {
   
 	// Register the markdown serializer
 	//context.subscriptions.push(vscode.workspace.registerNotebookSerializer("foyle-md-notebook", new MarkdownProvider(), providerOptions));
-	// Register the controller for the notebook
-	context.subscriptions.push(new Controller(client));
+	// Register the controllers for the notebooks
+	// notebookType must match the value in package.json
+	context.subscriptions.push(new Controller(client, "foyle-notebook", "foyle-notebook", "Foyle Notebook"));
   //context.subscriptions.push(new Controller(client, "foyle-notebook"));
   //context.subscriptions.push(new Controller(client, "foyle-md-notebook"));
   
