@@ -8,10 +8,6 @@ import * as docpb from "../gen/foyle/v1alpha1/doc_pb";
 
 // Controller handles execution of cells.
 export class Controller {
-  // readonly label: string = "Foyle Notebook";  
-  // readonly notebookType: string = "foyle-notebook";
-  // readonly id: string = "foyle-notebook-kernel";
-
   // The controller needs to register the languages it handles. Each cell in the
   // notebook has a langId field. That is used to match it to the supported kernel.
   // I think that is used to match the controller to the cell.

@@ -27,11 +27,6 @@ export function activate(context: vscode.ExtensionContext) {
 	// notebookType must match the value in package.json
 	context.subscriptions.push(new Controller(client, "foyle-notebook", "foyle-notebook", "Foyle Notebook"));
 	context.subscriptions.push(new Controller(client, "foyle-notebook-md", "foyle-notebook-md", "Foyle Notebook Markdown"));
-  //context.subscriptions.push(new Controller(client, "foyle-notebook"));
-  //context.subscriptions.push(new Controller(client, "foyle-md-notebook"));
-  
-  // TODO(jeremy): Register a command to handle generation
-  //context.subscriptions.push(vscode.commands.registerCommand("foyle.generate", handleGenerate));
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
