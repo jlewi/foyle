@@ -24,7 +24,8 @@ export function activate(context: vscode.ExtensionContext) {
 	// Register the markdown serializer
 	//context.subscriptions.push(vscode.workspace.registerNotebookSerializer("foyle-md-notebook", new MarkdownProvider(), providerOptions));
 	// Register the controller for the notebook
-  context.subscriptions.push(new Controller(client, "foyle-notebook"));
+	context.subscriptions.push(new Controller(client));
+  //context.subscriptions.push(new Controller(client, "foyle-notebook"));
   //context.subscriptions.push(new Controller(client, "foyle-md-notebook"));
   
   // TODO(jeremy): Register a command to handle generation
