@@ -22,21 +22,11 @@ export function activate(context: vscode.ExtensionContext) {
   );
   
 	// Register the markdown serializer
-	context.subscriptions.push(vscode.workspace.registerNotebookSerializer('markdown-notebook', new MarkdownProvider(), providerOptions));
+	//context.subscriptions.push(vscode.workspace.registerNotebookSerializer("foyle-md-notebook", new MarkdownProvider(), providerOptions));
 	// Register the controller for the notebook
-  context.subscriptions.push(new Controller(client));
-  context.subscriptions.push(new Controller(client, true));
+  context.subscriptions.push(new Controller(client, "foyle-notebook"));
+  //context.subscriptions.push(new Controller(client, "foyle-md-notebook"));
   
-
-  context.subscriptions.push(vscode.commands.registerCommand("foyle-notebook.newInteractive", async () => {
-		const result: { inputUri: vscode.Uri, notebookUri?: vscode.Uri, notebookEditor?: vscode.NotebookEditor } | undefined = await vscode.commands.executeCommand('interactive.open',
-			undefined,
-			undefined,
-			`${context.extension.id}/foyle-notebook-interactive-kernel`,
-			undefined
-		);
-	}));
-
   // TODO(jeremy): Register a command to handle generation
   //context.subscriptions.push(vscode.commands.registerCommand("foyle.generate", handleGenerate));
 

@@ -9,8 +9,8 @@ import * as docpb from "../gen/foyle/v1alpha1/doc_pb";
 // Controller handles execution of cells.
 export class Controller {
   readonly label: string = "Foyle Notebook";  
-  readonly notebookType: string = "foyle-notebook";
-  readonly id: string = "foyle-notebook-kernel";
+  readonly notebookType: string = "";
+  readonly id: string = "";
 
   // The controller needs to register the languages it handles. Each cell in the
   // notebook has a langId field. That is used to match it to the supported kernel.
@@ -20,12 +20,10 @@ export class Controller {
   private client: client.FoyleClient;
   private readonly _controller: vscode.NotebookController;
   private _executionOrder = 0;    
-  constructor(client: client.FoyleClient, isInteractive?: boolean) {
+  constructor(client: client.FoyleClient, notebookType: string) {
     this.client = client;
-    if (isInteractive) {
-      this.id = "foyle-notebook-interactive-kernel";
-      this.notebookType = "interactive";
-    }
+    this.id = `${notebookType}-kernel`;   
+    this.label = notebookType; 
     this._controller = vscode.notebooks.createNotebookController(
       this.id,
       this.notebookType,
