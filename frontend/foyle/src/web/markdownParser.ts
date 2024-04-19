@@ -5,6 +5,7 @@
 // File originally based on
 // https://github.com/microsoft/vscode-markdown-notebook/blob/main/src/markdownParser.ts
 import * as vscode from 'vscode';
+import { bashLang } from './constants';
 
 export interface RawNotebookCell {
 	indentation?: string;
@@ -91,8 +92,14 @@ export function parseMarkdown(content: string): RawNotebookCell[] {
 	}
 
 	function parseCodeBlock(leadingWhitespace: string, codeBlockStart: ICodeBlockStart): void {
-		const language = LANG_IDS.get(codeBlockStart.langId) || codeBlockStart.langId;
-		const startSourceIdx = ++i;
+		var language = LANG_IDS.get(codeBlockStart.langId) || codeBlockStart.langId;
+		
+    // Default the language to the bash language that the executor knows how to execute
+    if (language === "") {
+      language = bashLang;
+    }
+
+    const startSourceIdx = ++i;
 		while (true) {
 			const currLine = lines[i];
 			if (i >= lines.length) {
