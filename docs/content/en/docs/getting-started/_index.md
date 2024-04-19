@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: Getting started with Foyle?
+description: Getting started with Foyle
 weight: 2
 ---
 
@@ -97,3 +97,7 @@ If you are unhappy with the default key binding to generate a completion you can
 1. Click the gear icon in the lower left window and then select "Keyboard shortcuts"
 1. Search for "Foyle"
 1. Change the keybinding for `Foyle: generate a completion` to the keybinding you want to use
+
+## Where to go next
+
+* [Using Markdown Files](/docs/markdown/)

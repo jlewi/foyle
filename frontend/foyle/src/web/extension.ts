@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { Controller } from './controller';
 import {FoyleClient} from './client';
 import { Serializer } from './serializer';
+import { MarkdownProvider , providerOptions} from './markdown';
 import * as generate from './generate';
 import * as debug from './debug';
 // Create a client for the backend.
@@ -20,22 +21,12 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
   
-	// Register the controller for the notebook
-  context.subscriptions.push(new Controller(client));
-  context.subscriptions.push(new Controller(client, true));
-  
-
-  context.subscriptions.push(vscode.commands.registerCommand("foyle-notebook.newInteractive", async () => {
-		const result: { inputUri: vscode.Uri, notebookUri?: vscode.Uri, notebookEditor?: vscode.NotebookEditor } | undefined = await vscode.commands.executeCommand('interactive.open',
-			undefined,
-			undefined,
-			`${context.extension.id}/foyle-notebook-interactive-kernel`,
-			undefined
-		);
-	}));
-
-  // TODO(jeremy): Register a command to handle generation
-  //context.subscriptions.push(vscode.commands.registerCommand("foyle.generate", handleGenerate));
+	// Register the markdown serializer
+	context.subscriptions.push(vscode.workspace.registerNotebookSerializer("foyle-notebook-md", new MarkdownProvider(), providerOptions));
+	// Register the controllers for the notebooks
+	// notebookType must match the value in package.json
+	context.subscriptions.push(new Controller(client, "foyle-notebook", "foyle-notebook", "Foyle Notebook"));
+	context.subscriptions.push(new Controller(client, "foyle-notebook-md", "foyle-notebook-md", "Foyle Notebook Markdown"));
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
