@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { Controller } from './controller';
 import {FoyleClient} from './client';
 import { Serializer } from './serializer';
+import { MarkdownProvider , providerOptions} from './markdown';
 import * as generate from './generate';
 import * as debug from './debug';
 // Create a client for the backend.
@@ -20,6 +21,8 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
   
+	// Register the markdown serializer
+	context.subscriptions.push(vscode.workspace.registerNotebookSerializer('markdown-notebook', new MarkdownProvider(), providerOptions));
 	// Register the controller for the notebook
   context.subscriptions.push(new Controller(client));
   context.subscriptions.push(new Controller(client, true));

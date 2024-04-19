@@ -62,7 +62,17 @@
             "filenamePattern": "*.{foyle}"
           }
         ]
-      }
+      },
+      {
+				"type": "markdown-notebook",
+				"displayName": "Markdown Notebook",
+				"priority": "option",
+				"selector": [
+					{
+						"filenamePattern": "*.{md,markdown}"
+					}
+				]
+			}
     ],
     "languages": [
       {
