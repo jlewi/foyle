@@ -35,7 +35,7 @@
         "command": "foyle.generate",
         "key": "win+;",
         "mac": "cmd+;",
-        "when": "resourceExtname==.foyle"
+        "when": "resourceExtname==.foyle || resourceExtname==.md || resourceExtname==.markdown"
       }
     ],
     "configuration": {
@@ -60,6 +60,15 @@
         "selector": [
           {
             "filenamePattern": "*.{foyle}"
+          }
+        ]
+      },
+      {
+        "type": "foyle-notebook-md",
+        "displayName": "Foyle Notebook",
+        "selector": [
+          {
+            "filenamePattern": "*.{md,markdown}"
           }
         ]
       }  
