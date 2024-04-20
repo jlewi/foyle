@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jlewi/foyle/app/pkg/analyze"
 	"time"
 
 	"html/template"
@@ -50,6 +51,7 @@ type Server struct {
 	agent            *agent.Agent
 	executor         *executor.Executor
 	conn             *grpc.ClientConn
+	logsCrud         *analyze.CrudHandler
 	shutdownComplete chan bool
 }
 
@@ -71,10 +73,15 @@ func NewServer(config config.Config) (*Server, error) {
 		return nil, err
 	}
 
+	logsCrud, err := analyze.NewCrudHandler(config)
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{
 		config:   config,
 		executor: e,
 		agent:    a,
+		logsCrud: logsCrud,
 	}
 
 	if err := s.createGinEngine(); err != nil {
@@ -209,15 +216,7 @@ func (s *Server) createGinEngine() error {
 	}
 
 	// Add REST handlers for blocklogs
-	router.GET("api/blocklogs/:id", func(c *gin.Context) {
-		id := c.Param("id")
-		// Use the id to fetch or manipulate the resource
-		// For now, we'll just echo it back
-		c.JSON(http.StatusOK, gin.H{
-			"id": id,
-		})
-	})
-
+	router.GET("api/blocklogs/:id", s.logsCrud.GetBlockLog)
 	s.engine = router
 	return nil
 }
