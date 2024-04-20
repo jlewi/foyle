@@ -207,6 +207,17 @@ func (s *Server) createGinEngine() error {
 		corsMiddleWare := cors.New(corsConfig)
 		router.Use(corsMiddleWare)
 	}
+
+	// Add REST handlers for blocklogs
+	router.GET("api/blocklogs/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		// Use the id to fetch or manipulate the resource
+		// For now, we'll just echo it back
+		c.JSON(http.StatusOK, gin.H{
+			"id": id,
+		})
+	})
+
 	s.engine = router
 	return nil
 }
