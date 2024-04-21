@@ -221,26 +221,24 @@ func (s *Server) createGinEngine() error {
 	router.GET("api/blocklogs/:id", s.logsCrud.GetBlockLog)
 
 	app.Route("/", &logsviewer.Viewer{})
+
+	if strings.HasSuffix(logsviewer.AppPath, "/") {
+		return errors.New("logsviewer.AppPath should not have a trailing slash")
+	}
+
+	if !strings.HasPrefix(logsviewer.AppPath, "/") {
+		return errors.New("logsviewer.AppPath should have a leading slash")
+	}
+
 	viewerApp := &app.Handler{
 		Name:        "FoyleLogsViewer",
 		Description: "View Foyle Logs",
 		// Since we don't want to serve the viewer on the root "/" we need to use a CustomProvider
-		Resources: app.CustomProvider("", "/viewer"),
+		Resources: app.CustomProvider("", logsviewer.AppPath),
 	}
 	// N.B. We need a trailing slash for the relativePath passed to router. Any but not in the stripprefix
 	// because we need to leave the final slash in the path so that the route ends up matching.
-	//router.Group("/viewer").Use(gin.WrapH(viewerApp))
-	//router.Any("/viewer", gin.WrapH(viewerApp))
-	router.Any("/viewer/*any", gin.WrapH(http.StripPrefix("/viewer", viewerApp)))
-
-	//router.Group("/someprefix").Use(func(c *gin.Context) {
-	//	c.JSON(http.StatusOK, gin.H{"message": "Hello World from path " + c.FullPath()})
-	//}).GET("/somepath", func(c *gin.Context) {
-	//	c.JSON(http.StatusOK, gin.H{"message": "Hello World"})
-	//})
-	router.GET("/someprefix/*any", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"matchedRoute": c.FullPath(), "path": c.Request.URL.Path})
-	})
+	router.Any(logsviewer.AppPath+"/*any", gin.WrapH(http.StripPrefix(logsviewer.AppPath, viewerApp)))
 
 	s.engine = router
 	return nil
