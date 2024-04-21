@@ -5,7 +5,7 @@ build: build-dir
 	CGO_ENABLED=0 go build -o .build/foyle github.com/jlewi/foyle/app
 
 build-wasm:
-	GOARCH=wasm GOOS=js go build -o web/app.wasm ./viewer
+	GOARCH=wasm GOOS=js go build -o web/app.wasm ./pwa
 
 tidy-go:
 	gofmt -s -w .

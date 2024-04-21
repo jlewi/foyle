@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jlewi/foyle/app/pkg/analyze"
+	"github.com/jlewi/foyle/app/pkg/logsviewer"
+	"github.com/maxence-charriere/go-app/v9/pkg/app"
 	"time"
 
 	"html/template"
@@ -217,6 +219,14 @@ func (s *Server) createGinEngine() error {
 
 	// Add REST handlers for blocklogs
 	router.GET("api/blocklogs/:id", s.logsCrud.GetBlockLog)
+
+	app.Route(logsviewer.AppPath, &logsviewer.Viewer{})
+	viewerApp := &app.Handler{
+		Name:        "FoyleLogsViewer",
+		Description: "View Foyle Logs",
+	}
+	router.Any(logsviewer.AppPath, gin.WrapH(viewerApp))
+
 	s.engine = router
 	return nil
 }
