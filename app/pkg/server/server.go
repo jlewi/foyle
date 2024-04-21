@@ -220,12 +220,18 @@ func (s *Server) createGinEngine() error {
 	// Add REST handlers for blocklogs
 	router.GET("api/blocklogs/:id", s.logsCrud.GetBlockLog)
 
-	app.Route(logsviewer.AppPath, &logsviewer.Viewer{})
+	app.Route("/", &logsviewer.Viewer{})
 	viewerApp := &app.Handler{
 		Name:        "FoyleLogsViewer",
 		Description: "View Foyle Logs",
+		// Since we don't want to serve the viewer on the root "/" we need to use a CustomProvider
+		Resources: app.CustomProvider("", "/viewer"),
 	}
-	router.Any(logsviewer.AppPath, gin.WrapH(viewerApp))
+	// N.B. We need a trailing slash for the relativePath passed to router. Any but not in the stripprefix
+	// because we need to leave the final slash in the path so that the route ends up matching.
+	//router.Group("/viewer").Use(gin.WrapH(viewerApp))
+	//router.Any("/viewer", gin.WrapH(viewerApp))
+	router.Any("/viewer/", gin.WrapH(http.StripPrefix("/viewer", viewerApp)))
 
 	s.engine = router
 	return nil

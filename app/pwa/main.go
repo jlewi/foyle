@@ -16,8 +16,6 @@ func main() {
 	//
 	// This is done by calling the Route() function,  which tells go-app what
 	// component to display for a given path, on both client and server-side.
-	//
-	// N.B. Keep this in sync with the rout registered in the ginserver in server.go
 	app.Route("/", &logsviewer.Viewer{})
 
 	// Once the routes set up, the next thing to do is to either launch the app
@@ -35,10 +33,10 @@ func main() {
 
 	// N.B. This code isn't actually used to serve because we serve it off our existing gin server defined in the
 	// server pkg. But its useful for debugging/
-	http.Handle(logsviewer.AppPath, http.StripPrefix("/viewer", &app.Handler{
+	http.Handle("/", http.StripPrefix("/viewer", &app.Handler{
 		Name:        "Hello",
 		Description: "An Hello World! example",
-		Resources:   app.CustomProvider("", "viewer"),
+		Resources:   app.CustomProvider("", "/viewer"),
 	}))
 
 	if err := http.ListenAndServe(":8000", nil); err != nil {
