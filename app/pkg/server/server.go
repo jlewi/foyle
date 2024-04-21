@@ -231,7 +231,16 @@ func (s *Server) createGinEngine() error {
 	// because we need to leave the final slash in the path so that the route ends up matching.
 	//router.Group("/viewer").Use(gin.WrapH(viewerApp))
 	//router.Any("/viewer", gin.WrapH(viewerApp))
-	router.Any("/viewer/", gin.WrapH(http.StripPrefix("/viewer", viewerApp)))
+	router.Any("/viewer/*any", gin.WrapH(http.StripPrefix("/viewer", viewerApp)))
+
+	//router.Group("/someprefix").Use(func(c *gin.Context) {
+	//	c.JSON(http.StatusOK, gin.H{"message": "Hello World from path " + c.FullPath()})
+	//}).GET("/somepath", func(c *gin.Context) {
+	//	c.JSON(http.StatusOK, gin.H{"message": "Hello World"})
+	//})
+	router.GET("/someprefix/*any", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"matchedRoute": c.FullPath(), "path": c.Request.URL.Path})
+	})
 
 	s.engine = router
 	return nil
@@ -470,8 +479,8 @@ func (s *Server) registerGRPCGatewayRoutes() error {
 	// we need to configure the gin server to delegate to the gateway mux for the appropriate routes.
 	// There currently doesn't seem to be anyway to do this programmatically. So if we add new routes we'd
 	// have to update the code here.
-	// TODO(jeremy): Actually can we do this with the group method? https://gin-gonic.com/docs/examples/grouping-routes/
-	// e.g.
+	// TODO(jeremy): Actually I don't think we can use the group method but I think we can use the star method.
+	// e.g. router.Any("/api/*any", handleFunc)
 	// api := router.Group("/api", handleFunc)
 	pathPrefix := "/api/v1alpha1"
 
