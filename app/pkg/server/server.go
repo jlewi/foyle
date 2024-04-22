@@ -6,6 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jlewi/foyle/app/pkg/analyze"
+	"github.com/jlewi/foyle/app/pkg/logsviewer"
+	"github.com/maxence-charriere/go-app/v9/pkg/app"
+
 	"html/template"
 	"log"
 	"net"
@@ -50,6 +54,7 @@ type Server struct {
 	agent            *agent.Agent
 	executor         *executor.Executor
 	conn             *grpc.ClientConn
+	logsCrud         *analyze.CrudHandler
 	shutdownComplete chan bool
 }
 
@@ -71,10 +76,15 @@ func NewServer(config config.Config) (*Server, error) {
 		return nil, err
 	}
 
+	logsCrud, err := analyze.NewCrudHandler(config)
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{
 		config:   config,
 		executor: e,
 		agent:    a,
+		logsCrud: logsCrud,
 	}
 
 	if err := s.createGinEngine(); err != nil {
@@ -207,6 +217,38 @@ func (s *Server) createGinEngine() error {
 		corsMiddleWare := cors.New(corsConfig)
 		router.Use(corsMiddleWare)
 	}
+
+	// Add REST handlers for blocklogs
+	router.GET("api/blocklogs/:id", s.logsCrud.GetBlockLog)
+
+	app.Route("/", &logsviewer.MainApp{})
+
+	if strings.HasSuffix(logsviewer.AppPath, "/") {
+		return errors.New("logsviewer.AppPath should not have a trailing slash")
+	}
+
+	if !strings.HasPrefix(logsviewer.AppPath, "/") {
+		return errors.New("logsviewer.AppPath should have a leading slash")
+	}
+
+	endpoint := fmt.Sprintf("http://%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
+	log.Info("Setting up logs viewer", "endpoint", endpoint, "path", logsviewer.AppPath)
+	viewerApp := &app.Handler{
+		Name:        "FoyleLogsViewer",
+		Description: "View Foyle Logs",
+		// Since we don't want to serve the viewer on the root "/" we need to use a CustomProvider
+		Resources: app.CustomProvider("", logsviewer.AppPath),
+		Styles: []string{
+			"/web/viewer.css", // Loads traceSelector.css file.
+		},
+		Env: map[string]string{
+			logsviewer.EndpointEnvVar: endpoint,
+		},
+	}
+	// N.B. We need a trailing slash for the relativePath passed to router. Any but not in the stripprefix
+	// because we need to leave the final slash in the path so that the route ends up matching.
+	router.Any(logsviewer.AppPath+"/*any", gin.WrapH(http.StripPrefix(logsviewer.AppPath, viewerApp)))
+
 	s.engine = router
 	return nil
 }
@@ -444,8 +486,8 @@ func (s *Server) registerGRPCGatewayRoutes() error {
 	// we need to configure the gin server to delegate to the gateway mux for the appropriate routes.
 	// There currently doesn't seem to be anyway to do this programmatically. So if we add new routes we'd
 	// have to update the code here.
-	// TODO(jeremy): Actually can we do this with the group method? https://gin-gonic.com/docs/examples/grouping-routes/
-	// e.g.
+	// TODO(jeremy): Actually I don't think we can use the group method but I think we can use the star method.
+	// e.g. router.Any("/api/*any", handleFunc)
 	// api := router.Group("/api", handleFunc)
 	pathPrefix := "/api/v1alpha1"
 

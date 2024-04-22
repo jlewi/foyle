@@ -1,0 +1,25 @@
+.main-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.header {
+    height: 5%;
+    background-color: #9aefa8;
+}
+
+.content {
+    display: flex;
+    flex: 1;
+}
+
+.sidebar {
+    width: 150px;
+    background-color: #57d2ed;
+}
+
+.main-window {
+    flex: 1;
+    background-color: #fff;
+}

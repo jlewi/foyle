@@ -12,3 +12,4 @@ dist/
 **/bin
 **/plugin
 **/cover.out
+**/*.wasm
