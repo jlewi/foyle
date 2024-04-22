@@ -3,13 +3,14 @@ package analyze
 import (
 	"context"
 	"encoding/json"
-	"github.com/jlewi/foyle/app/api"
 	"io"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/jlewi/foyle/app/api"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

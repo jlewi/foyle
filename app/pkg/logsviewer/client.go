@@ -3,14 +3,15 @@ package logsviewer
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"io"
-	"net/http"
-	"strings"
 )
 
 var (

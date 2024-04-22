@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
@@ -11,11 +17,6 @@ import (
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"io"
-	"net/http"
-	"os"
-	"path/filepath"
-	"sort"
 )
 
 // CrudHandler is a handler for CRUD operations on log entries

@@ -2,6 +2,7 @@ package logsviewer
 
 import (
 	"bytes"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/pkg/errors"

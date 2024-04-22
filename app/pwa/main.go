@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/jlewi/foyle/app/pkg/logsviewer"
-	"go.uber.org/zap"
 	"log"
 	"net/http"
+
+	"github.com/jlewi/foyle/app/pkg/logsviewer"
+	"go.uber.org/zap"
 
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 )

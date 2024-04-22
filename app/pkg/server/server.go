@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/logsviewer"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
-	"time"
 
 	"html/template"
 	"log"

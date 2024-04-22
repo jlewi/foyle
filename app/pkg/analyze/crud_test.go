@@ -2,13 +2,14 @@ package analyze
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-cmp/cmp"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/config"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestGetBlockLog(t *testing.T) {
