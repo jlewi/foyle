@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-cmp/cmp"
+	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +19,7 @@ func TestGetBlockLog(t *testing.T) {
 	}
 
 	// Add a block log to the handler's cache for testing
-	handler.blockLogs = map[string]BlockLog{
+	handler.blockLogs = map[string]api.BlockLog{
 		"test-id": {
 			ID:       "test-id",
 			ExitCode: 7,
@@ -50,7 +51,7 @@ func TestGetBlockLog(t *testing.T) {
 
 	// Check the response body
 	actualBody := w.Body.String()
-	actual := BlockLog{}
+	actual := api.BlockLog{}
 	if err := json.Unmarshal([]byte(actualBody), &actual); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/zapr"
+	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/pkg/errors"
@@ -19,7 +20,7 @@ import (
 
 // CrudHandler is a handler for CRUD operations on log entries
 type CrudHandler struct {
-	blockLogs map[string]BlockLog
+	blockLogs map[string]api.BlockLog
 	cfg       config.Config
 }
 
@@ -63,7 +64,7 @@ func (h *CrudHandler) loadCache(ctx context.Context) error {
 	}
 
 	sort.Strings(matches)
-	h.blockLogs = make(map[string]BlockLog)
+	h.blockLogs = make(map[string]api.BlockLog)
 
 	latest := matches[len(matches)-1]
 	log := logs.FromContext(ctx)
@@ -76,7 +77,7 @@ func (h *CrudHandler) loadCache(ctx context.Context) error {
 	defer f.Close()
 	d := json.NewDecoder(f)
 	for {
-		b := &BlockLog{}
+		b := &api.BlockLog{}
 		if err := d.Decode(b); err != nil {
 			if err == io.EOF {
 				break

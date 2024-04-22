@@ -3,6 +3,7 @@ package analyze
 import (
 	"context"
 	"encoding/json"
+	"github.com/jlewi/foyle/app/api"
 	"io"
 	"math/rand"
 	"os"
@@ -33,15 +34,15 @@ func shuffle(in []string) []string {
 func Test_BuildBlockLog(t *testing.T) {
 	type testCase struct {
 		name     string
-		block    *BlockLog
-		traces   map[string]Trace
-		expected *BlockLog
+		block    *api.BlockLog
+		traces   map[string]api.Trace
+		expected *api.BlockLog
 	}
 
-	traces := make(map[string]Trace)
+	traces := make(map[string]api.Trace)
 
 	const bid1 = "g123output1"
-	genTrace := &GenerateTrace{
+	genTrace := &api.GenerateTrace{
 		TraceID:   "g123",
 		StartTime: timeMustParse(time.RFC3339, "2021-01-01T00:00:00Z"),
 		EndTime:   timeMustParse(time.RFC3339, "2021-01-01T00:01:00Z"),
@@ -64,7 +65,7 @@ func Test_BuildBlockLog(t *testing.T) {
 		},
 	}
 
-	execTrace1 := &ExecuteTrace{
+	execTrace1 := &api.ExecuteTrace{
 		TraceID:   "e456",
 		StartTime: timeMustParse(time.RFC3339, "2021-01-02T00:00:00Z"),
 		EndTime:   timeMustParse(time.RFC3339, "2021-01-02T00:01:00Z"),
@@ -87,7 +88,7 @@ func Test_BuildBlockLog(t *testing.T) {
 		},
 	}
 
-	execTrace2 := &ExecuteTrace{
+	execTrace2 := &api.ExecuteTrace{
 		TraceID:   "e789",
 		StartTime: timeMustParse(time.RFC3339, "2021-01-03T00:00:00Z"),
 		EndTime:   timeMustParse(time.RFC3339, "2021-01-03T00:01:00Z"),
@@ -119,13 +120,13 @@ func Test_BuildBlockLog(t *testing.T) {
 	cases := []testCase{
 		{
 			name: "basic",
-			block: &BlockLog{
+			block: &api.BlockLog{
 				ID:         bid1,
 				GenTraceID: genTrace.TraceID,
 
 				ExecTraceIDs: execTraceIds,
 			},
-			expected: &BlockLog{
+			expected: &api.BlockLog{
 				ID:             bid1,
 				GenTraceID:     genTrace.TraceID,
 				ExecTraceIDs:   execTraceIds,
@@ -189,9 +190,9 @@ func Test_Analyzer(t *testing.T) {
 	}
 	d := json.NewDecoder(f)
 
-	actual := map[string]*BlockLog{}
+	actual := map[string]*api.BlockLog{}
 	for {
-		var b BlockLog
+		var b api.BlockLog
 		if err := d.Decode(&b); err != nil {
 			if err == io.EOF {
 				break
@@ -249,10 +250,10 @@ func checkGenTracesFiles(t *testing.T, path string) {
 		t.Errorf("Failed to open output file: %v", err)
 		return
 	}
-	traces := make([]*GenerateTrace, 0, 10)
+	traces := make([]*api.GenerateTrace, 0, 10)
 	d := json.NewDecoder(genFile)
 	for {
-		trace := &GenerateTrace{}
+		trace := &api.GenerateTrace{}
 		if err := d.Decode(trace); err != nil {
 			if err == io.EOF {
 				break
@@ -274,10 +275,10 @@ func checkExecuteTracesFiles(t *testing.T, path string) {
 		t.Errorf("Failed to open output file: %v", err)
 		return
 	}
-	traces := make([]*ExecuteTrace, 0, 10)
+	traces := make([]*api.ExecuteTrace, 0, 10)
 	d := json.NewDecoder(genFile)
 	for {
-		trace := &ExecuteTrace{}
+		trace := &api.ExecuteTrace{}
 		if err := d.Decode(trace); err != nil {
 			if err == io.EOF {
 				break
@@ -311,14 +312,14 @@ func Test_CombineGenerateEntries(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			entries := make([]*LogEntry, 0, 10)
+			entries := make([]*api.LogEntry, 0, 10)
 			testFile, err := os.Open(filepath.Join(cwd, "test_data", c.linesFile))
 			if err != nil {
 				t.Fatalf("Failed to open test file: %v", err)
 			}
 			d := json.NewDecoder(testFile)
 			for {
-				e := &LogEntry{}
+				e := &api.LogEntry{}
 				err := d.Decode(e)
 				if err != nil {
 					if err == io.EOF {
@@ -366,14 +367,14 @@ func Test_CombineExecuteEntries(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			entries := make([]*LogEntry, 0, 10)
+			entries := make([]*api.LogEntry, 0, 10)
 			testFile, err := os.Open(filepath.Join(cwd, "test_data", c.linesFile))
 			if err != nil {
 				t.Fatalf("Failed to open test file: %v", err)
 			}
 			d := json.NewDecoder(testFile)
 			for {
-				e := &LogEntry{}
+				e := &api.LogEntry{}
 				err := d.Decode(e)
 				if err != nil {
 					if err == io.EOF {

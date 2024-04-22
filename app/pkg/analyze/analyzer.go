@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jlewi/foyle/app/api"
 	"io"
 	"os"
 	"path/filepath"
@@ -71,10 +72,10 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outDir string) (
 }
 
 // buildTraces creates a map of all the traces and initializes the blocks.
-func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFiles) (map[string]Trace, map[string]*BlockLog, error) {
+func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFiles) (map[string]api.Trace, map[string]*api.BlockLog, error) {
 	log := logs.FromContext(ctx)
 	// Entries is a mapping from a traceId to a list of logEntries associated with that entry.
-	traceEntries := make(map[string][]*LogEntry)
+	traceEntries := make(map[string][]*api.LogEntry)
 
 	for _, p := range jsonFiles {
 		log.Info("Reading file", "path", p)
@@ -86,7 +87,7 @@ func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFile
 		d := json.NewDecoder(f)
 
 		for {
-			entry := &LogEntry{}
+			entry := &api.LogEntry{}
 			err := d.Decode(entry)
 
 			if err != nil {
@@ -104,7 +105,7 @@ func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFile
 
 			items, ok := traceEntries[entry.TraceID()]
 			if !ok {
-				items = make([]*LogEntry, 0, 10)
+				items = make([]*api.LogEntry, 0, 10)
 			}
 			items = append(items, entry)
 			traceEntries[entry.TraceID()] = items
@@ -112,10 +113,10 @@ func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFile
 	}
 
 	// Store a map of all traces
-	traces := make(map[string]Trace)
+	traces := make(map[string]api.Trace)
 
 	// Build a map of the blocks
-	blocks := make(map[string]*BlockLog)
+	blocks := make(map[string]*api.BlockLog)
 
 	// Create encoders to write the traces
 	genFile, err := os.Create(resultFiles.GenerateTraces[0])
@@ -147,7 +148,7 @@ func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFile
 
 		// Update the blocks associated with this trace
 		switch t := trace.(type) {
-		case *GenerateTrace:
+		case *api.GenerateTrace:
 			for _, oBlock := range t.Response.GetBlocks() {
 				bid := oBlock.GetId()
 				if bid == "" {
@@ -155,7 +156,7 @@ func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFile
 				}
 				block, ok := blocks[bid]
 				if !ok {
-					block = &BlockLog{
+					block = &api.BlockLog{
 						ID: bid,
 					}
 					blocks[bid] = block
@@ -163,14 +164,14 @@ func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFile
 				block.GenTraceID = tid
 			}
 			enc = genEnc
-		case *ExecuteTrace:
+		case *api.ExecuteTrace:
 			bid := t.Request.GetBlock().GetId()
 			if bid == "" {
 				continue
 			}
 			block, ok := blocks[bid]
 			if !ok {
-				block = &BlockLog{
+				block = &api.BlockLog{
 					ID: bid,
 				}
 				blocks[bid] = block
@@ -243,7 +244,7 @@ func initResultFiles(outDir string) ResultFiles {
 	}
 }
 
-func buildBlockLogs(ctx context.Context, traces map[string]Trace, blocks map[string]*BlockLog, outFile string) error {
+func buildBlockLogs(ctx context.Context, traces map[string]api.Trace, blocks map[string]*api.BlockLog, outFile string) error {
 	log := logs.FromContext(ctx)
 
 	oDir := filepath.Dir(outFile)
@@ -277,7 +278,7 @@ func buildBlockLogs(ctx context.Context, traces map[string]Trace, blocks map[str
 	return nil
 }
 
-func buildBlockLog(ctx context.Context, block *BlockLog, traces map[string]Trace) error {
+func buildBlockLog(ctx context.Context, block *api.BlockLog, traces map[string]api.Trace) error {
 	log := logs.FromContext(ctx)
 	log = log.WithValues("blockId", block.ID)
 	log.Info("Building block log", "block", block)
@@ -287,7 +288,7 @@ func buildBlockLog(ctx context.Context, block *BlockLog, traces map[string]Trace
 	}
 
 	if block.GenTraceID != "" {
-		genTrace, ok := traces[block.GenTraceID].(*GenerateTrace)
+		genTrace, ok := traces[block.GenTraceID].(*api.GenerateTrace)
 		if !ok {
 			log.Error(errors.New("Missing GenerateTrace for traceId"), "Error getting generate trace", "genTraceId", block.GenTraceID)
 		} else {
@@ -306,10 +307,10 @@ func buildBlockLog(ctx context.Context, block *BlockLog, traces map[string]Trace
 		}
 	}
 
-	var lastTrace *ExecuteTrace
+	var lastTrace *api.ExecuteTrace
 	// Get the last execution trace
 	for _, tid := range block.ExecTraceIDs {
-		trace, ok := traces[tid].(*ExecuteTrace)
+		trace, ok := traces[tid].(*api.ExecuteTrace)
 		if !ok {
 			log.Error(errors.New("Missing ExecuteTrace for traceId"), "Error getting execute trace", "execTraceId", tid)
 			continue
@@ -339,7 +340,7 @@ func buildBlockLog(ctx context.Context, block *BlockLog, traces map[string]Trace
 	return nil
 }
 
-func combineEntriesForTrace(ctx context.Context, entries []*LogEntry) (Trace, error) {
+func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (api.Trace, error) {
 	// First sort the entries by timestamp.
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Time().Before(entries[j].Time())
@@ -360,8 +361,8 @@ func combineEntriesForTrace(ctx context.Context, entries []*LogEntry) (Trace, er
 	return nil, errors.New("Failed to identify trace type")
 }
 
-func combineGenerateTrace(ctx context.Context, entries []*LogEntry) (*GenerateTrace, error) {
-	trace := &GenerateTrace{}
+func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*api.GenerateTrace, error) {
+	trace := &api.GenerateTrace{}
 	for _, e := range entries {
 		if trace.TraceID == "" {
 			trace.TraceID = e.TraceID()
@@ -394,8 +395,8 @@ func combineGenerateTrace(ctx context.Context, entries []*LogEntry) (*GenerateTr
 	return trace, nil
 }
 
-func combineExecuteTrace(ctx context.Context, entries []*LogEntry) (*ExecuteTrace, error) {
-	trace := &ExecuteTrace{}
+func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*api.ExecuteTrace, error) {
+	trace := &api.ExecuteTrace{}
 	for _, e := range entries {
 		if trace.TraceID == "" {
 			trace.TraceID = e.TraceID()

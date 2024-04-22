@@ -1,4 +1,4 @@
-package analyze
+package api
 
 import (
 	"encoding/json"

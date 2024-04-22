@@ -3,7 +3,7 @@ package logsviewer
 import (
 	"context"
 	"encoding/json"
-	"github.com/jlewi/foyle/app/pkg/analyze"
+	"github.com/jlewi/foyle/app/api"
 	"io"
 	"net/http"
 )
@@ -14,7 +14,7 @@ type LogsClient struct {
 	Endpoint string
 }
 
-func (c *LogsClient) GetBlockLog(ctx context.Context, blockID string) (*analyze.BlockLog, error) {
+func (c *LogsClient) GetBlockLog(ctx context.Context, blockID string) (*api.BlockLog, error) {
 	// For now don't use the cache always dynamically generate the trace.
 	r, err := http.Get(c.Endpoint + "api/blocklogs/" + blockID)
 	if err != nil {
@@ -25,7 +25,7 @@ func (c *LogsClient) GetBlockLog(ctx context.Context, blockID string) (*analyze.
 	if err != nil {
 		return nil, err
 	}
-	block := &analyze.BlockLog{}
+	block := &api.BlockLog{}
 	if err := json.Unmarshal(b, block); err != nil {
 		return nil, err
 	}
