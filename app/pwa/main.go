@@ -16,7 +16,7 @@ func main() {
 	//
 	// This is done by calling the Route() function,  which tells go-app what
 	// component to display for a given path, on both client and server-side.
-	app.Route("/", &logsviewer.Viewer{})
+	app.Route("/", &logsviewer.MainApp{})
 
 	// Once the routes set up, the next thing to do is to either launch the app
 	// or the server that serves the app.
@@ -37,6 +37,12 @@ func main() {
 		Name:        "Hello",
 		Description: "An Hello World! example",
 		Resources:   app.CustomProvider("", "/viewer"),
+		Styles: []string{
+			"/web/viewer.css", // Loads traceSelector.css file.
+		},
+		Env: map[string]string{
+			logsviewer.EndpointEnvVar: "http://localhost:8000",
+		},
 	}))
 
 	if err := http.ListenAndServe(":8000", nil); err != nil {

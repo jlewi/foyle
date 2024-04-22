@@ -235,6 +235,12 @@ func (s *Server) createGinEngine() error {
 		Description: "View Foyle Logs",
 		// Since we don't want to serve the viewer on the root "/" we need to use a CustomProvider
 		Resources: app.CustomProvider("", logsviewer.AppPath),
+		Styles: []string{
+			"/web/viewer.css", // Loads traceSelector.css file.
+		},
+		Env: map[string]string{
+			logsviewer.EndpointEnvVar: fmt.Sprintf("http://%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort),
+		},
 	}
 	// N.B. We need a trailing slash for the relativePath passed to router. Any but not in the stripprefix
 	// because we need to leave the final slash in the path so that the route ends up matching.
