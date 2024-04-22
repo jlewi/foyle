@@ -3,9 +3,18 @@ package logsviewer
 import (
 	"context"
 	"encoding/json"
+	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
+	"github.com/maxence-charriere/go-app/v9/pkg/app"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
+	"strings"
+)
+
+var (
+	defaultClient *LogsClient
 )
 
 // LogsClient client for the logs service.
@@ -30,4 +39,25 @@ func (c *LogsClient) GetBlockLog(ctx context.Context, blockID string) (*api.Bloc
 		return nil, err
 	}
 	return block, nil
+}
+
+func GetClient() *LogsClient {
+	if defaultClient == nil {
+		log := zapr.NewLogger(zap.L())
+		// N.B. I think using EndpointEnvVar is better using Window().Location().Href because of how we would deal with
+		// Reverse proxies. If we're behind some sort of reverse proxy we'd probably want the server to set the
+		// appropriate baseURL
+		endpoint := app.Getenv(EndpointEnvVar)
+		if endpoint == "" {
+			log.Error(errors.New("EndpointEnvVar is not set"), "Failed to create logsclient")
+		}
+		if !strings.HasSuffix(endpoint, "/") {
+			endpoint = endpoint + "/"
+		}
+		log.Info("Creating logs client", "endpoint", endpoint)
+		defaultClient = &LogsClient{
+			Endpoint: endpoint,
+		}
+	}
+	return defaultClient
 }

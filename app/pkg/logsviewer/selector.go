@@ -1,9 +1,7 @@
 package logsviewer
 
 import (
-	"github.com/go-logr/zapr"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
-	"go.uber.org/zap"
 	"strings"
 )
 
@@ -30,14 +28,7 @@ func (h *blockSelector) Render() app.UI {
 		app.Button().
 			Text("Display").
 			OnClick(func(ctx app.Context, e app.Event) {
-				// Handle button click event here
-				// TODO(jeremy): Using os.Getenv is not working as a way of passing values from the server to the
-				// client.
-				// endpoint := os.Getenv(EndpointEnvVar)
-				endpoint := "http://localhost:8080/"
-				client := LogsClient{
-					Endpoint: endpoint,
-				}
+				client := GetClient()
 				blockID := app.Window().GetElementByID(blockInputID).Get("value").String()
 				blockID = strings.TrimSpace(blockID)
 				if blockID == "" {
@@ -45,8 +36,6 @@ func (h *blockSelector) Render() app.UI {
 					h.Update()
 					return
 				}
-				log := zapr.NewLogger(zap.L())
-				log.Info("Fetching block log", "blockID", blockID, "endpoint", endpoint)
 				blockLog, err := client.GetBlockLog(ctx, blockID)
 				if err != nil {
 					ctx.SetState(getErrorState, err.Error())
