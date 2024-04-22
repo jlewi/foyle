@@ -220,7 +220,7 @@ func (s *Server) createGinEngine() error {
 	// Add REST handlers for blocklogs
 	router.GET("api/blocklogs/:id", s.logsCrud.GetBlockLog)
 
-	app.Route("/", &logsviewer.Viewer{})
+	app.Route("/", &logsviewer.MainApp{})
 
 	if strings.HasSuffix(logsviewer.AppPath, "/") {
 		return errors.New("logsviewer.AppPath should not have a trailing slash")
@@ -230,6 +230,8 @@ func (s *Server) createGinEngine() error {
 		return errors.New("logsviewer.AppPath should have a leading slash")
 	}
 
+	endpoint := fmt.Sprintf("http://%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
+	log.Info("Setting up logs viewer", "endpoint", endpoint, "path", logsviewer.AppPath)
 	viewerApp := &app.Handler{
 		Name:        "FoyleLogsViewer",
 		Description: "View Foyle Logs",
@@ -239,7 +241,7 @@ func (s *Server) createGinEngine() error {
 			"/web/viewer.css", // Loads traceSelector.css file.
 		},
 		Env: map[string]string{
-			logsviewer.EndpointEnvVar: fmt.Sprintf("http://%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort),
+			logsviewer.EndpointEnvVar: endpoint,
 		},
 	}
 	// N.B. We need a trailing slash for the relativePath passed to router. Any but not in the stripprefix

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"github.com/jlewi/foyle/app/pkg/logsviewer"
+	"go.uber.org/zap"
 	"log"
 	"net/http"
 
@@ -12,6 +14,16 @@ import (
 // It is executed in 2 different environments: A client (the web browser) and a
 // server.
 func main() {
+	// We need to configure a logger so that messages will be logged to the console.
+	c := zap.NewDevelopmentConfig()
+	c.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+	newLogger, err := c.Build()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to initialize zap logger; error %v", err))
+	}
+
+	zap.ReplaceGlobals(newLogger)
+
 	// The first thing to do is to associate the hello component with a path.
 	//
 	// This is done by calling the Route() function,  which tells go-app what

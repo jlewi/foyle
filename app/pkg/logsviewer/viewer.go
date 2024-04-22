@@ -1,9 +1,7 @@
 package logsviewer
 
 import (
-	"github.com/go-logr/zapr"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
-	"go.uber.org/zap"
 )
 
 type view string
@@ -36,9 +34,7 @@ type MainApp struct {
 }
 
 func (c *MainApp) Render() app.UI {
-	log := zapr.NewLogger(zap.L())
 	if c.main == nil {
-		log.Info("Creating markdown viewer; I'm not sure why this is neccessary; shouldn't this be initialized in main")
 		c.main = &mainWindow{}
 	}
 	return app.Div().Class("main-layout").Body(
