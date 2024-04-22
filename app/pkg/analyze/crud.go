@@ -60,8 +60,7 @@ func (h *CrudHandler) loadCache(ctx context.Context) error {
 	glob := filepath.Join(pDir, "blocks*.jsonl")
 	matches, err := filepath.Glob(glob)
 	if err != nil {
-		errors.Wrapf(err, "Failed to match glob %s", glob)
-		return err
+		return errors.Wrapf(err, "Failed to match glob %s", glob)
 	}
 
 	sort.Strings(matches)

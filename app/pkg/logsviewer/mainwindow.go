@@ -72,7 +72,7 @@ func (m *mainWindow) handleGetAction(ctx app.Context, action app.Action) {
 		blockJson, err := json.MarshalIndent(block, "", " ")
 		if err != nil {
 			log.Error(err, "Failed to turn blocklog into json")
-			m.HTMLContent = fmt.Sprintf("Failed to turn blocklog into json: error %+v")
+			m.HTMLContent = fmt.Sprintf("Failed to turn blocklog into json: error %+v", err)
 		} else {
 			raw := "<pre>" + string(blockJson) + "</pre>"
 			m.HTMLContent = raw

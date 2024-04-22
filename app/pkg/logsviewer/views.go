@@ -27,7 +27,7 @@ func renderGeneratedBlock(block *api.BlockLog) (string, error) {
 		return "", err
 	}
 
-	return string(buf.Bytes()), nil
+	return buf.String(), nil
 }
 
 // renderExecutedBlock returns the executed block as HTML if there is one
@@ -47,5 +47,5 @@ func renderExecutedBlock(block *api.BlockLog) (string, error) {
 		return "", err
 	}
 
-	return string(buf.Bytes()), nil
+	return buf.String(), nil
 }
