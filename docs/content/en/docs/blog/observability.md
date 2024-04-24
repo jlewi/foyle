@@ -2,12 +2,12 @@
 title: Building AIs that log human feedback
 linkTitle: Logging Human Feedback
 date: 2024-04-24
-author: Jeremy Lewi
+author: "[Jeremy Lewi](https://lewi.us/about)"
+type: blog
 ---
 
 
-[Foyle](https://foyle.io/) is an open source assistant I’m building to help software developers deploy and operate software. One of Foyle's central premises is that creating a UX that implicitly captures human feedback is critical to building AIs that effectively assist us with operations. This post describes
-how Foyle uses existing logging libraries and patterns to capture human feedback.
+[Foyle](https://foyle.io/) is an open source assistant to help software developers deal with the pain of devops. Developers are expected to operate their software which means dealing with the complexity of Cloud. Foyle aims to simplify operations with AI.  One of Foyle's central premises is that creating a UX that implicitly captures human feedback is critical to building AIs that effectively assist us with operations. 
 
 ## The Problem
 
@@ -40,9 +40,9 @@ If users are copying and pasting between two different applications the likeliho
 Foyle’s frontend is VSCode notebooks. In Foyle, when you ask an AI for assistance, the output is rendered as cells in the notebook. The cells contain shell commands that can then be used to execute those commands either locally or remotely using the notebook controller API, which talks to a Foyle server. Here's a short video
 illustrating the key interactions.
 
-<div style="position: relative; padding-bottom: 25%; height: 0;">
-<iframe width="560" height="315" src="https://www.youtube.com/embed/gU1XyRsV2n4?si=SNlYWKlgCmo4vXPi" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-</div>
+<!-- cc_load_policy turns on captions by default-->
+<iframe width="560" height="315" src="https://www.youtube.com/embed/gU1XyRsV2n4?cc_load_policy=1&si=SNlYWKlgCmo4vXPi" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 
 Crucially, cells are central to how Foyle creates a UX that automatically collects human feedback. When the AI generates a cell, it attaches a UUID to that cell. That UUID links the cell to a trace that captures all the processing the AI did to generate it (e.g any LLM calls, RAG calls, etc…). In VSCode, we can use cell metadata to track the UUID associated with a cell.
 
