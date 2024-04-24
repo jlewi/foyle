@@ -1,13 +1,12 @@
 ---
-title: Logging Human Feedback
+title: Building AIs that log human feedback
+linkTitle: Logging Human Feedback
 date: 2024-04-24
-author: 
-  name: "Jeremy Lewi"
-  link: https://lewi.us/about
+author: Jeremy Lewi
 ---
 
 
-[Foyle](https://foyle.io/)is an open source assistant I’m building to help software developers deploy and operate software. One of Foyle's central premises is that creating a UX that implicitly captures human feedback is critical to building AIs that effectively assist us with operations. This post describes
+[Foyle](https://foyle.io/) is an open source assistant I’m building to help software developers deploy and operate software. One of Foyle's central premises is that creating a UX that implicitly captures human feedback is critical to building AIs that effectively assist us with operations. This post describes
 how Foyle uses existing logging libraries and patterns to capture human feedback.
 
 ## The Problem
