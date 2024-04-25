@@ -181,4 +181,4 @@ I’m open to new [consulting work](https://lewi.us/hire) and other forms of adv
 
 ## Acknowledgements
 
-I really appreciate [Hamel Husain](https://hamel.dev/) and (Joseph Gleasure)[https://josephgleasure.com/] reviewing and editing this post.
+I really appreciate [Hamel Husain](https://hamel.dev/) and [Joseph Gleasure](https://josephgleasure.com/) reviewing and editing this post.
