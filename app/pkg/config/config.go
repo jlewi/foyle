@@ -170,6 +170,10 @@ func (c *Config) GetProcessedLogDir() string {
 	return filepath.Join(c.GetLogDir(), "processed")
 }
 
+func (c *Config) GetTrainingDir() string {
+	return filepath.Join(c.GetConfigDir(), "training")
+}
+
 func (c *Config) GetLogLevel() string {
 	if c.Logging.Level == "" {
 		return "info"
