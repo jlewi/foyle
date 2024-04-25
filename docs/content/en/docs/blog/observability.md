@@ -13,10 +13,9 @@ type: blog
 
 As software developers, we all ask AIs (ChatGPT, Claude, Bard, Ollama, etc.…) to write commands to perform operations. These AIs often make mistakes. This is especially true when the correct answer depends on internal knowledge, which the AI doesn’t have.
 
-
 * What region, cluster, or namespace is used for dev vs. prod?
-* What resources is that internal code name referring to?
-* What logging schema is used by that internal CICD tool?
+* What resources is the internal code name "caribou" referring to?
+* What logging schema is used by our internal CICD tool?
 
 The experience today is
 
@@ -30,12 +29,10 @@ When it comes to building better AIs, the human feedback provided by the last st
 
 If we want to collect human feedback, we need to create a single unified experience for
 
-
-
 1. Asking the AI for help
 2. Editing/Executing AI suggested operations
 
-If users are copying and pasting between two different applications the likelihood of being able to instrument it to collect feedback goes way down.Fortunately, we already have a well-adopted and familiar pattern for combining exposition, commands/code, and rich output. Its notebooks. 
+If users are copying and pasting between two different applications the likelihood of being able to instrument it to collect feedback goes way down. Fortunately, we already have a well-adopted and familiar pattern for combining exposition, commands/code, and rich output. Its notebooks. 
 
 Foyle’s frontend is VSCode notebooks. In Foyle, when you ask an AI for assistance, the output is rendered as cells in the notebook. The cells contain shell commands that can then be used to execute those commands either locally or remotely using the notebook controller API, which talks to a Foyle server. Here's a short video
 illustrating the key interactions.
