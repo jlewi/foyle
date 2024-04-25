@@ -169,7 +169,7 @@ The final piece is being able to easily visualize the traces to inspect what’s
 To solve the visualization problem, I’ve built a lightweight progressive web app(PWA) in Go ([code](https://github.com/jlewi/foyle/tree/main/app/pkg/logsviewer)) using [maxence-charriere/go-app](https://github.com/maxence-charriere/go-app). While I won’t be winning any design awards, it allows me to get the job done quickly and reuse existing libraries. For example, to render markdown as HTML I could reuse the Go libraries I was already using ([yuin/goldmark](https://github.com/yuin/goldmark)). More importantly, I don’t have to wrestle with a stack(typescript, REACT, etc…) that I’m not proficient in. With [Google Logs Analytics](https://cloud.google.com/logging/docs/analyze/query-and-view), I can query the logs using SQL. This makes it very easy to join and process a trace in the web app. This makes it possible to view traces in real-time without having to build and deploy a streaming pipeline. 
 
 
-## Where to find Foyle
+## Try Foyle
 
 Please consider following the [getting started guide](/docs/getting-started/) to try out an early version of Foyle and share your thoughts by email([jeremy@lewi.us](mailto:jeremy@lewi.us)) on [GitHub](https://github.com/jlewi/foyle/issues)(jlewi/foyle) or on twitter ([@jeremylewi](https://twitter.com/jeremylewi))!
 
