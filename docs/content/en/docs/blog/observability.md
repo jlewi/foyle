@@ -34,7 +34,7 @@ If we want to collect human feedback, we need to create a single unified experie
 
 If users are copying and pasting between two different applications the likelihood of being able to instrument it to collect feedback goes way down. Fortunately, we already have a well-adopted and familiar pattern for combining exposition, commands/code, and rich output. Its notebooks. 
 
-Foyle’s frontend is VSCode notebooks. In Foyle, when you ask an AI for assistance, the output is rendered as cells in the notebook. The cells contain shell commands that can then be used to execute those commands either locally or remotely using the notebook controller API, which talks to a Foyle server. Here's a short video
+Foyle’s frontend is VSCode notebooks. In Foyle, when you ask an AI for assistance, the output is rendered as cells in the notebook. The cells contain shell commands that can then be used to execute those commands either locally or remotely using the [notebook controller API](https://code.visualstudio.com/api/extension-guides/notebook#controller), which talks to a Foyle server. Here's a short video
 illustrating the key interactions.
 
 <!-- cc_load_policy turns on captions by default-->
@@ -52,15 +52,15 @@ When a user executes a cell, the frontend sends the contents of the cell along w
 Capturing traces of the AI and execution are essential to logging human feedback. Foyle is designed to run on your infrastructure (whether locally or in your Cloud). Therefore, it's critical that Foyle not be too opinionated about how traces are logged. Fortunately, this is a well-solved problem. The standard pattern is:
 
 1. Instrument the app using [structured logs](https://newrelic.com/blog/how-to-relic/structured-logging)
-2. App emits logs to stdout/stderr
-3. When deploying the app collect stdout/stderr and ship to whatever backend you want to use (e.g. [Google Cloud Logging](https://cloud.google.com/logging?utm_source=google&utm_medium=cpc&utm_campaign=na-US-all-en-dr-skws-all-all-trial-e-dr-1707554&utm_content=text-ad-none-any-DEV_c-CRE_665665942555-ADGP_Hybrid+%7C+SKWS+-+MIX+%7C+Txt-Operations-Cloud+Logging-KWID_43700077212829919-kwd-35764926831&utm_term=KW_cloud+logging-ST_cloud+logging&gad_source=1&gclid=Cj0KCQjwiYOxBhC5ARIsAIvdH53Ojmkc3b--6hxt9l3zqmJfXvyrE2aTDw8fyb90g5SKrfPAbHnBajAaAtIrEALw_wcB&gclsrc=aw.ds&hl=en), [Datadog](https://www.datadoghq.com/), Splunk etc…)
+2. App emits logs to stdout and stderr
+3. When deploying the app collect stdout and stderr and ship them to whatever backend you want to use (e.g. [Google Cloud Logging](https://cloud.google.com/logging?utm_source=google&utm_medium=cpc&utm_campaign=na-US-all-en-dr-skws-all-all-trial-e-dr-1707554&utm_content=text-ad-none-any-DEV_c-CRE_665665942555-ADGP_Hybrid+%7C+SKWS+-+MIX+%7C+Txt-Operations-Cloud+Logging-KWID_43700077212829919-kwd-35764926831&utm_term=KW_cloud+logging-ST_cloud+logging&gad_source=1&gclid=Cj0KCQjwiYOxBhC5ARIsAIvdH53Ojmkc3b--6hxt9l3zqmJfXvyrE2aTDw8fyb90g5SKrfPAbHnBajAaAtIrEALw_wcB&gclsrc=aw.ds&hl=en), [Datadog](https://www.datadoghq.com/), Splunk etc…)
 
-When running locally, setting up an agent to collect logs can be annoying, so Foyle has the built-in ability to log to files. We are currently evaluating the need to add direct support for other backends like Cloud Logging. This should only matter when running locally because if you're deploying on Cloud chances are your infrastructure is already instrumented to collect stdout/stderr and ship them to your backend of choice.
+When running locally, setting up an agent to collect logs can be annoying, so Foyle has the built-in ability to log to files. We are currently evaluating the need to add direct support for other backends like Cloud Logging. This should only matter when running locally because if you're deploying on Cloud chances are your infrastructure is already instrumented to collect stdout and stderr and ship them to your backend of choice.
 
 
 ## Don’t reinvent logging
 
-Using existing logging libraries that support structured logging seems so obvious to me that it hardly seems worth mentioning. Except, within the AIEngineering/LLMOps community, it’s not clear to me that people are reusing existing libraries and patterns. Notably, I’m seeing a new class of observability solutions that require you to instrument your code with their SDK. I think this is undesirable as it violates the separation of concerns between how an application is instrumented and how that telemetry is stored, processed, and rendered. My current opinion is that Agent/LLM observability can often be achieved by reusing existing logging patterns. So, in defense of that view, here’s the solution I’ve opted for.
+Using existing logging libraries that support structured logging seems so obvious to me that it hardly seems worth mentioning. Except, within the AI Engineering/LLMOps community, it’s not clear to me that people are reusing existing libraries and patterns. Notably, I’m seeing a new class of observability solutions that require you to instrument your code with their SDK. I think this is undesirable as it violates the separation of concerns between how an application is instrumented and how that telemetry is stored, processed, and rendered. My current opinion is that Agent/LLM observability can often be achieved by reusing existing logging patterns. So, in defense of that view, here’s the solution I’ve opted for.
 
 Structured logging means that each log line is a JSON record which can contain arbitrary fields. To Capture LLM or RAG requests and responses, I log [them](https://github.com/jlewi/foyle/blob/7db00af74bef5d1cc460e6499a3e7aac6c4291a0/app/pkg/agent/agent.go#L117); e.g.
 
@@ -127,12 +127,9 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 ```
 
 
-Since I’ve instrumented [foyle](https://foyle.io/) with open telemetry(OTEL), each request is automatically assigned a trace id. I attach that trace id to all the log entries associated with that request. Using the trace id assigned by OTEL means I can link the logs with the open telemetry trace data.
+Since I’ve instrumented [Foyle](https://foyle.io/) with open telemetry(OTEL), each request is automatically assigned a trace id. I attach that trace id to all the log entries associated with that request. Using the trace id assigned by OTEL means I can link the logs with the open telemetry trace data.
 
-OTEL is an open standard for [distributed tracing](https://docs.honeycomb.io/get-started/basics/observability/concepts/distributed-tracing/). I find OTEL great for instrumenting my code to understand how long different parts of my code took, how often errors occur and how many requests I’m getting. You could use OTEL for [LLM Observability](https://docs.honeycomb.io/get-started/start-building/llm/). However, I chose logs because as noted in the next section they are easier to mine.
-
-The only difficulty I've hit is when trying to log protocol buffers. To log protocol buffers, I used the [go-proto-zap-marshaler](https://github.com/kazegusuri/go-proto-zap-marshaler) proto plugin to generate logging functions for each proto that use proto’s JSON serialization format. 
-
+OTEL is an open standard for [distributed tracing](https://docs.honeycomb.io/get-started/basics/observability/concepts/distributed-tracing/). I find OTEL great for instrumenting my code to understand how long different parts of my code took, how often errors occur and how many requests I’m getting. You can use OTEL for LLM Observability; here's an [example](https://docs.honeycomb.io/get-started/start-building/llm/). However, I chose logs because as noted in the next section they are easier to mine.
 
 ### Aside: Structured Logging In Python
 
@@ -154,8 +151,8 @@ Post-processing your logs is often critical to unlocking the most valuable insig
 
 
 * Build a trace by grouping log entries by trace ID
-* Reykey each trace by the cell it is associated with (cellId, trace)
-* Group traces by cellId
+* Reykey each trace by the cell id the trace is associated with
+* Group traces by cell id
 
 This logic is highly specific to Foyle. No observability tool will support it out of box. 
 
@@ -166,7 +163,7 @@ Consequently, a key consideration for my observability backend is how easily it 
 
 The final piece is being able to easily visualize the traces to inspect what’s going on. Arguably, this is where you might expect LLM/AI focused tools might shine. Unfortunately, as the previous section illustrates, the primary way I want to view Foyle’s data is to look at the processing associated with a particular cell. This requires post-processing the raw logs. As a result, out of box visualizations won’t let me view the data in the most meaningful way. 
 
-To solve the visualization problem, I’ve built a lightweight progressive web app(PWA) in Go ([code](https://github.com/jlewi/foyle/tree/main/app/pkg/logsviewer)) using [https://github.com/maxence-charriere/go-app](https://github.com/maxence-charriere/go-app). While I won’t be winning any design awards, it allows me to get the job done quickly and reuse existing libraries; for example, I used the markdown library I was already using ([yuin/goldmark](https://github.com/yuin/goldmark)). More importantly, it means I don’t have to wrestle with a stack(typescript, REACT, etc…) that I’m not proficient in. With [Google Logs Analytics](https://cloud.google.com/logging/docs/analyze/query-and-view), I can query the logs using SQL. This makes it very easy to join and process a trace in the web app. This makes it possible to view traces in real-time without having to build and deploy a streaming pipeline. 
+To solve the visualization problem, I’ve built a lightweight progressive web app(PWA) in Go ([code](https://github.com/jlewi/foyle/tree/main/app/pkg/logsviewer)) using [maxence-charriere/go-app](https://github.com/maxence-charriere/go-app). While I won’t be winning any design awards, it allows me to get the job done quickly and reuse existing libraries. For example, to render markdown as HTML I could reuse the Go libraries I was already using ([yuin/goldmark](https://github.com/yuin/goldmark)). More importantly, I don’t have to wrestle with a stack(typescript, REACT, etc…) that I’m not proficient in. With [Google Logs Analytics](https://cloud.google.com/logging/docs/analyze/query-and-view), I can query the logs using SQL. This makes it very easy to join and process a trace in the web app. This makes it possible to view traces in real-time without having to build and deploy a streaming pipeline. 
 
 
 ## Where to find Foyle
