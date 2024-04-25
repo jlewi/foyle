@@ -4,6 +4,8 @@ linkTitle: Logging Human Feedback
 date: 2024-04-24
 author: "[Jeremy Lewi](https://lewi.us/about)"
 type: blog
+images: 
+  - "/featured-background.jpg"
 ---
 
 

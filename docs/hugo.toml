@@ -87,7 +87,11 @@ section = ["HTML", "print", "RSS"]
 privacy_policy = "https://foyle.io/privacy"
 
 # First one is picked as the Twitter card image if not set on page.
-images = ["content/en/featured-background.jpg"]
+# TODO(jeremy): Should we use a smaller image for the twitter card?
+# See: https://github.com/jlewi/foyle/issues/77
+# My suspicion is that if we use a path "/featured-background.jpg" it will resolve to an absolute
+# path of the serving path. i.e. http://${HOST}/featured-background.jpg
+images = ["/featured-background.jpg"]
 
 # Menu title if your navbar has a versions selector to access old versions of your site.
 # This menu appears only if you have at least one [params.versions] set.
