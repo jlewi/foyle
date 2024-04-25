@@ -6,7 +6,7 @@ author: "[Jeremy Lewi](https://lewi.us/about)"
 type: blog
 descrption: Foyle is an open source assistant to help software developers deal with the pain of devops. One of Foyle's central premises is that creating a UX that implicitly captures human feedback is critical to building AIs that effectively assist us with operations. This post describes how Foyle logs that feedback.
 images: 
-  - "/featured-background.jpg"
+  - "/docs/blog/cellids.svg"
 ---
 
 
