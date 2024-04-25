@@ -178,3 +178,7 @@ Please consider following the [getting started guide](/docs/getting-started/) to
 I’m a Machine Learning platform engineer with over 15 years of experience. I create platforms that facilitate the rapid deployment of AI into production. I worked on Google’s Vertex AI where I created Kubeflow, one of the most popular OSS frameworks for ML. 
 
 I’m open to new [consulting work](https://lewi.us/hire) and other forms of advisory. If you need help with your project, send me a brief email at [jeremy@lewi.us](mailto:jeremy@lewi/us).
+
+## Acknowledgements
+
+I really appreciate [Hamel Husain](https://hamel.dev/) and (Joseph Gleasure)[https://josephgleasure.com/] reviewing and editing this post.
