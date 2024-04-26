@@ -24,7 +24,10 @@ func (m *Example) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) er
 		return nil
 	}
 
-	keyName = "embedding" // field embedding = 1
+	keyName = "id" // field id = 1
+	enc.AddString(keyName, m.Id)
+
+	keyName = "embedding" // field embedding = 2
 	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
 		for _, rv := range m.Embedding {
 			_ = rv
@@ -33,7 +36,7 @@ func (m *Example) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) er
 		return nil
 	}))
 
-	keyName = "query" // field query = 2
+	keyName = "query" // field query = 3
 	if m.Query != nil {
 		var vv interface{} = m.Query
 		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
@@ -41,7 +44,7 @@ func (m *Example) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) er
 		}
 	}
 
-	keyName = "answer" // field answer = 3
+	keyName = "answer" // field answer = 4
 	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
 		for _, rv := range m.Answer {
 			_ = rv

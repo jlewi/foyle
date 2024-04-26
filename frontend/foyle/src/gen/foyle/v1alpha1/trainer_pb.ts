@@ -14,17 +14,22 @@ import { Block, Doc } from "./doc_pb";
  */
 export class Example extends Message<Example> {
   /**
-   * @generated from field: repeated float embedding = 1;
+   * @generated from field: string id = 1;
+   */
+  id = "";
+
+  /**
+   * @generated from field: repeated float embedding = 2;
    */
   embedding: number[] = [];
 
   /**
-   * @generated from field: Doc query = 2;
+   * @generated from field: Doc query = 3;
    */
   query?: Doc;
 
   /**
-   * @generated from field: repeated Block answer = 3;
+   * @generated from field: repeated Block answer = 4;
    */
   answer: Block[] = [];
 
@@ -36,9 +41,10 @@ export class Example extends Message<Example> {
   static readonly runtime: typeof proto3 = proto3;
   static readonly typeName = "Example";
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
-    { no: 1, name: "embedding", kind: "scalar", T: 2 /* ScalarType.FLOAT */, repeated: true },
-    { no: 2, name: "query", kind: "message", T: Doc },
-    { no: 3, name: "answer", kind: "message", T: Block, repeated: true },
+    { no: 1, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "embedding", kind: "scalar", T: 2 /* ScalarType.FLOAT */, repeated: true },
+    { no: 3, name: "query", kind: "message", T: Doc },
+    { no: 4, name: "answer", kind: "message", T: Block, repeated: true },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): Example {

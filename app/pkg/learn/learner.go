@@ -13,11 +13,14 @@ import (
 	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
 	"github.com/sashabaranov/go-openai"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"os"
 	"path/filepath"
 	"strings"
+)
+
+const (
+	fileSuffix = ".example.binpb"
 )
 
 // Learner handles the learn loop to learn from past mistakes.
@@ -62,7 +65,8 @@ func (l *Learner) Reconcile(ctx context.Context) error {
 	// Load the blocklogs
 	blocks, err := analyze.LoadLatestBlockLogs(ctx, l.Config.GetProcessedLogDir())
 	if err != nil {
-
+		log.Error(err, "There was a problem loading the latest block logs")
+		allErrors.AddCause(errors.New("The latest block locks could not be loaded; check logs for more information"))
 	}
 
 	if err := l.reconcileExamples(ctx, blocks); err != nil {
@@ -70,6 +74,10 @@ func (l *Learner) Reconcile(ctx context.Context) error {
 		allErrors.AddCause(errors.New("Not all example were reconciled successfully; check logs for more information"))
 	}
 
+	if err := l.reconcileEmbeddings(ctx); err != nil {
+		log.Error(err, "There were problems reconciling embeddings")
+		allErrors.AddCause(errors.New("Not all embedded were reconciled successfully; check logs for more information"))
+	}
 	return nil
 }
 
@@ -95,7 +103,7 @@ func (l *Learner) reconcileExamples(ctx context.Context, blocks map[string]api.B
 			continue
 		}
 
-		expectedFile := filepath.Join(l.Config.GetTrainingDir(), fmt.Sprintf("%s.foyle", b.ID))
+		expectedFile := l.getExampleFile(b.ID)
 
 		_, err := os.Stat(expectedFile)
 		if err == nil {
@@ -103,18 +111,20 @@ func (l *Learner) reconcileExamples(ctx context.Context, blocks map[string]api.B
 			continue
 		}
 
-		// TODO(jeremy): Should we take into account execution status?
+		// TODO(jeremy): Should we take into account execution status when looking for mistakes?
 
 		// Deep copy the original message
 		newDoc := proto.Clone(b.Doc).(*v1alpha1.Doc)
 		newBlock := proto.Clone(b.ExecutedBlock).(*v1alpha1.Block)
-		newDoc.Blocks = append(newDoc.Blocks, newBlock)
+		answer := []*v1alpha1.Block{newBlock}
 
-		// Using jsonpb.Marshaler
-		marshaler := &protojson.MarshalOptions{
-			Indent: "  ",
+		example := &v1alpha1.Example{
+			Id:     b.ID,
+			Query:  newDoc,
+			Answer: answer,
 		}
-		encoded, err := marshaler.Marshal(newDoc)
+
+		encoded, err := proto.Marshal(example)
 		if err != nil {
 			log.Error(err, "Failed to serialize doc", "id", b.ID)
 			allErrors.AddCause(err)
@@ -134,38 +144,44 @@ func (l *Learner) reconcileExamples(ctx context.Context, blocks map[string]api.B
 	return nil
 }
 
-func (l *Learner) reconcileEmbeddings(ctx context.Context, bids []string) error {
-	log := logs.FromContext(ctx)
+func (l *Learner) getExampleFile(id string) string {
+	return filepath.Join(l.Config.GetTrainingDir(), fmt.Sprintf("%s%s", id, fileSuffix))
+}
 
+func (l *Learner) reconcileEmbeddings(ctx context.Context) error {
+	oLog := logs.FromContext(ctx)
 	allErrors := &helpers.ListOfErrors{}
 
-	for id := range bids {
+	glob := filepath.Join(l.Config.GetTrainingDir(), "*"+fileSuffix)
+	matches, err := filepath.Glob(glob)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to match glob %s", glob)
+	}
 
-		expectedFile := filepath.Join(l.Config.GetTrainingDir(), fmt.Sprintf("%s.embeddings.binpb", id))
+	for _, eFile := range matches {
+		log := oLog.WithValues("file", eFile)
 
-		_, err := os.Stat(expectedFile)
-		if err == nil {
-			log.V(logs.Debug).Info("File for block exists", "id", id, "file", expectedFile)
-			continue
-		}
-
-		inFile := filepath.Join(l.Config.GetTrainingDir(), fmt.Sprintf("%s.foyle", id))
-		rawDoc, err := os.ReadFile(inFile)
+		rawExample, err := os.ReadFile(eFile)
 		if err != nil {
-			log.Error(err, "Failed to read file containing doc for block", "file", inFile, "id", id)
+			log.Error(err, "Failed to read file containing doc for block")
 			allErrors.AddCause(err)
 			continue
 		}
 
-		doc := &v1alpha1.Doc{}
-		if err := protojson.Unmarshal(rawDoc, doc); err != nil {
-			log.Error(err, "Failed to unmarshal doc", "id", id)
+		example := &v1alpha1.Example{}
+		if err := proto.Unmarshal(rawExample, example); err != nil {
+			log.Error(err, "Failed to unmarshal example")
 			allErrors.AddCause(err)
 			continue
 		}
 
-		// Get the query which is everything except the last block
-		query := docToQuery(doc)
+		if example.Embedding != nil {
+			log.V(logs.Debug).Info("Embedding already exists", "id", example.Id)
+			// Skip if we already have an embedding
+			continue
+		}
+
+		query := docs.DocToMarkdown(example.Query)
 
 		request := openai.EmbeddingRequestStrings{
 			Input:          []string{query},
@@ -175,26 +191,33 @@ func (l *Learner) reconcileEmbeddings(ctx context.Context, bids []string) error 
 		}
 		resp, err := l.client.CreateEmbeddings(ctx, request)
 		if err != nil {
-			log.Error(err, "Failed to create embeddings", "id", id, "query", query)
+			log.Error(err, "Failed to create embeddings", "id", example.Id, "query", query)
 			allErrors.AddCause(err)
 			continue
 		}
 
 		if len(resp.Data) != 1 {
-			log.Error(err, "Expected exactly 1 embedding", "id", id, "query", query, "got", len(resp.Data))
+			log.Error(err, "Expected exactly 1 embedding", "id", example.Id, "query", query, "got", len(resp.Data))
 			allErrors.AddCause(errors.New("Expected exactly 1 embedding"))
 			continue
 		}
 
 		if len(resp.Data[0].Embedding) != oai.SmallEmbeddingsDims {
-			log.Error(err, "Embeddings have wrong dimension", "id", id, "query", query, "got", len(resp.Data[0].Embedding), "want", oai.SmallEmbeddingsDims)
+			log.Error(err, "Embeddings have wrong dimension", "id", example.Id, "query", query, "got", len(resp.Data[0].Embedding), "want", oai.SmallEmbeddingsDims)
 			allErrors.AddCause(errors.New("Embeddings have wrong dimension"))
 			continue
 		}
 
-		e := v1alpha1.Example{}
-		if err := os.WriteFile(expectedFile, encoded, 0777); err != nil {
-			log.Error(err, "Failed to serialize doc", "id", b.ID)
+		example.Embedding = resp.Data[0].Embedding
+
+		encoded, err := proto.Marshal(example)
+		if err != nil {
+			log.Error(err, "Failed to serialize example", "id", example.Id)
+			allErrors.AddCause(err)
+			continue
+		}
+		if err := os.WriteFile(eFile, encoded, 0777); err != nil {
+			log.Error(err, "Failed to update example file", "id", example.Id)
 			allErrors.AddCause(err)
 			continue
 		}
@@ -204,13 +227,4 @@ func (l *Learner) reconcileEmbeddings(ctx context.Context, bids []string) error 
 		return allErrors
 	}
 	return nil
-}
-
-// docToExample converts a doc into an example which is a query and an answer
-func docToQuery(doc *v1alpha1.Doc) string {
-	var sb strings.Builder
-	for _, b := range doc.Blocks[:len(doc.Blocks)-1] {
-		sb.WriteString(docs.BlockToMarkdown())
-	}
-	return sb.String()
 }

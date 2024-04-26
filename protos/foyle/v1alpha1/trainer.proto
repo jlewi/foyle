@@ -8,7 +8,8 @@ option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
 
 // Example represents an example to be used in few shot learning
 message Example {
-  repeated float embedding = 1;
-  Doc query = 2;
-  repeated Block answer = 3;
+  string id = 1;
+  repeated float embedding = 2;
+  Doc query = 3;
+  repeated Block answer = 4;
 }
