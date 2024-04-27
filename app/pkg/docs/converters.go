@@ -13,7 +13,11 @@ import (
 // BlockToMarkdown converts a block to markdown
 func BlockToMarkdown(block *v1alpha1.Block) string {
 	sb := strings.Builder{}
+	writeBlockMarkdown(&sb, block)
+	return sb.String()
+}
 
+func writeBlockMarkdown(sb *strings.Builder, block *v1alpha1.Block) {
 	switch block.GetKind() {
 	case v1alpha1.BlockKind_CODE:
 		// Code just gets written as a code block
@@ -33,8 +37,22 @@ func BlockToMarkdown(block *v1alpha1.Block) string {
 			sb.WriteString("\n```\n")
 		}
 	}
+}
+
+// BlocksToMarkdown converts a sequence of blocks to markdown
+func BlocksToMarkdown(blocks []*v1alpha1.Block) string {
+	sb := strings.Builder{}
+
+	for _, block := range blocks {
+		writeBlockMarkdown(&sb, block)
+	}
 
 	return sb.String()
+}
+
+// DocToMarkdown converts a doc to markdown
+func DocToMarkdown(doc *v1alpha1.Doc) string {
+	return BlocksToMarkdown(doc.GetBlocks())
 }
 
 // MarkdownToBlocks converts a markdown string into a sequence of blocks.

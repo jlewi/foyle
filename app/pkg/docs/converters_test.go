@@ -54,6 +54,42 @@ func Test_BlockToMarkdown(t *testing.T) {
 	}
 }
 
+func Test_DockToMarkdown(t *testing.T) {
+	type testCase struct {
+		name     string
+		doc      *v1alpha1.Doc
+		expected string
+	}
+
+	// Most test cases are covered by BlockToMarkdown. The primary purpose of this test is to ensure proper
+	// spacing between blocks.
+	testCases := []testCase{
+		{
+			name: "markup",
+			doc: &v1alpha1.Doc{
+				Blocks: []*v1alpha1.Block{
+					{
+						Kind:     v1alpha1.BlockKind_MARKUP,
+						Contents: "block 1",
+					},
+					{
+						Kind:     v1alpha1.BlockKind_MARKUP,
+						Contents: "block 2",
+					},
+				},
+			},
+			expected: "block 1\nblock 2\n",
+		},
+	}
+	for _, c := range testCases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := DocToMarkdown(c.doc)
+			if d := cmp.Diff(c.expected, actual); d != "" {
+				t.Errorf("Unexpected diff:\n%s", d)
+			}
+		})
+	}
+}
 func Test_MarkdownToBlocks(t *testing.T) {
 	type testCase struct {
 		name     string

@@ -25,6 +25,12 @@ var (
 	promptTemplate = template.Must(template.New("prompt").Parse(promptTemplateString))
 )
 
+type Example struct {
+	Input  string
+	Output string
+}
+
 type promptArgs struct {
 	Document string
+	Examples []Example
 }

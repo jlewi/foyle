@@ -40,6 +40,8 @@ func NewTailer(blocks []*v1alpha1.Block, maxCharLen int) *Tailer {
 func (p *Tailer) Text() string {
 	var sb strings.Builder
 	for i := p.firstBlock; i < len(p.mdBlocks); i++ {
+		// N.B. we need to keep this in sync BlocksToMarkdown w.r.t. inserting new whitespace. Otherwise
+		// we could potentially introduce drift in our data.
 		sb.WriteString(p.mdBlocks[i])
 	}
 	return sb.String()

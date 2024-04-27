@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -21,10 +22,11 @@ import (
 //such as files, environment variables, and command line flags. After merging, viper unmarshals the configuration into the Configuration struct, which is then used throughout the application.
 
 const (
-	ConfigFlagName = "config"
-	LevelFlagName  = "level"
-	appName        = "foyle"
-	ConfigDir      = "." + appName
+	ConfigFlagName    = "config"
+	LevelFlagName     = "level"
+	appName           = "foyle"
+	ConfigDir         = "." + appName
+	defaultMaxResults = 3
 )
 
 // Config represents the persistent configuration data for Foyle.
@@ -49,6 +51,17 @@ type Config struct {
 type AgentConfig struct {
 	// Model is the name of the model to use to generate completions
 	Model string `json:"model" yaml:"model"`
+
+	// RAG is the configuration for the RAG model
+	RAG *RAGConfig `json:"rag,omitempty" yaml:"rag,omitempty"`
+}
+
+// RAGConfig configures the RAG model
+type RAGConfig struct {
+	// Enabled is whether to enable the RAG model or not
+	Enabled bool `json:"enabled" yaml:"enabled"`
+	// MaxResults is the maximum number of results to return
+	MaxResults int `json:"maxResults" yaml:"maxResults"`
 }
 
 // ServerConfig configures the server
@@ -170,6 +183,10 @@ func (c *Config) GetProcessedLogDir() string {
 	return filepath.Join(c.GetLogDir(), "processed")
 }
 
+func (c *Config) GetTrainingDir() string {
+	return filepath.Join(c.GetConfigDir(), "training")
+}
+
 func (c *Config) GetLogLevel() string {
 	if c.Logging.Level == "" {
 		return "info"
@@ -194,6 +211,23 @@ func (c *Config) GetAssetsDir() string {
 	return filepath.Join(c.GetConfigDir(), "assets")
 }
 
+func (c *Config) UseRAG() bool {
+	if c.Agent == nil || c.Agent.RAG == nil {
+		return false
+	}
+	return c.Agent.RAG.Enabled
+}
+
+func (c *Config) RagMaxResults() int {
+	if c.Agent == nil || c.Agent.RAG == nil {
+		return -1
+	}
+	if c.Agent.RAG.MaxResults <= 0 {
+		return defaultMaxResults
+	}
+	return c.Agent.RAG.MaxResults
+}
+
 func (c *Config) UseHoneycomb() bool {
 	if c.Telemetry == nil {
 		return false
@@ -205,6 +239,23 @@ func (c *Config) UseHoneycomb() bool {
 		return false
 	}
 	return true
+}
+
+// DeepCopy returns a deep copy.
+func (c *Config) DeepCopy() Config {
+	b, err := json.Marshal(c)
+	if err != nil {
+		log := zapr.NewLogger(zap.L())
+		log.Error(err, "Failed to marshal config")
+		panic(err)
+	}
+	var copy Config
+	if err := json.Unmarshal(b, &copy); err != nil {
+		log := zapr.NewLogger(zap.L())
+		log.Error(err, "Failed to unmarshal config")
+		panic(err)
+	}
+	return copy
 }
 
 // InitViper function is responsible for reading the configuration file and environment variables, if they are set.

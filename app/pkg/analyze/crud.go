@@ -33,10 +33,17 @@ func NewCrudHandler(cfg config.Config) (*CrudHandler, error) {
 
 func (h *CrudHandler) GetBlockLog(c *gin.Context) {
 	log := zapr.NewLogger(zap.L())
-	if err := h.loadCache(c); err != nil {
-		log.Error(err, "Failed to load cache")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+
+	// lazily load blocklogs
+	if h.blockLogs == nil {
+		blockLogs, err := LoadLatestBlockLogs(c.Request.Context(), h.cfg.GetProcessedLogDir())
+		if err != nil {
+			log.Error(err, "Failed to load cache")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		h.blockLogs = blockLogs
+
 	}
 	id := c.Param("id")
 
@@ -50,21 +57,15 @@ func (h *CrudHandler) GetBlockLog(c *gin.Context) {
 	c.JSON(http.StatusOK, b)
 }
 
-// loadCache lazily loads the cache of block logs
-func (h *CrudHandler) loadCache(ctx context.Context) error {
-	if h.blockLogs != nil {
-		return nil
-	}
-
-	pDir := h.cfg.GetProcessedLogDir()
-	glob := filepath.Join(pDir, "blocks*.jsonl")
+func LoadLatestBlockLogs(ctx context.Context, logDir string) (map[string]api.BlockLog, error) {
+	glob := filepath.Join(logDir, "blocks*.jsonl")
 	matches, err := filepath.Glob(glob)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to match glob %s", glob)
+		return nil, errors.Wrapf(err, "Failed to match glob %s", glob)
 	}
 
 	sort.Strings(matches)
-	h.blockLogs = make(map[string]api.BlockLog)
+	blockLogs := make(map[string]api.BlockLog)
 
 	latest := matches[len(matches)-1]
 	log := logs.FromContext(ctx)
@@ -72,7 +73,7 @@ func (h *CrudHandler) loadCache(ctx context.Context) error {
 
 	f, err := os.Open(latest)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to open %s", latest)
+		return nil, errors.Wrapf(err, "Failed to open %s", latest)
 	}
 	defer f.Close()
 	d := json.NewDecoder(f)
@@ -84,9 +85,8 @@ func (h *CrudHandler) loadCache(ctx context.Context) error {
 			}
 			log.Error(err, "Failed to decode block log")
 		}
-
-		h.blockLogs[b.ID] = *b
+		blockLogs[b.ID] = *b
 	}
 
-	return nil
+	return blockLogs, nil
 }
