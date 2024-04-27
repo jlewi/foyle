@@ -6,17 +6,25 @@ If a command has already been executed the output of the command will be provide
 with the language `output`. Use the output to help you figure out the problem or complete the task.
 If you need me to execute a command please provide the command in a code block and I will execute it
 and then add the output to the document.
-{{if .Examples}}
+
 Here are a bunch of examples of input documents along with the expected output. You can use these examples to help you figure out the problem or task to be solved.
-{{range .Examples}}
+
 <example>
 <input>
-{{.Input}}
+input1
 </input>
 <output>
-{{.Output}}
+output1
 </output>
-</example>{{end}}{{end}}
+</example>
+<example>
+<input>
+input2
+</input>
+<output>
+output2
+</output>
+</example>
 Here's the actual document containing the problem or task to be solved:
 
-{{.Document}}
+blah blah

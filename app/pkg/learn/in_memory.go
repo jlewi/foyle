@@ -9,6 +9,7 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
 	"github.com/sashabaranov/go-openai"
+	"go.uber.org/zap"
 	"gonum.org/v1/gonum/mat"
 	"google.golang.org/protobuf/proto"
 	"os"
@@ -48,7 +49,7 @@ func NewInMemoryExampleDB(cfg config.Config, client *openai.Client) (*InMemoryEx
 }
 
 func (db *InMemoryExampleDB) GetExamples(ctx context.Context, doc *v1alpha1.Doc, maxResults int) ([]*v1alpha1.Example, error) {
-	//log := logs.FromContext(ctx)
+	log := logs.FromContext(ctx)
 	query := docs.DocToMarkdown(doc)
 
 	if len(db.examples) == 0 {
@@ -97,7 +98,10 @@ func (db *InMemoryExampleDB) GetExamples(ctx context.Context, doc *v1alpha1.Doc,
 	results := make([]*v1alpha1.Example, 0, numResults)
 
 	for i := len(sorted) - numResults; i < len(sorted); i++ {
-		results = append(results, db.examples[sorted[i]])
+		example := db.examples[sorted[i]]
+		score := result.AtVec(sorted[i])
+		log.Info("RAG result", zap.Object("example", example), "score", score)
+		results = append(results, example)
 	}
 
 	return results, nil

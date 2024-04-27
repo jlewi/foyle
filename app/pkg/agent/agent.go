@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"github.com/jlewi/foyle/app/pkg/learn"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -37,18 +38,33 @@ type Agent struct {
 	v1alpha1.UnimplementedGenerateServiceServer
 	client *openai.Client
 	config config.Config
+	db     *learn.InMemoryExampleDB
 }
 
 func NewAgent(cfg config.Config, client *openai.Client) (*Agent, error) {
 	if cfg.Agent == nil {
 		return nil, errors.New("Configuration is missing AgentConfig; configuration must define the agent field.")
 	}
-
 	log := zapr.NewLogger(zap.L())
 	log.Info("Creating agent", "config", cfg.Agent)
+	var db *learn.InMemoryExampleDB
+	if cfg.Agent.RAGConfig != nil && cfg.Agent.RAGConfig.Enabled {
+		log.Info("RAG is enabled; loading data")
+
+		if client == nil {
+			return nil, errors.New("OpenAI client is required for RAG")
+		}
+		var err error
+		db, err = learn.NewInMemoryExampleDB(cfg, client)
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to create InMemoryExampleDB")
+		}
+	}
+
 	return &Agent{
 		client: client,
 		config: cfg,
+		db:     db,
 	}, nil
 }
 
@@ -58,8 +74,19 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 	log = log.WithValues("traceId", span.SpanContext().TraceID())
 	ctx = logr.NewContext(ctx, log)
 
+	var examples []*v1alpha1.Example
+	if a.config.UseRAG() {
+		var err error
+		examples, err = a.db.GetExamples(ctx, req.Doc, a.config.RagMaxResults())
+		if err != nil {
+			// Fail gracefully; keep going without examples
+			log.Error(err, "Failed to get examples")
+			examples = nil
+		}
+	}
+
 	log.Info("Agent.Generate", zap.Object("request", req))
-	blocks, err := a.completeWithRetries(ctx, req)
+	blocks, err := a.completeWithRetries(ctx, req, examples)
 	if err != nil {
 		// TODO(jeremy): Should we set a status code?
 		return nil, err
@@ -84,7 +111,7 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 	return resp, nil
 }
 
-func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateRequest) ([]*v1alpha1.Block, error) {
+func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateRequest, examples []*v1alpha1.Example) ([]*v1alpha1.Block, error) {
 	log := logs.FromContext(ctx)
 
 	t := docs.NewTailer(req.Doc.GetBlocks(), MaxDocChars)
