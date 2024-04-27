@@ -71,10 +71,10 @@ func Test_Generate(t *testing.T) {
 		t.Fatalf("Error creating OpenAI client; %v", err)
 	}
 
-	cfg.Agent.RAGConfig = &config.RAGConfig{
+	cfg.Agent.RAG = &config.RAGConfig{
 		MaxResults: 3,
 	}
-	cfg.Agent.RAGConfig.Enabled = true
+	cfg.Agent.RAG.Enabled = true
 	agentWithRag, err := NewAgent(*cfg, client)
 
 	if err != nil {
@@ -82,7 +82,7 @@ func Test_Generate(t *testing.T) {
 	}
 
 	cfgNoRag := cfg.DeepCopy()
-	cfgNoRag.Agent.RAGConfig.Enabled = false
+	cfgNoRag.Agent.RAG.Enabled = false
 	agentNoRag, err := NewAgent(cfgNoRag, client)
 
 	if err != nil {
@@ -97,7 +97,7 @@ func Test_Generate(t *testing.T) {
 			var agent *Agent
 			if c.maxResults > 0 {
 				agent = agentWithRag
-				agent.config.Agent.RAGConfig.MaxResults = c.maxResults
+				agent.config.Agent.RAG.MaxResults = c.maxResults
 			} else {
 				agent = agentNoRag
 			}

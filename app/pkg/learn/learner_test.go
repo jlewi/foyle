@@ -2,11 +2,12 @@ package learn
 
 import (
 	"context"
+	"os"
+	"testing"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"go.uber.org/zap"
-	"os"
-	"testing"
 )
 
 func Test_Learner(t *testing.T) {
@@ -21,7 +22,9 @@ func Test_Learner(t *testing.T) {
 	}
 	zap.ReplaceGlobals(log)
 
-	config.InitViper(nil)
+	if err := config.InitViper(nil); err != nil {
+		t.Fatalf("Error initializing Viper; %v", err)
+	}
 	cfg := config.GetConfig()
 
 	client, err := oai.NewClient(*cfg)
@@ -29,7 +32,7 @@ func Test_Learner(t *testing.T) {
 		t.Fatalf("Error creating OpenAI client; %v", err)
 	}
 
-	l, err := NewLearner(cfg, client)
+	l, err := NewLearner(*cfg, client)
 	if err != nil {
 		t.Fatalf("Error creating learner; %v", err)
 	}

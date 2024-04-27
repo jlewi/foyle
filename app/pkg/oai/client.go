@@ -4,10 +4,11 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/hashicorp/go-retryablehttp"
+
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
-	"github.com/hashicorp/go-retryablehttp"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/hydros/pkg/files"
 	"github.com/pkg/errors"

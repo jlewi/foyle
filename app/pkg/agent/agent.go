@@ -2,8 +2,9 @@ package agent
 
 import (
 	"context"
-	"github.com/jlewi/foyle/app/pkg/learn"
 	"strings"
+
+	"github.com/jlewi/foyle/app/pkg/learn"
 
 	"github.com/go-logr/logr"
 	"go.opentelemetry.io/otel/trace"
@@ -48,7 +49,7 @@ func NewAgent(cfg config.Config, client *openai.Client) (*Agent, error) {
 	log := zapr.NewLogger(zap.L())
 	log.Info("Creating agent", "config", cfg.Agent)
 	var db *learn.InMemoryExampleDB
-	if cfg.Agent.RAGConfig != nil && cfg.Agent.RAGConfig.Enabled {
+	if cfg.Agent.RAG != nil && cfg.Agent.RAG.Enabled {
 		log.Info("RAG is enabled; loading data")
 
 		if client == nil {
@@ -115,10 +116,18 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 	log := logs.FromContext(ctx)
 
 	t := docs.NewTailer(req.Doc.GetBlocks(), MaxDocChars)
-	for try := 0; try < maxTries; try++ {
 
+	exampleArgs := make([]Example, 0, len(examples))
+	for _, example := range examples {
+		exampleArgs = append(exampleArgs, Example{
+			Input:  docs.DocToMarkdown(example.Query),
+			Output: docs.BlocksToMarkdown(example.Answer),
+		})
+	}
+	for try := 0; try < maxTries; try++ {
 		args := promptArgs{
 			Document: t.Text(),
+			Examples: exampleArgs,
 		}
 
 		var sb strings.Builder

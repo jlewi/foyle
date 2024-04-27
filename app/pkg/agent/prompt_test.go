@@ -1,11 +1,12 @@
 package agent
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func Test_Prompt(t *testing.T) {

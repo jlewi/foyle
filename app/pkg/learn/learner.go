@@ -3,6 +3,10 @@ package learn
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/config"
@@ -14,9 +18,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sashabaranov/go-openai"
 	"google.golang.org/protobuf/proto"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 const (
@@ -27,14 +28,11 @@ const (
 //
 // TODO(jeremy): Should we call this a trainer?
 type Learner struct {
-	Config *config.Config
+	Config config.Config
 	client *openai.Client
 }
 
-func NewLearner(cfg *config.Config, client *openai.Client) (*Learner, error) {
-	if cfg == nil {
-		return nil, errors.New("Config is required")
-	}
+func NewLearner(cfg config.Config, client *openai.Client) (*Learner, error) {
 	if client == nil {
 		return nil, errors.New("OpenAI client is required")
 	}

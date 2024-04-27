@@ -2,6 +2,10 @@ package learn
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"sort"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -12,9 +16,6 @@ import (
 	"go.uber.org/zap"
 	"gonum.org/v1/gonum/mat"
 	"google.golang.org/protobuf/proto"
-	"os"
-	"path/filepath"
-	"sort"
 )
 
 // InMemoryExampleDB is an in-memory example database.

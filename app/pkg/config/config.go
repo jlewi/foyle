@@ -52,8 +52,8 @@ type AgentConfig struct {
 	// Model is the name of the model to use to generate completions
 	Model string `json:"model" yaml:"model"`
 
-	// RAGConfig is the configuration for the RAG model
-	RAGConfig *RAGConfig `json:"ragConfig,omitempty" yaml:"ragConfig,omitempty"`
+	// RAG is the configuration for the RAG model
+	RAG *RAGConfig `json:"rag,omitempty" yaml:"rag,omitempty"`
 }
 
 // RAGConfig configures the RAG model
@@ -212,20 +212,20 @@ func (c *Config) GetAssetsDir() string {
 }
 
 func (c *Config) UseRAG() bool {
-	if c.Agent == nil || c.Agent.RAGConfig == nil {
+	if c.Agent == nil || c.Agent.RAG == nil {
 		return false
 	}
-	return c.Agent.RAGConfig.Enabled
+	return c.Agent.RAG.Enabled
 }
 
 func (c *Config) RagMaxResults() int {
-	if c.Agent == nil || c.Agent.RAGConfig == nil {
+	if c.Agent == nil || c.Agent.RAG == nil {
 		return -1
 	}
-	if c.Agent.RAGConfig.MaxResults <= 0 {
+	if c.Agent.RAG.MaxResults <= 0 {
 		return defaultMaxResults
 	}
-	return c.Agent.RAGConfig.MaxResults
+	return c.Agent.RAG.MaxResults
 }
 
 func (c *Config) UseHoneycomb() bool {

@@ -2,15 +2,16 @@ package learn
 
 import (
 	"context"
+	"os"
+	"sort"
+	"testing"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"go.uber.org/zap"
 	"gonum.org/v1/gonum/mat"
 	"google.golang.org/protobuf/encoding/protojson"
-	"os"
-	"sort"
-	"testing"
 )
 
 func Test_SortIndexes(t *testing.T) {
@@ -64,7 +65,10 @@ func Test_InMemoryDB(t *testing.T) {
 	}
 	zap.ReplaceGlobals(log)
 
-	config.InitViper(nil)
+	if err := config.InitViper(nil); err != nil {
+		t.Fatalf("Error initializing Viper; %v", err)
+	}
+
 	cfg := config.GetConfig()
 
 	client, err := oai.NewClient(*cfg)
