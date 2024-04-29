@@ -2,7 +2,7 @@
 
 * **Author**: Jeremy Lewi
 * **Last Updated**: 2024-04-23
-* **Status**: Being Drafted
+* **Status**: Publish
 
 ## Objective
 
