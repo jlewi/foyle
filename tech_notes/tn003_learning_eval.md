@@ -106,7 +106,19 @@ itself is the first positional argument. For the positional we compute the edit 
 of the positional argument. For the named arguments we match arguments by name and count the number of incorrect,
 missing, and extra arguments.
 
-
+```math
+D(i, j) = \begin{cases} 
+0 & \text{if } i = 0 \text{ and } j = 0 \\
+i & \text{if } j = 0 \text{ and } i > 0 \\
+j & \text{if } i = 0 \text{ and } j > 0 \\
+min \begin{cases} 
+D(i-1, j) + 1 \\
+D(i, j-1) + 1 \\
+D(i-1, j-1) + 1 & \text{if } a[i] \neq b[j] \\
+D(i-1, j-1) & \text{if } a[i] = b[j]
+\end{cases} & \text{if } i, j > 0
+\end{cases}
+```
 
 ## How do we ensure the evaluation set isn't in our training set
 
