@@ -189,3 +189,10 @@ An easy way to do this would be to include a log field `eval` that is set to `tr
 We still want the Agent to log the evaluation examples so we can use the logs and traces to evaluate the Agent. 
 
 In the future we could potentially set the `eval` field in the request if we want to use the same server for both training and evaluation. For now, we'd probably run the Agent as a batch job and not start a server.
+
+## Alternatives
+
+### LLM Evaluation
+
+Using an LLM to evaluate the correctness of generated responses is another option. I'm not sure what advantage this would offer over the proposed metric. The proposed
+metric has the advantage that it is interpratable and deteriminstic. LLM scoring would introduce another dimension of complexity; in particular we'd potentially need to calibrarte the LLM to align its scores with human scoring.
