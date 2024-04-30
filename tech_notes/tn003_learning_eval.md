@@ -104,7 +104,10 @@ missing, and extra arguments. We can denote this as follows. Let $a$ and $b$ be 
 arguments for two different commands $r_a$ and $r_b$ that we wish to compare.
 
 $$
-a = {a_0, ..., a_{m}} \\
+a = {a_0, ..., a_{m}}
+$$
+
+$$
 b = {b_0, ..., b_{n}}
 $$
 
