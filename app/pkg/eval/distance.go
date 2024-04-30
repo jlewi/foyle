@@ -26,7 +26,13 @@ func Distance(left executor.Instruction, right executor.Instruction) (int, error
 
 	// Compute the distance of the unnamed arguments
 	unamedDistance, err := editDistance(leftArgs.unnamed, rightArgs.unnamed)
-	return unamedDistance, err
+	if err != nil {
+		return -1, err
+	}
+
+	// Compute the distance of the named arguments
+	namedDistance := dictDistance(leftArgs.named, rightArgs.named)
+	return unamedDistance + namedDistance, nil
 }
 
 // editDistance computes the edit distance between two slices of strings.
@@ -78,6 +84,38 @@ func (t *tokenizer) tokenize(vals []string) (string, error) {
 		result += t.dict[l]
 	}
 	return result, nil
+}
+
+// dictDistance computes the distance between two dictionaries.
+func dictDistance(left map[string]string, right map[string]string) int {
+	// Each key in one dictionary but not the other contributes 1 to the distance.
+	distance := 0
+	distance += countKeysNotInRight(left, right)
+	distance += countKeysNotInRight(right, left)
+
+	// Now we need to check the values of the keys that are in both dictionaries.
+	// If the values don't match then we need to add 1 to the distance.
+	for k := range left {
+		if _, ok := right[k]; !ok {
+			continue
+		}
+
+		if left[k] != right[k] {
+			distance += 1
+		}
+	}
+
+	return distance
+}
+
+func countKeysNotInRight(left map[string]string, right map[string]string) int {
+	d := 0
+	for k := range left {
+		if _, ok := right[k]; !ok {
+			d += 1
+		}
+	}
+	return d
 }
 
 func splitInstruction(instruction executor.Instruction) command {
