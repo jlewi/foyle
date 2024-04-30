@@ -111,9 +111,15 @@ $$
 Then we can define the edit distance between the positional arguments as
 
 $$
-distance = D_p(m,n) \\
-D_p(i,0) = \sum_{k=0}^{i} w_{del}(a_k) \\
-D_p(0,j) = \sum_{k=0}^{j} w_{ins}(b_k)  \\
+distance = D_p(m,n)
+$$
+$$
+D_p(i,0) = \sum_{k=0}^{i} w_{del}(a_k)
+$$
+$$
+D_p(0,j) = \sum_{k=0}^{j} w_{ins}(b_k)
+$$
+$$
 D_p(i, j) = \begin{cases}
 D_p(i-1, j-1) & \text{if } a_i = b_j \\
 min \begin{cases}
@@ -129,8 +135,12 @@ Here $w_{del}$, $w_{ins}$, and $w_{sub}$ are weights for deletion, insertion, an
 We can treat named arguments as two dictionaries `c` and `d`. We can define the edit distance between the named arguments as follows
 
 $$
-K = \text{keys}(c) \cup \text{keys}(d) \\
-D_n = \sum_{k \in K} f(k) \\
+K = \text{keys}(c) \cup \text{keys}(d)
+$$
+$$
+D_n = \sum_{k \in K} f(k)
+$$
+$$
 f(k) = \begin{cases}
 w_{del}(c[k]) & \text{if } k \notin \text{keys}(d) \\
 w_{ins}(d[k]) & \text{if } k \notin \text{keys}(c) \\
