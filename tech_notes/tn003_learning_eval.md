@@ -31,7 +31,8 @@ Foyle before and after learning from human feedback. We propose to achieve this 
 $$
 S = \sum_{i=0}^n D(r_i, r'_i) 
 $$
-5. Compare the scores before and after learning from human feedback.
+
+1. Compare the scores before and after learning from human feedback.
 
 ## Learning: What Do We Want To Learn
 
