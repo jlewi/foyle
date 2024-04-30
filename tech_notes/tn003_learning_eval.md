@@ -28,9 +28,9 @@ Foyle before and after learning from human feedback. We propose to achieve this 
 1. For each query $q_i$ in the evaluation dataset, we will generate a command $r'_i$ using the Agent. 
 1. Compute an evaluation score using a metric similar to the edit distance 
 
-$$
-S = \sum_{i=0}^n D(r_i, r'_i) 
-$$
+   $$
+   S = \sum_{i=0}^n D(r_i, r'_i) 
+   $$
 
 1. Compare the scores before and after learning from human feedback.
 
