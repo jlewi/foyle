@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"github.com/jlewi/foyle/app/pkg/config"
 	"testing"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -43,8 +44,8 @@ func Test_Executor(t *testing.T) {
 			},
 		},
 	}
-
-	e, err := NewExecutor()
+	cfg := config.Config{}
+	e, err := NewExecutor(cfg)
 	if err != nil {
 		t.Fatalf("Failed to create executor: %v", err)
 	}

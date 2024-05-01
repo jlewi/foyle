@@ -72,7 +72,7 @@ func NewAgent(cfg config.Config, client *openai.Client) (*Agent, error) {
 func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v1alpha1.GenerateResponse, error) {
 	span := trace.SpanFromContext(ctx)
 	log := logs.FromContext(ctx)
-	log = log.WithValues("traceId", span.SpanContext().TraceID())
+	log = log.WithValues("traceId", span.SpanContext().TraceID(), "evalMode", a.config.EvalMode())
 	ctx = logr.NewContext(ctx, log)
 
 	var examples []*v1alpha1.Example

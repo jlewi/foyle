@@ -60,7 +60,7 @@ type Server struct {
 
 // NewServer creates a new server
 func NewServer(config config.Config) (*Server, error) {
-	e, err := executor.NewExecutor()
+	e, err := executor.NewExecutor(config)
 	if err != nil {
 		return nil, err
 	}

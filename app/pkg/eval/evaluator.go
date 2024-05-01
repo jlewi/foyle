@@ -1,0 +1,274 @@
+package eval
+
+import (
+	"context"
+	"github.com/cockroachdb/pebble"
+	"github.com/google/uuid"
+	"github.com/jlewi/foyle/app/pkg/agent"
+	"github.com/jlewi/foyle/app/pkg/config"
+	"github.com/jlewi/foyle/app/pkg/logs"
+	"github.com/jlewi/foyle/app/pkg/oai"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"github.com/jlewi/monogo/helpers"
+	"github.com/pkg/errors"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"os"
+	"path/filepath"
+)
+
+type Evaluator struct {
+	config config.Config
+	agent  *agent.Agent
+}
+
+func NewEvaluator(cfg config.Config) (*Evaluator, error) {
+	cfg = cfg.DeepCopy()
+	if cfg.Agent == nil {
+		cfg.Agent = &config.AgentConfig{}
+	}
+	// Ensure we are in evaluation mode.
+	cfg.Agent.EvalMode = true
+
+	client, err := oai.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	agent, err := agent.NewAgent(cfg, client)
+
+	if err != nil {
+		return nil, err
+	}
+	return &Evaluator{
+		config: cfg,
+		agent:  agent,
+	}, nil
+}
+
+func (e *Evaluator) Reconcile(ctx context.Context, evalDir string, outDir string) error {
+	db, err := pebble.Open(outDir, &pebble.Options{})
+	if err != nil {
+		return err
+	}
+	defer helpers.DeferIgnoreError(db.Close)
+
+	// List all the files
+	files, err := e.listEvalFiles(ctx, evalDir)
+	if err != nil {
+		return err
+	}
+
+	log := logs.FromContext(ctx)
+	log.Info("Found eval files", "numFiles", len(files))
+
+	// Now iterate over the DB and figure out which files haven't  been loaded into the db.
+
+	unloadedFiles, err := e.findUnloadedFiles(ctx, db, files)
+	if err != nil {
+		return err
+	}
+	log.Info("Found unloaded files", "numFiles", len(unloadedFiles))
+
+	// We need to load the evaluation data into the database.
+	if err := e.loadFoyleFiles(ctx, db, unloadedFiles); err != nil {
+		return err
+	}
+
+	// Now generate predictions for any results that are missing them.
+	if err := e.reconcilePredictions(ctx, db); err != nil {
+		return err
+	}
+
+	// Compute the distance
+
+	return nil
+}
+
+func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB) error {
+	olog := logs.FromContext(ctx)
+	iter, err := db.NewIterWithContext(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if key == nil {
+			break
+		}
+
+		log := olog.WithValues("id", string(key))
+		value, err := iter.ValueAndErr()
+		if err != nil {
+			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
+		}
+
+		result := &v1alpha1.EvalResult{}
+		if err := proto.Unmarshal(value, result); err != nil {
+			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
+		}
+
+		if len(result.GetActual()) > 0 {
+			log.Info("Skipping; already have answer", "path", result.ExampleFile)
+			// We have the answer so we don't need to generate it.
+			continue
+		}
+
+		if len(result.Actual) == 0 {
+			// We need to generate the answer.
+			resp, err := e.agent.Generate(ctx, &v1alpha1.GenerateRequest{
+				Doc: result.Example.Query,
+			})
+			if err != nil {
+				result.Error = err.Error()
+				result.Status = v1alpha1.EvalResultStatus_ERROR
+				continue
+			}
+
+			result.Actual = resp.GetBlocks()
+			b, err := proto.Marshal(result)
+			if err != nil {
+				return errors.Wrapf(err, "Failed to marshal result")
+			}
+			if err := db.Set(key, b, nil); err != nil {
+				return errors.Wrapf(err, "Failed to write result to DB")
+			}
+		}
+	}
+	return nil
+}
+
+func (e *Evaluator) findUnloadedFiles(ctx context.Context, db *pebble.DB, files []string) ([]string, error) {
+	unprocessed := map[string]bool{}
+
+	iter, err := db.NewIterWithContext(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close()
+
+	for _, file := range files {
+		unprocessed[file] = true
+	}
+
+	// Iterate over the files in the DB and remove them from the list of files to load.
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if key == nil {
+			break
+		}
+
+		value, err := iter.ValueAndErr()
+		if err != nil {
+			// Should we ignore the error?
+			return nil, errors.Wrapf(err, "Failed to read value for key %s", string(key))
+		}
+
+		result := &v1alpha1.EvalResult{}
+		if err := proto.Unmarshal(value, result); err != nil {
+			return nil, errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
+		}
+
+		delete(unprocessed, result.ExampleFile)
+
+	}
+
+	toProcess := make([]string, 0, len(unprocessed))
+	for file := range unprocessed {
+		toProcess = append(toProcess, file)
+	}
+
+	return toProcess, nil
+}
+
+// listEvalFiles returns a list of the all the Foyle files in the eval directory.
+func (e *Evaluator) listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
+	examples := make([]string, 0, 100)
+	filepath.Walk(evalDir, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+
+		if filepath.Ext(path) != ".foyle" {
+			return nil
+		}
+
+		examples = append(examples, path)
+		return nil
+	})
+
+	return examples, nil
+}
+
+// loadFoyleFiles loads a bunch of Foyle files representing evaluation data and converts them into example
+// protos.
+func (e *Evaluator) loadFoyleFiles(ctx context.Context, db *pebble.DB, files []string) error {
+	oLog := logs.FromContext(ctx)
+
+	allErrors := &helpers.ListOfErrors{}
+	for _, path := range files {
+		log := oLog.WithValues("path", path)
+		log.Info("Processing file")
+
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			log.Error(err, "Failed to read file")
+			allErrors.AddCause(err)
+			// Keep going
+			continue
+		}
+
+		doc := &v1alpha1.Doc{}
+		if err := protojson.Unmarshal(contents, doc); err != nil {
+			log.Error(err, "Failed to unmarshal example")
+			allErrors.AddCause(err)
+			// Keep going
+			continue
+		}
+
+		if len(doc.GetBlocks()) < 2 {
+			log.Info("Skipping doc; too few blocks; at least two are required")
+			continue
+		}
+
+		answer := doc.GetBlocks()[len(doc.GetBlocks())-1]
+		doc.Blocks = doc.Blocks[:len(doc.GetBlocks())-1]
+		if answer.Kind != v1alpha1.BlockKind_CODE {
+			log.Info("Skipping doc; last block must be code")
+			continue
+		}
+
+		id := uuid.NewString()
+		example := &v1alpha1.Example{
+			Id:     id,
+			Query:  doc,
+			Answer: []*v1alpha1.Block{answer},
+		}
+
+		result := &v1alpha1.EvalResult{
+			Example:     example,
+			ExampleFile: path,
+		}
+
+		b, err := proto.Marshal(result)
+		if err != nil {
+			log.Error(err, "Failed to marshal result")
+			allErrors.AddCause(err)
+			// Keep going
+			continue
+		}
+		if err := db.Set([]byte(id), b, nil); err != nil {
+			log.Error(err, "Failed to write result to DB")
+			allErrors.AddCause(err)
+			// Keep going
+			continue
+		}
+	}
+
+	if len(allErrors.Causes) > 0 {
+		return allErrors
+	}
+
+	return nil
+}

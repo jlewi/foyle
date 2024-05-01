@@ -54,6 +54,10 @@ type AgentConfig struct {
 
 	// RAG is the configuration for the RAG model
 	RAG *RAGConfig `json:"rag,omitempty" yaml:"rag,omitempty"`
+
+	// EvalMode is whether to run in evaluation mode or not.
+	// In EvalMode logs are specially marked so requests won't be used for training.
+	EvalMode bool `json:"evalMode" yaml:"evalMode"`
 }
 
 // RAGConfig configures the RAG model
@@ -239,6 +243,13 @@ func (c *Config) UseHoneycomb() bool {
 		return false
 	}
 	return true
+}
+
+func (c *Config) EvalMode() bool {
+	if c.Agent == nil {
+		return false
+	}
+	return c.Agent.EvalMode
 }
 
 // DeepCopy returns a deep copy.
