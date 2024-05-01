@@ -4,6 +4,7 @@ import (
 	"github.com/pulumi/pulumi-gcp/sdk/v7/go/gcp/container"
 	"github.com/pulumi/pulumi-gcp/sdk/v7/go/gcp/organizations"
 	"github.com/pulumi/pulumi-gcp/sdk/v7/go/gcp/projects"
+	"github.com/pulumi/pulumi-gcp/sdk/v7/go/gcp/serviceaccount"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -33,6 +34,7 @@ func main() {
 			"artifactregistry.googleapis.com",
 			"cloudbuild.googleapis.com",
 			"container.googleapis.com",
+			"sheets.googleapis.com",
 			"storage.googleapis.com",
 			"secretmanager.googleapis.com",
 		}
@@ -61,6 +63,24 @@ func main() {
 			Project:            p.ProjectId,
 			DeletionProtection: pulumi.Bool(false),
 		}, pulumi.DependsOn(svcs))
+		if err != nil {
+			return err
+		}
+		account, err := serviceaccount.NewAccount(ctx, "developer", &serviceaccount.AccountArgs{
+			AccountId:   pulumi.String("developer"),
+			DisplayName: pulumi.String("Developer Service Account"),
+			Project:     p.ProjectId,
+		})
+		if err != nil {
+			return err
+		}
+
+		// Create IAM binding for the service account
+		_, err = serviceaccount.NewIAMBinding(ctx, "serviceAccountIAMBinding", &serviceaccount.IAMBindingArgs{
+			ServiceAccountId: account.Name,
+			Role:             pulumi.String("roles/iam.serviceAccountTokenCreator"),
+			Members:          pulumi.StringArray{pulumi.String("user:jeremy@lewi.us")},
+		})
 		if err != nil {
 			return err
 		}

@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"fmt"
 	"github.com/cockroachdb/pebble"
 	"github.com/google/uuid"
 	"github.com/jlewi/foyle/app/pkg/agent"
@@ -11,6 +12,10 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
+	"google.golang.org/api/googleapi"
+	"google.golang.org/api/impersonate"
+	"google.golang.org/api/option"
+	"google.golang.org/api/sheets/v4"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"os"
@@ -136,6 +141,79 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB) err
 			}
 		}
 	}
+	return nil
+}
+
+func (e *Evaluator) updateGoogleSheet(ctx context.Context) error {
+	log := logs.FromContext(ctx)
+	// Replace spreadsheetID and sheetName with your actual spreadsheet ID and sheet name
+	spreadsheetID := "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE"
+	sheetName := "Results"
+
+	log.WithValues("spreadsheetID", spreadsheetID, "sheetName", sheetName)
+	log.Info("Updating Google Sheet")
+	credentialsConfig := &impersonate.CredentialsConfig{
+		TargetPrincipal: "developer@foyle-dev.iam.gserviceaccount.com",
+		Scopes:          []string{"https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"},
+	}
+
+	credentials, err := impersonate.CredentialsTokenSource(ctx, *credentialsConfig)
+	if err != nil {
+		log.Error(err, "Unable to create impersonated credentials")
+		return err
+	}
+
+	srv, err := sheets.NewService(ctx, option.WithTokenSource(credentials))
+	if err != nil {
+		log.Error(err, "Unable to retrieve Sheets client")
+		return err
+	}
+
+	// Create the sheet if it doesn't exist
+	batchUpdateRequest := &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: []*sheets.Request{
+			{
+				AddSheet: &sheets.AddSheetRequest{
+					Properties: &sheets.SheetProperties{
+						Title: sheetName,
+					},
+				},
+			},
+		},
+	}
+
+	_, err = srv.Spreadsheets.BatchUpdate(spreadsheetID, batchUpdateRequest).Context(ctx).Do()
+	if err != nil {
+		apiErr, ok := err.(*googleapi.Error)
+		if ok {
+			if apiErr.Code == 400 {
+				log.V(1).Info("Sheet already exists")
+			} else {
+				log.Error(err, "Unable to create new sheet ")
+				return errors.Wrapf(err, "Unable to create new sheet named: %s", sheetName)
+			}
+		} else {
+			return errors.Wrapf(err, "Unable to create new sheet named: %s", sheetName)
+		}
+	}
+
+	// Prepare the value range to write
+	writeRange := fmt.Sprintf("%s!A1:B1", sheetName)
+	values := [][]interface{}{{"cost", 100}}
+	valueRange := &sheets.ValueRange{
+		Values: values,
+	}
+
+	// Write the value range to the sheet
+	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, writeRange, valueRange).
+		ValueInputOption("USER_ENTERED").
+		Context(ctx).
+		Do()
+	if err != nil {
+		log.Error(err, "Unable to write data to sheet")
+		return errors.Wrapf(err, "Unable to write data to sheet")
+	}
+
 	return nil
 }
 
