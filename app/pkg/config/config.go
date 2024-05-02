@@ -46,6 +46,8 @@ type Config struct {
 	AzureOpenAI *AzureOpenAIConfig `json:"azureOpenAI,omitempty" yaml:"azureOpenAI,omitempty"`
 
 	Telemetry *TelemetryConfig `json:"telemetry,omitempty" yaml:"telemetry,omitempty"`
+
+	Eval *EvalConfig `json:"eval,omitempty" yaml:"eval,omitempty"`
 }
 
 type AgentConfig struct {
@@ -66,6 +68,11 @@ type RAGConfig struct {
 	Enabled bool `json:"enabled" yaml:"enabled"`
 	// MaxResults is the maximum number of results to return
 	MaxResults int `json:"maxResults" yaml:"maxResults"`
+}
+
+type EvalConfig struct {
+	// GCPServiceAccount is the service account to use to update Google Sheets
+	GCPServiceAccount string `json:"gcpServiceAccount" yaml:"gcpServiceAccount"`
 }
 
 // ServerConfig configures the server

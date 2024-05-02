@@ -39,8 +39,13 @@ func Test_Evaluator(t *testing.T) {
 		t.Fatalf("Error getting eval directory; %v", err)
 	}
 
-	outDir := "/tmp/foyle/eval"
-	if err := e.Reconcile(context.Background(), evalDir, outDir); err != nil {
+	experiment := EvalExperiment{
+		EvalDir:       evalDir,
+		DBDir:         "/tmp/foyle/eval",
+		GoogleSheetID: "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE",
+		SheetName:     "Results",
+	}
+	if err := e.Reconcile(context.Background(), experiment); err != nil {
 		t.Fatalf("Error reconciling; %v", err)
 	}
 }

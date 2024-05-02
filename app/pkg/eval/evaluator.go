@@ -50,15 +50,30 @@ func NewEvaluator(cfg config.Config) (*Evaluator, error) {
 	}, nil
 }
 
-func (e *Evaluator) Reconcile(ctx context.Context, evalDir string, outDir string) error {
-	db, err := pebble.Open(outDir, &pebble.Options{})
+type EvalExperiment struct {
+	// EvalDir is the directory containing the evaluation data.
+	EvalDir string
+
+	// DBDir is the directory for the pebble database that will store the results
+	DBDir string
+
+	// GoogleSheetID is the ID of the Google Sheet to update with the results.
+	GoogleSheetID string
+
+	// SheetName is the name of the sheet to update.
+	SheetName string
+}
+
+func (e *Evaluator) Reconcile(ctx context.Context, experiment EvalExperiment) error {
+
+	db, err := pebble.Open(experiment.DBDir, &pebble.Options{})
 	if err != nil {
 		return err
 	}
 	defer helpers.DeferIgnoreError(db.Close)
 
 	// List all the files
-	files, err := e.listEvalFiles(ctx, evalDir)
+	files, err := e.listEvalFiles(ctx, experiment.EvalDir)
 	if err != nil {
 		return err
 	}
@@ -86,6 +101,10 @@ func (e *Evaluator) Reconcile(ctx context.Context, evalDir string, outDir string
 
 	// Compute the distance
 
+	// Update the Google Sheet
+	if err := e.updateGoogleSheet(ctx, experiment); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -144,16 +163,16 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB) err
 	return nil
 }
 
-func (e *Evaluator) updateGoogleSheet(ctx context.Context) error {
+func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment EvalExperiment) error {
 	log := logs.FromContext(ctx)
-	// Replace spreadsheetID and sheetName with your actual spreadsheet ID and sheet name
-	spreadsheetID := "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE"
-	sheetName := "Results"
+	if e.config.Eval == nil || e.config.Eval.GCPServiceAccount == "" {
+		return errors.New("GCPServiceAccount is required to update Google Sheet")
+	}
 
-	log.WithValues("spreadsheetID", spreadsheetID, "sheetName", sheetName)
+	log.WithValues("spreadsheetID", experiment.GoogleSheetID, "sheetName", experiment.SheetName)
 	log.Info("Updating Google Sheet")
 	credentialsConfig := &impersonate.CredentialsConfig{
-		TargetPrincipal: "developer@foyle-dev.iam.gserviceaccount.com",
+		TargetPrincipal: e.config.Eval.GCPServiceAccount,
 		Scopes:          []string{"https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"},
 	}
 
@@ -175,14 +194,14 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context) error {
 			{
 				AddSheet: &sheets.AddSheetRequest{
 					Properties: &sheets.SheetProperties{
-						Title: sheetName,
+						Title: experiment.SheetName,
 					},
 				},
 			},
 		},
 	}
 
-	_, err = srv.Spreadsheets.BatchUpdate(spreadsheetID, batchUpdateRequest).Context(ctx).Do()
+	_, err = srv.Spreadsheets.BatchUpdate(experiment.GoogleSheetID, batchUpdateRequest).Context(ctx).Do()
 	if err != nil {
 		apiErr, ok := err.(*googleapi.Error)
 		if ok {
