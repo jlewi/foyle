@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/config"
+	"github.com/jlewi/foyle/app/pkg/docs"
+	"github.com/jlewi/foyle/app/pkg/executor"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
@@ -25,6 +27,7 @@ import (
 type Evaluator struct {
 	config config.Config
 	agent  *agent.Agent
+	parser *executor.BashishParser
 }
 
 func NewEvaluator(cfg config.Config) (*Evaluator, error) {
@@ -44,9 +47,17 @@ func NewEvaluator(cfg config.Config) (*Evaluator, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	parser, err := executor.NewBashishParser()
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &Evaluator{
 		config: cfg,
 		agent:  agent,
+		parser: parser,
 	}, nil
 }
 
@@ -100,9 +111,12 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment EvalExperiment) er
 	}
 
 	// Compute the distance
+	if err := e.reconcileDistance(ctx, db); err != nil {
+		return err
+	}
 
 	// Update the Google Sheet
-	if err := e.updateGoogleSheet(ctx, experiment); err != nil {
+	if err := e.updateGoogleSheet(ctx, experiment, db); err != nil {
 		return err
 	}
 	return nil
@@ -163,7 +177,109 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB) err
 	return nil
 }
 
-func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment EvalExperiment) error {
+func (e *Evaluator) updateResult(ctx context.Context, id string, result *v1alpha1.EvalResult, db *pebble.DB) error {
+	b, err := proto.Marshal(result)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to marshal result")
+	}
+	if err := db.Set([]byte(id), b, nil); err != nil {
+		return errors.Wrapf(err, "Failed to write result to DB")
+	}
+	return nil
+}
+
+func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error {
+	olog := logs.FromContext(ctx)
+	iter, err := db.NewIterWithContext(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if key == nil {
+			break
+		}
+
+		log := olog.WithValues("id", string(key))
+		value, err := iter.ValueAndErr()
+		if err != nil {
+			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
+		}
+
+		result := &v1alpha1.EvalResult{}
+		if err := proto.Unmarshal(value, result); err != nil {
+			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
+		}
+
+		// DO NOT COMMIT this code is commented out to force recomputation of the distance
+		//if result.Distance >= 0 && result.Status != v1alpha1.EvalResultStatus_UNKNOWN_EVAL_RESULT_STATUS {
+		//	log.Info("Skipping; distance already computed")
+		//	continue
+		//}
+
+		var actualBlock *v1alpha1.Block
+
+		for _, b := range result.Actual {
+			if b.Kind == v1alpha1.BlockKind_CODE {
+				actualBlock = b
+				break
+			}
+		}
+		if actualBlock == nil {
+			log.Info("Skipping; no code blocks found in the answer")
+			continue
+		}
+
+		if len(result.Example.GetAnswer()) > 1 {
+			log.Info("Warning; expected answer more than one answer block. Only the first is used")
+		}
+
+		expected, err := e.parser.Parse(result.Example.Answer[0].GetContents())
+		if err != nil {
+			log.Error(err, "Failed to parse expected answer to command")
+			result.Error = err.Error()
+			result.Status = v1alpha1.EvalResultStatus_ERROR
+			if err := e.updateResult(ctx, string(key), result, db); err != nil {
+				log.Error(err, "Failed to update result")
+			}
+			continue
+		}
+
+		actual, err := e.parser.Parse(actualBlock.GetContents())
+		if err != nil {
+			log.Error(err, "Failed to parse actual answer to command")
+			result.Error = err.Error()
+			result.Status = v1alpha1.EvalResultStatus_ERROR
+			if err := e.updateResult(ctx, string(key), result, db); err != nil {
+				log.Error(err, "Failed to update result")
+			}
+			continue
+		}
+
+		distance, err := Distance(expected[0], actual[0])
+
+		if err != nil {
+			log.Error(err, "Failed to compute distance")
+			result.Error = err.Error()
+			result.Status = v1alpha1.EvalResultStatus_ERROR
+			if err := e.updateResult(ctx, string(key), result, db); err != nil {
+				log.Error(err, "Failed to update result")
+			}
+			continue
+		}
+
+		result.Distance = int32(distance)
+		result.Status = v1alpha1.EvalResultStatus_DONE
+		if err := e.updateResult(ctx, string(key), result, db); err != nil {
+			log.Error(err, "Failed to update result")
+		}
+	}
+	return nil
+}
+
+func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment EvalExperiment, db *pebble.DB) error {
 	log := logs.FromContext(ctx)
 	if e.config.Eval == nil || e.config.Eval.GCPServiceAccount == "" {
 		return errors.New("GCPServiceAccount is required to update Google Sheet")
@@ -209,22 +325,49 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment EvalExperi
 				log.V(1).Info("Sheet already exists")
 			} else {
 				log.Error(err, "Unable to create new sheet ")
-				return errors.Wrapf(err, "Unable to create new sheet named: %s", sheetName)
+				return errors.Wrapf(err, "Unable to create new sheet named: %s", experiment.SheetName)
 			}
 		} else {
-			return errors.Wrapf(err, "Unable to create new sheet named: %s", sheetName)
+			return errors.Wrapf(err, "Unable to create new sheet named: %s", experiment.SheetName)
 		}
 	}
 
 	// Prepare the value range to write
-	writeRange := fmt.Sprintf("%s!A1:B1", sheetName)
-	values := [][]interface{}{{"cost", 100}}
+	writeRange := fmt.Sprintf("%s", experiment.SheetName)
+	values := [][]interface{}{{"id", "prompt", "actual", "expected", "distance"}}
+
+	iter, err := db.NewIterWithContext(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if key == nil {
+			break
+		}
+
+		value, err := iter.ValueAndErr()
+		if err != nil {
+			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
+		}
+
+		result := &v1alpha1.EvalResult{}
+		if err := proto.Unmarshal(value, result); err != nil {
+			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
+		}
+
+		prompt := docs.DocToMarkdown(result.Example.Query)
+		row := []interface{}{result.Example.Id, prompt, docs.BlocksToMarkdown(result.Actual), docs.BlocksToMarkdown(result.Example.Answer), result.Distance}
+		values = append(values, row)
+	}
 	valueRange := &sheets.ValueRange{
 		Values: values,
 	}
 
 	// Write the value range to the sheet
-	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, writeRange, valueRange).
+	_, err = srv.Spreadsheets.Values.Update(experiment.GoogleSheetID, writeRange, valueRange).
 		ValueInputOption("USER_ENTERED").
 		Context(ctx).
 		Do()
@@ -346,6 +489,8 @@ func (e *Evaluator) loadFoyleFiles(ctx context.Context, db *pebble.DB, files []s
 		result := &v1alpha1.EvalResult{
 			Example:     example,
 			ExampleFile: path,
+			// initialize distance to a negative value so we can tell when it hasn't been computed
+			Distance: -1,
 		}
 
 		b, err := proto.Marshal(result)

@@ -2,7 +2,9 @@ package eval
 
 import (
 	"context"
+	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/pkg/config"
+	"github.com/jlewi/monogo/helpers"
 	"go.uber.org/zap"
 	"os"
 	"path/filepath"
@@ -71,7 +73,18 @@ func Test_Evaluator_Google_Sheets(t *testing.T) {
 		t.Fatalf("Error creating evaluator; %v", err)
 	}
 
-	if err := e.updateGoogleSheet(context.Background()); err != nil {
+	experiment := EvalExperiment{
+		EvalDir:       "",
+		DBDir:         "/tmp/foyle/eval",
+		GoogleSheetID: "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE",
+		SheetName:     "Results",
+	}
+	db, err := pebble.Open(experiment.DBDir, &pebble.Options{})
+	if err != nil {
+		t.Fatalf("Error opening DB; %v", err)
+	}
+	defer helpers.DeferIgnoreError(db.Close)
+	if err := e.updateGoogleSheet(context.Background(), experiment, db); err != nil {
 		t.Fatalf("Error updating Google Sheet; %v", err)
 	}
 }
