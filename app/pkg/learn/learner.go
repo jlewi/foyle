@@ -46,6 +46,8 @@ func (l *Learner) Reconcile(ctx context.Context) error {
 	// TODO(jeremy): Can we call Analyze to compute the latest logs?
 	log := logs.FromContext(ctx)
 
+	log.Error(errors.New("Not implemented"), "The learning code needs to be updated to filter out examples that are used for evaluation")
+
 	trainDir := l.Config.GetTrainingDir()
 	if _, err := os.Stat(trainDir); err != nil {
 		if os.IsNotExist(err) {

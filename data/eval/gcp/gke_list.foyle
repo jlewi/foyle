@@ -1,0 +1,32 @@
+{
+  "blocks": [
+    {
+      "kind": "MARKUP",
+      "language": "markdown",
+      "contents": "Describe the dev cluster?"
+    },
+    {
+      "kind": "CODE",
+      "language": "bash",
+      "contents": "gcloud container clusters describe --region=us-west1 --project=foyle-dev dev",
+      "outputs": [
+        {
+          "items": [
+            {
+              "mime": "text/plain",
+              "textData": "exitCode: 1"
+            }
+          ]
+        },
+        {
+          "items": [
+            {
+              "mime": "text/plain",
+              "textData": "stderr:\nERROR: (gcloud.container.clusters.describe) ResponseError: code=404, message=Not found: projects/foyle-dev/locations/us-west1/clusters/dev.\nNo cluster named 'dev' in foyle-dev."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

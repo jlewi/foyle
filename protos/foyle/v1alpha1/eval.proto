@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+import "foyle/v1alpha1/doc.proto";
+import "foyle/v1alpha1/trainer.proto";
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
+
+enum EvalResultStatus {
+  UNKNOWN_EVAL_RESULT_STATUS = 0;
+  DONE = 1;
+  ERROR = 2;
+}
+
+// EvalResult represents an evaluation result
+message EvalResult {
+  // Example is the answer and expected result
+  Example example = 1;
+
+  // example_file is the file containing the example
+  string example_file = 2;
+
+  // Actual response
+  repeated Block actual = 3;
+
+  // The distance between the actual and expected response
+  int32 distance = 4;
+
+  string error = 5;
+
+  // Status of the evaluation
+  EvalResultStatus status = 6;
+}

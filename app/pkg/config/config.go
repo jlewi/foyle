@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jlewi/foyle/app/api"
+
 	"github.com/go-logr/zapr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -17,6 +19,10 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
+
+// TODO(jeremy): We should finish moving the configuration datastructure into the API package.
+// However, we should keep the API package free of other dependencies (e.g. Cobra) so that might necessitate
+// refactoring the code a bit more.
 
 // Note: The application uses viper for configuration management. Viper merges configurations from various sources
 //such as files, environment variables, and command line flags. After merging, viper unmarshals the configuration into the Configuration struct, which is then used throughout the application.
@@ -37,31 +43,23 @@ type Config struct {
 	APIVersion string `json:"apiVersion" yaml:"apiVersion" yamltags:"required"`
 	Kind       string `json:"kind" yaml:"kind" yamltags:"required"`
 
-	Logging Logging       `json:"logging" yaml:"logging"`
-	Server  ServerConfig  `json:"server" yaml:"server"`
-	Assets  *AssetConfig  `json:"assets,omitempty" yaml:"assets,omitempty"`
-	Agent   *AgentConfig  `json:"agent,omitempty" yaml:"agent,omitempty"`
-	OpenAI  *OpenAIConfig `json:"openai,omitempty" yaml:"openai,omitempty"`
+	Logging Logging          `json:"logging" yaml:"logging"`
+	Server  ServerConfig     `json:"server" yaml:"server"`
+	Assets  *AssetConfig     `json:"assets,omitempty" yaml:"assets,omitempty"`
+	Agent   *api.AgentConfig `json:"agent,omitempty" yaml:"agent,omitempty"`
+	OpenAI  *OpenAIConfig    `json:"openai,omitempty" yaml:"openai,omitempty"`
 	// AzureOpenAI contains configuration for Azure OpenAI. A non nil value means use Azure OpenAI.
 	AzureOpenAI *AzureOpenAIConfig `json:"azureOpenAI,omitempty" yaml:"azureOpenAI,omitempty"`
 
 	Telemetry *TelemetryConfig `json:"telemetry,omitempty" yaml:"telemetry,omitempty"`
+
+	// TODO(jeremy): Should we move this into the experiment?
+	Eval *EvalConfig `json:"eval,omitempty" yaml:"eval,omitempty"`
 }
 
-type AgentConfig struct {
-	// Model is the name of the model to use to generate completions
-	Model string `json:"model" yaml:"model"`
-
-	// RAG is the configuration for the RAG model
-	RAG *RAGConfig `json:"rag,omitempty" yaml:"rag,omitempty"`
-}
-
-// RAGConfig configures the RAG model
-type RAGConfig struct {
-	// Enabled is whether to enable the RAG model or not
-	Enabled bool `json:"enabled" yaml:"enabled"`
-	// MaxResults is the maximum number of results to return
-	MaxResults int `json:"maxResults" yaml:"maxResults"`
+type EvalConfig struct {
+	// GCPServiceAccount is the service account to use to update Google Sheets
+	GCPServiceAccount string `json:"gcpServiceAccount" yaml:"gcpServiceAccount"`
 }
 
 // ServerConfig configures the server
@@ -239,6 +237,13 @@ func (c *Config) UseHoneycomb() bool {
 		return false
 	}
 	return true
+}
+
+func (c *Config) EvalMode() bool {
+	if c.Agent == nil {
+		return false
+	}
+	return c.Agent.EvalMode
 }
 
 // DeepCopy returns a deep copy.

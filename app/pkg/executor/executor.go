@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jlewi/foyle/app/pkg/config"
+
 	"go.uber.org/zap"
 
 	"github.com/go-logr/logr"
@@ -22,23 +24,25 @@ import (
 // Executor is responsible for executing the commands
 type Executor struct {
 	v1alpha1.UnimplementedExecuteServiceServer
-	p *BashishParser
+	p      *BashishParser
+	config config.Config
 }
 
-func NewExecutor() (*Executor, error) {
+func NewExecutor(cfg config.Config) (*Executor, error) {
 	p, err := NewBashishParser()
 	if err != nil {
 		return nil, err
 	}
 	return &Executor{
-		p: p,
+		p:      p,
+		config: cfg,
 	}, nil
 }
 
 func (e *Executor) Execute(ctx context.Context, req *v1alpha1.ExecuteRequest) (*v1alpha1.ExecuteResponse, error) {
 	span := trace.SpanFromContext(ctx)
 	log := logs.FromContext(ctx)
-	log = log.WithValues("traceId", span.SpanContext().TraceID())
+	log = log.WithValues("traceId", span.SpanContext().TraceID(), "evalMode", e.config.EvalMode())
 	ctx = logr.NewContext(ctx, log)
 
 	log.Info("Executor.Execute", "blockId", req.GetBlock().GetId(), zap.Object("request", req))

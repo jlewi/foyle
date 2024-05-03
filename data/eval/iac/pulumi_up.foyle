@@ -1,0 +1,32 @@
+{
+  "blocks": [
+    {
+      "kind": "CODE",
+      "language": "bash",
+      "contents": "Sync the dev infra"
+    },
+    {
+      "kind": "CODE",
+      "language": "bash",
+      "contents": "pulumi up -C /Users/jlewi/git_foyle/iac/dev --non-interactive --yes\n",
+      "outputs": [
+        {
+          "items": [
+            {
+              "mime": "text/plain",
+              "textData": "exitCode: 0"
+            }
+          ]
+        },
+        {
+          "items": [
+            {
+              "mime": "text/plain",
+              "textData": "stdout:\nPreviewing update (dev)\n\nView Live: https://app.pulumi.com/jlewi/foyle-dev/dev/previews/e0d6037d-1bf5-4fbf-92d7-2b1d9f574053\n\n\n@ Previewing update..................\n    pulumi:pulumi:Stack foyle-dev-dev running \n@ Previewing update.....\n    pulumi:pulumi:Stack foyle-dev-dev running warning: unable to detect a global setting for GCP Project;\n@ Previewing update....\n    gcp:organizations:Project project  \n    gcp:projects:Service cloudbuild.googleapis.com  \n    gcp:projects:Service artifactregistry.googleapis.com  \n    gcp:projects:Service container.googleapis.com  \n    gcp:projects:Service storage.googleapis.com  \n    gcp:projects:Service secretmanager.googleapis.com  \n    gcp:container:Cluster dev  \n    pulumi:pulumi:Stack foyle-dev-dev  1 warning\nDiagnostics:\n  pulumi:pulumi:Stack (foyle-dev-dev):\n    warning: unable to detect a global setting for GCP Project;\n    Pulumi will rely on per-resource settings for this operation.\n    Set the GCP Project by using:\n    \t`pulumi config set gcp:project <project>`\n\nResources:\n    8 unchanged\n\nUpdating (dev)\n\nView Live: https://app.pulumi.com/jlewi/foyle-dev/dev/updates/7\n\n\n@ Updating.....\n    pulumi:pulumi:Stack foyle-dev-dev running \n@ Updating....\n    pulumi:pulumi:Stack foyle-dev-dev running warning: unable to detect a global setting for GCP Project;\n    gcp:organizations:Project project  \n    gcp:projects:Service storage.googleapis.com  \n    gcp:projects:Service secretmanager.googleapis.com  \n    gcp:projects:Service artifactregistry.googleapis.com  \n    gcp:projects:Service container.googleapis.com  \n    gcp:projects:Service cloudbuild.googleapis.com  \n    gcp:container:Cluster dev  \n    pulumi:pulumi:Stack foyle-dev-dev  1 warning\nDiagnostics:\n  pulumi:pulumi:Stack (foyle-dev-dev):\n    warning: unable to detect a global setting for GCP Project;\n    Pulumi will rely on per-resource settings for this operation.\n    Set the GCP Project by using:\n    \t`pulumi config set gcp:project <project>`\n\nResources:\n    8 unchanged\n\nDuration: 4s\n"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
