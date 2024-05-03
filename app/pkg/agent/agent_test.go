@@ -5,6 +5,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jlewi/foyle/app/api"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
@@ -71,7 +73,7 @@ func Test_Generate(t *testing.T) {
 		t.Fatalf("Error creating OpenAI client; %v", err)
 	}
 
-	cfg.Agent.RAG = &config.RAGConfig{
+	cfg.Agent.RAG = &api.RAGConfig{
 		MaxResults: 3,
 	}
 	cfg.Agent.RAG.Enabled = true

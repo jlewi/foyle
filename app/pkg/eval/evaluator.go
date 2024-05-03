@@ -2,7 +2,6 @@ package eval
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -351,7 +350,7 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 	}
 
 	// Prepare the value range to write
-	writeRange := fmt.Sprintf("%s", sheetName)
+	writeRange := sheetName
 	values := [][]interface{}{{"id", "prompt", "actual", "expected", "distance"}}
 
 	iter, err := db.NewIterWithContext(ctx, nil)
@@ -443,7 +442,7 @@ func (e *Evaluator) findUnloadedFiles(ctx context.Context, db *pebble.DB, files 
 // listEvalFiles returns a list of the all the Foyle files in the eval directory.
 func (e *Evaluator) listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
 	examples := make([]string, 0, 100)
-	filepath.Walk(evalDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(evalDir, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
@@ -456,7 +455,7 @@ func (e *Evaluator) listEvalFiles(ctx context.Context, evalDir string) ([]string
 		return nil
 	})
 
-	return examples, nil
+	return examples, err
 }
 
 // loadFoyleFiles loads a bunch of Foyle files representing evaluation data and converts them into example
