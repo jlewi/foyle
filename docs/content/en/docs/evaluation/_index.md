@@ -42,5 +42,30 @@ etc... This makes it likely users haven't actually issued those requests causing
 Once you have an evaluation dataset define an Experiment resource in a YAML file. Here's an example
 
 ```yaml
-
+kind: Experiment
+metadata:
+  name: "learning"
+spec:
+  evalDir: /Users/jlewi/git_foyle/data/eval
+  dbDir: /Users/jlewi/foyle_experiments/learning
+  sheetID: "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE"
+  sheetName: "Results"
+  Agent:
+    model: gpt-3.5-turbo-0125
+    rag:
+      enabled: true
+      maxResults: 3
 ```
+
+You can then run evaluation by running
+
+```bash
+foyle apply /path/to/experiment.yaml
+```
+
+This will run evaluation. If evaluation succeeds it will create a Google Sheet with the results. Each row in the
+Google Sheet contains the results for one example in the evaluation dataset. The distance column measures
+the distance between the predicted command and the actual command. The distance is the number of arguments
+that would need to be changed to turn the predicted command into the actual command. If the actual and expected
+are the same the distance will be zero. The maximum value of the edit distance is the maximum of the number of arguments
+in the actual and expected commands. 

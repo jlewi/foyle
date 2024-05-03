@@ -30,5 +30,6 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(NewLearnCmd())
 	rootCmd.AddCommand(NewConfigCmd())
 	rootCmd.AddCommand(NewLogsCmd())
+	rootCmd.AddCommand(NewApplyCmd())
 	return rootCmd
 }

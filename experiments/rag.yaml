@@ -1,0 +1,15 @@
+# A basic experiment to test learning
+kind: Experiment
+apiVersion: foyle.io/v1alpha1
+metadata:
+  name: "learning"
+spec:
+  evalDir: /Users/jlewi/git_foyle/data/eval
+  dbDir: /Users/jlewi/foyle_experiments/learning
+  sheetID: "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE"
+  sheetName: "Learning-Results"
+  agent:
+    model: gpt-3.5-turbo-0125
+    rag:
+      enabled: true
+      maxResults: 3

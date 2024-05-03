@@ -21,7 +21,7 @@ require (
 	github.com/honeycombio/honeycomb-opentelemetry-go v0.10.0
 	github.com/honeycombio/otel-config-go v1.15.0
 	github.com/jlewi/foyle/protos/go v0.0.0-00010101000000-000000000000
-	github.com/jlewi/hydros v0.0.6
+	github.com/jlewi/hydros v0.0.7-0.20240503183011-8f99ead373fb
 	github.com/jlewi/monogo v0.0.0-20240123191147-401afe194d74
 	github.com/maxence-charriere/go-app/v9 v9.8.0
 	github.com/pkg/errors v0.9.1

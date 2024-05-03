@@ -8,6 +8,7 @@ import (
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"os"
 	"path/filepath"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/google/uuid"
@@ -44,6 +45,15 @@ func NewEvaluator(cfg config.Config) (*Evaluator, error) {
 	}, nil
 }
 
+func (e *Evaluator) ReconcileNode(ctx context.Context, node *yaml.RNode) error {
+	experiment := &api.Experiment{}
+	if err := node.YNode().Decode(experiment); err != nil {
+		return errors.Wrapf(err, "Failed to decode experiment")
+	}
+
+	return e.Reconcile(ctx, *experiment)
+}
+
 func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) error {
 	db, err := pebble.Open(experiment.Spec.DBDir, &pebble.Options{})
 	if err != nil {
@@ -51,6 +61,9 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	}
 	defer helpers.DeferIgnoreError(db.Close)
 
+	if experiment.Spec.Agent == nil {
+		return errors.New("Agent is required")
+	}
 	agent, err := e.setupAgent(ctx, *experiment.Spec.Agent)
 	if err != nil {
 		return err
@@ -279,8 +292,17 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 	}
 
 	sheetName := experiment.Spec.SheetName
-	sheetID := experiment.Spec.GoogleSheetID
-	log.WithValues("spreadsheetID", sheetID, "sheetName", sheetName)
+	sheetID := experiment.Spec.SheetID
+
+	if sheetID == "" {
+		return errors.New("SheetID is required to update Google Sheet")
+	}
+
+	if sheetName == "" {
+		return errors.New("SheetName is required to update Google Sheet")
+	}
+
+	log = log.WithValues("spreadsheetID", sheetID, "sheetName", sheetName)
 	log.Info("Updating Google Sheet")
 	credentialsConfig := &impersonate.CredentialsConfig{
 		TargetPrincipal: e.config.Eval.GCPServiceAccount,
@@ -312,7 +334,7 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 		},
 	}
 
-	_, err = srv.Spreadsheets.BatchUpdate(experiment.Spec.GoogleSheetID, batchUpdateRequest).Context(ctx).Do()
+	_, err = srv.Spreadsheets.BatchUpdate(experiment.Spec.SheetID, batchUpdateRequest).Context(ctx).Do()
 	if err != nil {
 		apiErr, ok := err.(*googleapi.Error)
 		if ok {

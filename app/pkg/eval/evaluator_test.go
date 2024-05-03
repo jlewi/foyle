@@ -93,10 +93,10 @@ func experimentForTesting() (*api.Experiment, error) {
 
 	return &api.Experiment{
 		Spec: api.ExperimentSpec{
-			EvalDir:       evalDir,
-			DBDir:         "/tmp/foyle/eval",
-			GoogleSheetID: "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE",
-			SheetName:     "Results",
+			EvalDir:   evalDir,
+			DBDir:     "/tmp/foyle/eval",
+			SheetID:   "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE",
+			SheetName: "Results",
 			Agent: &api.AgentConfig{
 				Model: config.DefaultModel,
 				// No need to test RAG as part of testing evaluation.
