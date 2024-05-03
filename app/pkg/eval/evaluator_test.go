@@ -2,13 +2,14 @@ package eval
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/monogo/helpers"
 	"go.uber.org/zap"
-	"os"
-	"path/filepath"
-	"testing"
 )
 
 func Test_Evaluator(t *testing.T) {

@@ -1,10 +1,11 @@
 package eval
 
 import (
+	"testing"
+
 	"github.com/go-cmd/cmd"
 	"github.com/google/go-cmp/cmp"
 	"github.com/jlewi/foyle/app/pkg/executor"
-	"testing"
 )
 
 func Test_Distance(t *testing.T) {

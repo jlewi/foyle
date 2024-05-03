@@ -3,8 +3,9 @@ package executor
 import (
 	"context"
 	"fmt"
-	"github.com/jlewi/foyle/app/pkg/config"
 	"testing"
+
+	"github.com/jlewi/foyle/app/pkg/config"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 

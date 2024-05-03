@@ -47,6 +47,7 @@ type Config struct {
 
 	Telemetry *TelemetryConfig `json:"telemetry,omitempty" yaml:"telemetry,omitempty"`
 
+	// TODO(jeremy): Should we move this into the experiment?
 	Eval *EvalConfig `json:"eval,omitempty" yaml:"eval,omitempty"`
 }
 

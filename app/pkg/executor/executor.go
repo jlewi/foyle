@@ -3,9 +3,10 @@ package executor
 import (
 	"context"
 	"fmt"
-	"github.com/jlewi/foyle/app/pkg/config"
 	"strings"
 	"time"
+
+	"github.com/jlewi/foyle/app/pkg/config"
 
 	"go.uber.org/zap"
 

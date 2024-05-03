@@ -3,6 +3,9 @@ package eval
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/google/uuid"
 	"github.com/jlewi/foyle/app/pkg/agent"
@@ -20,8 +23,6 @@ import (
 	"google.golang.org/api/sheets/v4"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"os"
-	"path/filepath"
 )
 
 type Evaluator struct {
@@ -59,20 +60,6 @@ func NewEvaluator(cfg config.Config) (*Evaluator, error) {
 		agent:  agent,
 		parser: parser,
 	}, nil
-}
-
-type EvalExperiment struct {
-	// EvalDir is the directory containing the evaluation data.
-	EvalDir string
-
-	// DBDir is the directory for the pebble database that will store the results
-	DBDir string
-
-	// GoogleSheetID is the ID of the Google Sheet to update with the results.
-	GoogleSheetID string
-
-	// SheetName is the name of the sheet to update.
-	SheetName string
 }
 
 func (e *Evaluator) Reconcile(ctx context.Context, experiment EvalExperiment) error {
@@ -213,11 +200,10 @@ func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error 
 			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
 		}
 
-		// DO NOT COMMIT this code is commented out to force recomputation of the distance
-		//if result.Distance >= 0 && result.Status != v1alpha1.EvalResultStatus_UNKNOWN_EVAL_RESULT_STATUS {
-		//	log.Info("Skipping; distance already computed")
-		//	continue
-		//}
+		if result.Distance >= 0 && result.Status != v1alpha1.EvalResultStatus_UNKNOWN_EVAL_RESULT_STATUS {
+			log.Info("Skipping; distance already computed")
+			continue
+		}
 
 		var actualBlock *v1alpha1.Block
 

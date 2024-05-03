@@ -2,9 +2,10 @@ package eval
 
 import (
 	"errors"
+	"strings"
+
 	"github.com/agnivade/levenshtein"
 	"github.com/jlewi/foyle/app/pkg/executor"
-	"strings"
 )
 
 const (
