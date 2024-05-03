@@ -2,6 +2,8 @@ package eval
 
 import (
 	"context"
+	"github.com/jlewi/foyle/app/api"
+	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,22 +35,12 @@ func Test_Evaluator(t *testing.T) {
 		t.Fatalf("Error creating evaluator; %v", err)
 	}
 
-	cwd, err := os.Getwd()
+	experiment, err := experimentForTesting()
 	if err != nil {
-		t.Fatalf("Error getting working directory; %v", err)
-	}
-	evalDir, err := filepath.Abs(filepath.Join(cwd, "..", "..", "..", "data", "eval"))
-	if err != nil {
-		t.Fatalf("Error getting eval directory; %v", err)
+		t.Fatalf("Error creating experiment; %v", err)
 	}
 
-	experiment := EvalExperiment{
-		EvalDir:       evalDir,
-		DBDir:         "/tmp/foyle/eval",
-		GoogleSheetID: "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE",
-		SheetName:     "Results",
-	}
-	if err := e.Reconcile(context.Background(), experiment); err != nil {
+	if err := e.Reconcile(context.Background(), *experiment); err != nil {
 		t.Fatalf("Error reconciling; %v", err)
 	}
 }
@@ -74,18 +66,44 @@ func Test_Evaluator_Google_Sheets(t *testing.T) {
 		t.Fatalf("Error creating evaluator; %v", err)
 	}
 
-	experiment := EvalExperiment{
-		EvalDir:       "",
-		DBDir:         "/tmp/foyle/eval",
-		GoogleSheetID: "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE",
-		SheetName:     "Results",
+	experiment, err := experimentForTesting()
+	if err != nil {
+		t.Fatalf("Error creating experiment; %v", err)
 	}
-	db, err := pebble.Open(experiment.DBDir, &pebble.Options{})
+
+	db, err := pebble.Open(experiment.Spec.DBDir, &pebble.Options{})
 	if err != nil {
 		t.Fatalf("Error opening DB; %v", err)
 	}
 	defer helpers.DeferIgnoreError(db.Close)
-	if err := e.updateGoogleSheet(context.Background(), experiment, db); err != nil {
+	if err := e.updateGoogleSheet(context.Background(), *experiment, db); err != nil {
 		t.Fatalf("Error updating Google Sheet; %v", err)
 	}
+}
+
+func experimentForTesting() (*api.Experiment, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error getting working directory")
+	}
+	evalDir, err := filepath.Abs(filepath.Join(cwd, "..", "..", "..", "data", "eval"))
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error getting eval directory")
+	}
+
+	return &api.Experiment{
+		Spec: api.ExperimentSpec{
+			EvalDir:       evalDir,
+			DBDir:         "/tmp/foyle/eval",
+			GoogleSheetID: "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE",
+			SheetName:     "Results",
+			Agent: &api.AgentConfig{
+				Model: config.DefaultModel,
+				// No need to test RAG as part of testing evaluation.
+				RAG: &api.RAGConfig{
+					Enabled: false,
+				},
+			},
+		},
+	}, nil
 }

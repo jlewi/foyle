@@ -1,10 +1,9 @@
 package api
 
-
 // Experiment is a struct that represents an experiment
 type Experiment struct {
-	Metadata Metadata `json:"metadata"` yaml:"metadata"`
-	Spec     ExperimentSpec     `json:"spec"`    yaml:"spec"`
+	Metadata Metadata       `json:"metadata" yaml:"metadata"`
+	Spec     ExperimentSpec `json:"spec"    yaml:"spec"`
 }
 
 type ExperimentSpec struct {
@@ -20,5 +19,6 @@ type ExperimentSpec struct {
 	// SheetName is the name of the sheet to update.
 	SheetName string `json:"sheetName" yaml:"sheetName"`
 
-
+	// Agent is the configuration for the agent
+	Agent *AgentConfig `json:"agent,omitempty" yaml:"agent,omitempty"`
 }

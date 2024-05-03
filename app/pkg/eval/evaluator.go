@@ -3,17 +3,18 @@ package eval
 import (
 	"context"
 	"fmt"
+	"github.com/jlewi/foyle/app/api"
+	"github.com/jlewi/foyle/app/pkg/agent"
+	"github.com/jlewi/foyle/app/pkg/oai"
 	"os"
 	"path/filepath"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/google/uuid"
-	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/executor"
 	"github.com/jlewi/foyle/app/pkg/logs"
-	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
@@ -27,28 +28,10 @@ import (
 
 type Evaluator struct {
 	config config.Config
-	agent  *agent.Agent
 	parser *executor.BashishParser
 }
 
 func NewEvaluator(cfg config.Config) (*Evaluator, error) {
-	cfg = cfg.DeepCopy()
-	if cfg.Agent == nil {
-		cfg.Agent = &config.AgentConfig{}
-	}
-	// Ensure we are in evaluation mode.
-	cfg.Agent.EvalMode = true
-
-	client, err := oai.NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-	agent, err := agent.NewAgent(cfg, client)
-
-	if err != nil {
-		return nil, err
-	}
-
 	parser, err := executor.NewBashishParser()
 
 	if err != nil {
@@ -57,21 +40,24 @@ func NewEvaluator(cfg config.Config) (*Evaluator, error) {
 
 	return &Evaluator{
 		config: cfg,
-		agent:  agent,
 		parser: parser,
 	}, nil
 }
 
-func (e *Evaluator) Reconcile(ctx context.Context, experiment EvalExperiment) error {
-
-	db, err := pebble.Open(experiment.DBDir, &pebble.Options{})
+func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) error {
+	db, err := pebble.Open(experiment.Spec.DBDir, &pebble.Options{})
 	if err != nil {
 		return err
 	}
 	defer helpers.DeferIgnoreError(db.Close)
 
+	agent, err := e.setupAgent(ctx, *experiment.Spec.Agent)
+	if err != nil {
+		return err
+	}
+
 	// List all the files
-	files, err := e.listEvalFiles(ctx, experiment.EvalDir)
+	files, err := e.listEvalFiles(ctx, experiment.Spec.EvalDir)
 	if err != nil {
 		return err
 	}
@@ -93,7 +79,7 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment EvalExperiment) er
 	}
 
 	// Now generate predictions for any results that are missing them.
-	if err := e.reconcilePredictions(ctx, db); err != nil {
+	if err := e.reconcilePredictions(ctx, db, agent); err != nil {
 		return err
 	}
 
@@ -109,7 +95,28 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment EvalExperiment) er
 	return nil
 }
 
-func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB) error {
+func (e *Evaluator) setupAgent(ctx context.Context, agentConfig api.AgentConfig) (*agent.Agent, error) {
+	cfg := e.config.DeepCopy()
+
+	// Swap out the AgentConfig
+	cfg.Agent = &agentConfig
+
+	// Ensure we are in evaluation mode.
+	cfg.Agent.EvalMode = true
+
+	client, err := oai.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	agent, err := agent.NewAgent(cfg, client)
+
+	if err != nil {
+		return nil, err
+	}
+	return agent, nil
+}
+
+func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, agent *agent.Agent) error {
 	olog := logs.FromContext(ctx)
 	iter, err := db.NewIterWithContext(ctx, nil)
 	if err != nil {
@@ -142,7 +149,7 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB) err
 
 		if len(result.Actual) == 0 {
 			// We need to generate the answer.
-			resp, err := e.agent.Generate(ctx, &v1alpha1.GenerateRequest{
+			resp, err := agent.Generate(ctx, &v1alpha1.GenerateRequest{
 				Doc: result.Example.Query,
 			})
 			if err != nil {
@@ -265,13 +272,15 @@ func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error 
 	return nil
 }
 
-func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment EvalExperiment, db *pebble.DB) error {
+func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experiment, db *pebble.DB) error {
 	log := logs.FromContext(ctx)
 	if e.config.Eval == nil || e.config.Eval.GCPServiceAccount == "" {
 		return errors.New("GCPServiceAccount is required to update Google Sheet")
 	}
 
-	log.WithValues("spreadsheetID", experiment.GoogleSheetID, "sheetName", experiment.SheetName)
+	sheetName := experiment.Spec.SheetName
+	sheetID := experiment.Spec.GoogleSheetID
+	log.WithValues("spreadsheetID", sheetID, "sheetName", sheetName)
 	log.Info("Updating Google Sheet")
 	credentialsConfig := &impersonate.CredentialsConfig{
 		TargetPrincipal: e.config.Eval.GCPServiceAccount,
@@ -296,14 +305,14 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment EvalExperi
 			{
 				AddSheet: &sheets.AddSheetRequest{
 					Properties: &sheets.SheetProperties{
-						Title: experiment.SheetName,
+						Title: experiment.Spec.SheetName,
 					},
 				},
 			},
 		},
 	}
 
-	_, err = srv.Spreadsheets.BatchUpdate(experiment.GoogleSheetID, batchUpdateRequest).Context(ctx).Do()
+	_, err = srv.Spreadsheets.BatchUpdate(experiment.Spec.GoogleSheetID, batchUpdateRequest).Context(ctx).Do()
 	if err != nil {
 		apiErr, ok := err.(*googleapi.Error)
 		if ok {
@@ -311,15 +320,15 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment EvalExperi
 				log.V(1).Info("Sheet already exists")
 			} else {
 				log.Error(err, "Unable to create new sheet ")
-				return errors.Wrapf(err, "Unable to create new sheet named: %s", experiment.SheetName)
+				return errors.Wrapf(err, "Unable to create new sheet named: %s", sheetName)
 			}
 		} else {
-			return errors.Wrapf(err, "Unable to create new sheet named: %s", experiment.SheetName)
+			return errors.Wrapf(err, "Unable to create new sheet named: %s", sheetName)
 		}
 	}
 
 	// Prepare the value range to write
-	writeRange := fmt.Sprintf("%s", experiment.SheetName)
+	writeRange := fmt.Sprintf("%s", sheetName)
 	values := [][]interface{}{{"id", "prompt", "actual", "expected", "distance"}}
 
 	iter, err := db.NewIterWithContext(ctx, nil)
@@ -353,7 +362,7 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment EvalExperi
 	}
 
 	// Write the value range to the sheet
-	_, err = srv.Spreadsheets.Values.Update(experiment.GoogleSheetID, writeRange, valueRange).
+	_, err = srv.Spreadsheets.Values.Update(sheetID, writeRange, valueRange).
 		ValueInputOption("USER_ENTERED").
 		Context(ctx).
 		Do()
