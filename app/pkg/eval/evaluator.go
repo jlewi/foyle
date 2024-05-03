@@ -3,11 +3,12 @@ package eval
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/oai"
-	"os"
-	"path/filepath"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"github.com/cockroachdb/pebble"

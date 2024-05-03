@@ -2,11 +2,12 @@ package eval
 
 import (
 	"context"
-	"github.com/jlewi/foyle/app/api"
-	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/jlewi/foyle/app/api"
+	"github.com/pkg/errors"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/pkg/config"

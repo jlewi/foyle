@@ -3,12 +3,13 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/application"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"os"
 )
 
 // NewApplyCmd create an apply command
