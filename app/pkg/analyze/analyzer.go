@@ -296,6 +296,11 @@ func buildBlockLog(ctx context.Context, block *api.BlockLog, traces map[string]a
 			block.Doc = genTrace.Request.GetDoc()
 		}
 
+		// If the block was generated as part of evaluation mode then consider it to be in evaluation mode.
+		if genTrace.EvalMode {
+			block.EvalMode = true
+		}
+
 		// Find the actual block
 		for _, b := range genTrace.Response.GetBlocks() {
 			if b.GetId() == block.ID {
@@ -327,6 +332,10 @@ func buildBlockLog(ctx context.Context, block *api.BlockLog, traces map[string]a
 		}
 	}
 	if lastTrace != nil {
+		// If the block was executed as part of evaluation mode then consider it to be in evaluation mode.
+		if lastTrace.EvalMode {
+			block.EvalMode = true
+		}
 		block.ExecutedBlock = lastTrace.Request.GetBlock()
 		block.ExitCode = unsetExitCode
 		for _, o := range lastTrace.Response.GetOutputs() {

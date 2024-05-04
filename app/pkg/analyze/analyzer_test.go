@@ -112,9 +112,60 @@ func Test_BuildBlockLog(t *testing.T) {
 		},
 	}
 
+	// Create a block in evaluation mode
+	const bid2 = "g456output1"
+	genTrace2 := &api.GenerateTrace{
+		TraceID:   "g456",
+		StartTime: timeMustParse(time.RFC3339, "2021-01-01T00:00:00Z"),
+		EndTime:   timeMustParse(time.RFC3339, "2021-01-01T00:01:00Z"),
+		Request: &v1alpha1.GenerateRequest{
+			Doc: &v1alpha1.Doc{
+				Blocks: []*v1alpha1.Block{
+					{
+						Contents: "echo hello",
+					},
+				},
+			},
+		},
+		Response: &v1alpha1.GenerateResponse{
+			Blocks: []*v1alpha1.Block{
+				{
+					Id:       bid2,
+					Contents: "outcell",
+				},
+			},
+		},
+		EvalMode: true,
+	}
+
+	execTrace3 := &api.ExecuteTrace{
+		TraceID:   "e912",
+		StartTime: timeMustParse(time.RFC3339, "2021-01-03T00:00:00Z"),
+		EndTime:   timeMustParse(time.RFC3339, "2021-01-03T00:01:00Z"),
+		Request: &v1alpha1.ExecuteRequest{
+			Block: &v1alpha1.Block{
+				Contents: "echo hello",
+				Id:       bid2,
+			},
+		},
+		Response: &v1alpha1.ExecuteResponse{
+			Outputs: []*v1alpha1.BlockOutput{
+				{
+					Items: []*v1alpha1.BlockOutputItem{
+						{
+							TextData: "exitCode: 7",
+						},
+					},
+				},
+			},
+		},
+	}
+
 	traces[genTrace.TraceID] = genTrace
+	traces[genTrace2.TraceID] = genTrace2
 	traces[execTrace1.TraceID] = execTrace1
 	traces[execTrace2.TraceID] = execTrace2
+	traces[execTrace3.TraceID] = execTrace3
 
 	// We shuffle ExecTraceIds to make sure we properly set block log based on the later trace
 	execTraceIds := shuffle([]string{execTrace1.TraceID, execTrace2.TraceID})
@@ -135,6 +186,27 @@ func Test_BuildBlockLog(t *testing.T) {
 				GeneratedBlock: genTrace.Response.Blocks[0],
 				ExecutedBlock:  execTrace2.Request.Block,
 				ExitCode:       7,
+				EvalMode:       false,
+			},
+			traces: traces,
+		},
+		{
+			name: "eval_mode",
+			block: &api.BlockLog{
+				ID:         bid2,
+				GenTraceID: genTrace2.TraceID,
+
+				ExecTraceIDs: []string{execTrace3.TraceID},
+			},
+			expected: &api.BlockLog{
+				ID:             bid2,
+				GenTraceID:     genTrace2.TraceID,
+				ExecTraceIDs:   []string{execTrace3.TraceID},
+				Doc:            genTrace2.Request.Doc,
+				GeneratedBlock: genTrace2.Response.Blocks[0],
+				ExecutedBlock:  execTrace3.Request.Block,
+				ExitCode:       7,
+				EvalMode:       true,
 			},
 			traces: traces,
 		},

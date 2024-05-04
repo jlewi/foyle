@@ -192,4 +192,7 @@ type BlockLog struct {
 
 	// ExitCode is the exit code of the executed block
 	ExitCode int `json:"exitCode"`
+
+	// EvalMode is true if the block was generated as part of an evaluation and shouldn't be used for learning
+	EvalMode bool `json:"evalMode"`
 }
