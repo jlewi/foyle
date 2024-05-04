@@ -364,10 +364,21 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (api.T
 
 func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*api.GenerateTrace, error) {
 	trace := &api.GenerateTrace{}
+	evalMode := false
 	for _, e := range entries {
 		if trace.TraceID == "" {
 			trace.TraceID = e.TraceID()
 		}
+		if mode, present := e.EvalMode(); present {
+			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
+			// We don't want to assume that the evalMode will be set on all log entries in the trace.
+			// So the logic is to assume its not eval mode by default and then set it to eval mode if we find
+			// One entry that is marked as eval mode.
+			if mode {
+				evalMode = mode
+			}
+		}
+
 		if trace.Request == nil {
 			raw := e.Request()
 			if raw != nil {
@@ -392,16 +403,27 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*api.Ge
 			}
 		}
 	}
-
+	trace.EvalMode = evalMode
 	return trace, nil
 }
 
 func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*api.ExecuteTrace, error) {
 	trace := &api.ExecuteTrace{}
+	evalMode := false
 	for _, e := range entries {
 		if trace.TraceID == "" {
 			trace.TraceID = e.TraceID()
 		}
+		if mode, present := e.EvalMode(); present {
+			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
+			// We don't want to assume that the evalMode will be set on all log entries in the trace.
+			// So the logic is to assume its not eval mode by default and then set it to eval mode if we find
+			// One entry that is marked as eval mode.
+			if mode {
+				evalMode = mode
+			}
+		}
+
 		if trace.Request == nil {
 			raw := e.Request()
 			if raw != nil {
@@ -426,6 +448,6 @@ func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*api.Exe
 			}
 		}
 	}
-
+	trace.EvalMode = evalMode
 	return trace, nil
 }

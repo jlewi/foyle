@@ -39,6 +39,19 @@ func (L *LogEntry) Request() []byte {
 	return nil
 }
 
+// EvalMode returns value, ok. Where ok is true if the field was present and false otherwise.
+// If the field was present value is the value of the field.
+func (L *LogEntry) EvalMode() (bool, bool) {
+	v, ok := (*L)["evalMode"]
+	if !ok {
+		return false, false
+	}
+	if val, ok := v.(bool); ok {
+		return val, true
+	}
+	return false, false
+}
+
 func (L *LogEntry) Response() []byte {
 	v, ok := (*L)["response"]
 	if !ok {
@@ -127,6 +140,7 @@ type GenerateTrace struct {
 	EndTime   time.Time                  `json:"endTime"`
 	Request   *v1alpha1.GenerateRequest  `json:"request"`
 	Response  *v1alpha1.GenerateResponse `json:"response"`
+	EvalMode  bool                       `json:"evalMode"`
 }
 
 func (g *GenerateTrace) ID() string {
@@ -145,6 +159,7 @@ type ExecuteTrace struct {
 	EndTime   time.Time                 `json:"endTime"`
 	Request   *v1alpha1.ExecuteRequest  `json:"request"`
 	Response  *v1alpha1.ExecuteResponse `json:"response"`
+	EvalMode  bool                      `json:"evalMode"`
 }
 
 func (e *ExecuteTrace) ID() string {

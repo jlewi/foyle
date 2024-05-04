@@ -296,14 +296,21 @@ func checkExecuteTracesFiles(t *testing.T, path string) {
 
 func Test_CombineGenerateEntries(t *testing.T) {
 	type testCase struct {
-		name      string
-		linesFile string
+		name             string
+		linesFile        string
+		expectedEvalMode bool
 	}
 
 	cases := []testCase{
 		{
-			name:      "basic",
-			linesFile: "generate_trace_lines.jsonl",
+			name:             "basic",
+			linesFile:        "generate_trace_lines.jsonl",
+			expectedEvalMode: false,
+		},
+		{
+			name:             "evalMode",
+			linesFile:        "generate_trace_lines_eval_mode.jsonl",
+			expectedEvalMode: true,
 		},
 	}
 
@@ -345,20 +352,36 @@ func Test_CombineGenerateEntries(t *testing.T) {
 			if trace.Response == nil {
 				t.Errorf("Expected trace to have a response")
 			}
+
+			if trace.EvalMode != c.expectedEvalMode {
+				t.Errorf("Expected EvalMode to be %v but got %v", c.expectedEvalMode, trace.EvalMode)
+			}
 		})
 	}
 }
 
 func Test_CombineExecuteEntries(t *testing.T) {
 	type testCase struct {
-		name      string
-		linesFile string
+		name             string
+		linesFile        string
+		expectedEvalMode bool
 	}
 
 	cases := []testCase{
 		{
-			name:      "basic",
-			linesFile: "execute_traces_lines.jsonl",
+			name:             "basic",
+			linesFile:        "execute_traces_lines.jsonl",
+			expectedEvalMode: false,
+		},
+		{
+			name:             "eval_mode_true",
+			linesFile:        "execute_traces_lines_eval_mode.jsonl",
+			expectedEvalMode: true,
+		},
+		{
+			name:             "eval_mode_false",
+			linesFile:        "execute_traces_lines_eval_mode_false.jsonl",
+			expectedEvalMode: false,
 		},
 	}
 
@@ -399,6 +422,9 @@ func Test_CombineExecuteEntries(t *testing.T) {
 			}
 			if trace.Response == nil {
 				t.Errorf("Expected trace to have a response")
+			}
+			if trace.EvalMode != c.expectedEvalMode {
+				t.Errorf("Expected EvalMode to be %v but got %v", c.expectedEvalMode, trace.EvalMode)
 			}
 		})
 	}
