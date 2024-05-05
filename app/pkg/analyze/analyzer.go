@@ -296,6 +296,11 @@ func buildBlockLog(ctx context.Context, block *api.BlockLog, traces map[string]a
 			block.Doc = genTrace.Request.GetDoc()
 		}
 
+		// If the block was generated as part of evaluation mode then consider it to be in evaluation mode.
+		if genTrace.EvalMode {
+			block.EvalMode = true
+		}
+
 		// Find the actual block
 		for _, b := range genTrace.Response.GetBlocks() {
 			if b.GetId() == block.ID {
@@ -327,6 +332,10 @@ func buildBlockLog(ctx context.Context, block *api.BlockLog, traces map[string]a
 		}
 	}
 	if lastTrace != nil {
+		// If the block was executed as part of evaluation mode then consider it to be in evaluation mode.
+		if lastTrace.EvalMode {
+			block.EvalMode = true
+		}
 		block.ExecutedBlock = lastTrace.Request.GetBlock()
 		block.ExitCode = unsetExitCode
 		for _, o := range lastTrace.Response.GetOutputs() {
@@ -364,10 +373,21 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (api.T
 
 func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*api.GenerateTrace, error) {
 	trace := &api.GenerateTrace{}
+	evalMode := false
 	for _, e := range entries {
 		if trace.TraceID == "" {
 			trace.TraceID = e.TraceID()
 		}
+		if mode, present := e.EvalMode(); present {
+			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
+			// We don't want to assume that the evalMode will be set on all log entries in the trace.
+			// So the logic is to assume its not eval mode by default and then set it to eval mode if we find
+			// One entry that is marked as eval mode.
+			if mode {
+				evalMode = mode
+			}
+		}
+
 		if trace.Request == nil {
 			raw := e.Request()
 			if raw != nil {
@@ -392,16 +412,27 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*api.Ge
 			}
 		}
 	}
-
+	trace.EvalMode = evalMode
 	return trace, nil
 }
 
 func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*api.ExecuteTrace, error) {
 	trace := &api.ExecuteTrace{}
+	evalMode := false
 	for _, e := range entries {
 		if trace.TraceID == "" {
 			trace.TraceID = e.TraceID()
 		}
+		if mode, present := e.EvalMode(); present {
+			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
+			// We don't want to assume that the evalMode will be set on all log entries in the trace.
+			// So the logic is to assume its not eval mode by default and then set it to eval mode if we find
+			// One entry that is marked as eval mode.
+			if mode {
+				evalMode = mode
+			}
+		}
+
 		if trace.Request == nil {
 			raw := e.Request()
 			if raw != nil {
@@ -426,6 +457,6 @@ func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*api.Exe
 			}
 		}
 	}
-
+	trace.EvalMode = evalMode
 	return trace, nil
 }

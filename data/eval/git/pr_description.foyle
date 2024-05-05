@@ -1,0 +1,14 @@
+{
+  "blocks": [
+    {
+      "kind": "MARKUP",
+      "language": "markdown",
+      "contents": "Create a PR description"
+    },
+    {
+      "kind": "CODE",
+      "language": "bash",
+      "contents": "git diff origin/main | llm --model=gpt-4-0125-preview -s \"Create a PR description from the following diff\""
+    }
+  ]
+}

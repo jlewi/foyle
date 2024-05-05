@@ -46,8 +46,6 @@ func (l *Learner) Reconcile(ctx context.Context) error {
 	// TODO(jeremy): Can we call Analyze to compute the latest logs?
 	log := logs.FromContext(ctx)
 
-	log.Error(errors.New("Not implemented"), "The learning code needs to be updated to filter out examples that are used for evaluation")
-
 	trainDir := l.Config.GetTrainingDir()
 	if _, err := os.Stat(trainDir); err != nil {
 		if os.IsNotExist(err) {
@@ -97,7 +95,14 @@ func (l *Learner) reconcileExamples(ctx context.Context, blocks map[string]api.B
 			// Block wasn't the result of AI generation
 			continue
 		}
-		// TODO(jeremy): Should we use some sort of distance metric? e.g. edit distance?
+
+		if b.EvalMode {
+			log.V(logs.Debug).Info("Skipping block which was created as part of an eval", "id", b.ID)
+			continue
+		}
+
+		// TODO(jeremy): Should we use some sort of distance metric? e.g. edit distance? We could potentially
+		// Use the metric used for eval.
 		if strings.TrimSpace(b.ExecutedBlock.GetContents()) == strings.TrimSpace(b.GeneratedBlock.GetContents()) {
 			log.V(logs.Debug).Info("Skipping executed block which matches generated block", "id", b.ID)
 			continue
