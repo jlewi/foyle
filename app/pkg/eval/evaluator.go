@@ -501,6 +501,8 @@ func (e *Evaluator) loadFoyleFiles(ctx context.Context, db *pebble.DB, files []s
 			continue
 		}
 
+		// TODO(https://github.com/jlewi/foyle/issues/95): We should assign an ID to each example that is stable
+		// across experiments.
 		id := uuid.NewString()
 		example := &v1alpha1.Example{
 			Id:     id,

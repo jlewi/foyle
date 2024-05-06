@@ -32,3 +32,17 @@ message EvalResult {
   // Status of the evaluation
   EvalResultStatus status = 6;
 }
+
+message EvalResultListRequest {
+  // The path of the database to fetch results for
+  string database = 1;
+}
+
+message EvalResultListResponse {
+  repeated EvalResult items = 1;
+}
+
+
+service EvalService {
+  rpc List(EvalResultListRequest) returns (EvalResultListResponse) {}
+}
