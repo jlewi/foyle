@@ -306,6 +306,7 @@ func (a *App) SetupServer() (*server.Server, error) {
 func (a *App) ApplyPaths(ctx context.Context, paths []string) error {
 	log := util.LogFromContext(ctx)
 
+	yamlFiles := make([]string, 0, len(paths))
 	for _, resourcePath := range paths {
 		newPaths, err := util.FindYamlFiles(resourcePath)
 		if err != nil {
@@ -313,10 +314,10 @@ func (a *App) ApplyPaths(ctx context.Context, paths []string) error {
 			return err
 		}
 
-		paths = append(paths, newPaths...)
+		yamlFiles = append(yamlFiles, newPaths...)
 	}
 
-	for _, path := range paths {
+	for _, path := range yamlFiles {
 		err := a.apply(ctx, path)
 		if err != nil {
 			log.Error(err, "Apply failed", "path", path)

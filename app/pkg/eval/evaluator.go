@@ -55,6 +55,8 @@ func (e *Evaluator) ReconcileNode(ctx context.Context, node *yaml.RNode) error {
 }
 
 func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) error {
+	log := logs.FromContext(ctx).WithValues("experiment", experiment.Metadata.Name)
+	log.Info("Opening database", "database", experiment.Spec.DBDir)
 	db, err := pebble.Open(experiment.Spec.DBDir, &pebble.Options{})
 	if err != nil {
 		return err
@@ -75,7 +77,6 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 		return err
 	}
 
-	log := logs.FromContext(ctx)
 	log.Info("Found eval files", "numFiles", len(files))
 
 	// Now iterate over the DB and figure out which files haven't  been loaded into the db.
@@ -172,11 +173,9 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, age
 			}
 
 			result.Actual = resp.GetBlocks()
-			b, err := proto.Marshal(result)
-			if err != nil {
-				return errors.Wrapf(err, "Failed to marshal result")
-			}
-			if err := db.Set(key, b, nil); err != nil {
+
+			log.Info("Writing result to DB")
+			if err := e.updateResult(ctx, string(key), result, db); err != nil {
 				return errors.Wrapf(err, "Failed to write result to DB")
 			}
 		}
@@ -278,6 +277,7 @@ func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error 
 
 		result.Distance = int32(distance)
 		result.Status = v1alpha1.EvalResultStatus_DONE
+		log.Info("Updating distance", "distance", result.Distance)
 		if err := e.updateResult(ctx, string(key), result, db); err != nil {
 			log.Error(err, "Failed to update result")
 		}
