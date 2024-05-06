@@ -219,11 +219,10 @@ func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error 
 			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
 		}
 
-		// DO NOT COMMIT HACK TO RECOMPUTE DISTANCE and normalized distance
-		//if result.Distance >= 0 && result.Status != v1alpha1.EvalResultStatus_UNKNOWN_EVAL_RESULT_STATUS {
-		//	log.Info("Skipping; distance already computed")
-		//	continue
-		//}
+		if result.Distance >= 0 && result.Status != v1alpha1.EvalResultStatus_UNKNOWN_EVAL_RESULT_STATUS {
+			log.Info("Skipping; distance already computed")
+			continue
+		}
 
 		var actualBlock *v1alpha1.Block
 
