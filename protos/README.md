@@ -46,6 +46,14 @@ More documentation can be found [here](https://github.com/bufbuild/protobuf-es/b
 We [grpc-gateway](https://grpc-ecosystem.github.io/grpc-gateway/) to generate RESTful services from our grpc services.
 
 
+## connect-go
+
+To install the connect-go plugin
+
+```
+ go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+```
+
 ## Zap Marshalers
 
 We use [zap marshalers](https://pkg.go.dev/go.uber.org/zap#hdr-JSON) to generate MarshalLogObject methods for our types.

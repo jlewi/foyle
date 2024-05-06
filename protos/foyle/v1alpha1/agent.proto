@@ -3,7 +3,7 @@ syntax = "proto3";
 import "google/protobuf/struct.proto";
 import "foyle/v1alpha1/doc.proto";
 
-option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
 
 // grpc-gateway
 // https://github.com/grpc-ecosystem/grpc-gateway

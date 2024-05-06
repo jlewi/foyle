@@ -5,7 +5,7 @@ import "foyle/v1alpha1/trainer.proto";
 
 import "google/protobuf/struct.proto";
 
-option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
 
 enum EvalResultStatus {
   UNKNOWN_EVAL_RESULT_STATUS = 0;
