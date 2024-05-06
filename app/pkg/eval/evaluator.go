@@ -219,10 +219,11 @@ func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error 
 			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
 		}
 
-		if result.Distance >= 0 && result.Status != v1alpha1.EvalResultStatus_UNKNOWN_EVAL_RESULT_STATUS {
-			log.Info("Skipping; distance already computed")
-			continue
-		}
+		// DO NOT COMMIT HACK TO RECOMPUTE DISTANCE and normalized distance
+		//if result.Distance >= 0 && result.Status != v1alpha1.EvalResultStatus_UNKNOWN_EVAL_RESULT_STATUS {
+		//	log.Info("Skipping; distance already computed")
+		//	continue
+		//}
 
 		var actualBlock *v1alpha1.Block
 
@@ -275,7 +276,12 @@ func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error 
 			continue
 		}
 
-		result.Distance = int32(distance)
+		if distance.Max < distance.Distance {
+			log.Error(errors.New("Distance is greater than max distance"), "Distance is greater than max distance", "distance", distance.Distance, "max", distance.Max)
+		}
+
+		result.Distance = int32(distance.Distance)
+		result.NormalizedDistance = distance.Normalized
 		result.Status = v1alpha1.EvalResultStatus_DONE
 		log.Info("Updating distance", "distance", result.Distance)
 		if err := e.updateResult(ctx, string(key), result, db); err != nil {
@@ -351,7 +357,7 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 
 	// Prepare the value range to write
 	writeRange := sheetName
-	values := [][]interface{}{{"id", "prompt", "actual", "expected", "distance"}}
+	values := [][]interface{}{{"id", "file", "prompt", "actual", "expected", "distance", "normalized_distance"}}
 
 	iter, err := db.NewIterWithContext(ctx, nil)
 	if err != nil {
@@ -376,7 +382,7 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 		}
 
 		prompt := docs.DocToMarkdown(result.Example.Query)
-		row := []interface{}{result.Example.Id, prompt, docs.BlocksToMarkdown(result.Actual), docs.BlocksToMarkdown(result.Example.Answer), result.Distance}
+		row := []interface{}{result.Example.Id, result.ExampleFile, prompt, docs.BlocksToMarkdown(result.Actual), docs.BlocksToMarkdown(result.Example.Answer), result.Distance, result.NormalizedDistance}
 		values = append(values, row)
 	}
 	valueRange := &sheets.ValueRange{

@@ -52,6 +52,9 @@ func (m *EvalResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 	keyName = "distance" // field distance = 4
 	enc.AddInt32(keyName, m.Distance)
 
+	keyName = "normalized_distance" // field normalized_distance = 7
+	enc.AddFloat32(keyName, m.NormalizedDistance)
+
 	keyName = "error" // field error = 5
 	enc.AddString(keyName, m.Error)
 
