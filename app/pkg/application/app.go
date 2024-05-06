@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -316,7 +317,7 @@ func (a *App) ApplyPaths(ctx context.Context, paths []string) error {
 
 		yamlFiles = append(yamlFiles, newPaths...)
 	}
-
+	sort.Strings(yamlFiles)
 	for _, path := range yamlFiles {
 		err := a.apply(ctx, path)
 		if err != nil {
