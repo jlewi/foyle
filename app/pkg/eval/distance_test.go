@@ -13,21 +13,40 @@ func Test_Distance(t *testing.T) {
 		name     string
 		left     []string
 		right    []string
-		expected int
+		expected DistanceResult
 	}
 
 	cases := []testCase{
 		{
-			name:     "equal",
-			left:     []string{"gcloud", "-p", "acme", "--foo=bar", "baz"},
-			right:    []string{"gcloud", "-p", "acme", "--foo=bar", "baz"},
-			expected: 0,
+			name:  "equal",
+			left:  []string{"gcloud", "-p", "acme", "--foo=bar", "baz"},
+			right: []string{"gcloud", "-p", "acme", "--foo=bar", "baz"},
+			expected: DistanceResult{
+				Distance:   0,
+				Max:        5,
+				Normalized: 0,
+			},
 		},
 		{
-			name:     "notequal",
-			left:     []string{"gcloud", "-p", "acme", "--foo=bar", "baz"},
-			right:    []string{"gcloud", "acme", "--foo=lab", "baz"},
-			expected: 2,
+			name:  "notequal",
+			left:  []string{"gcloud", "-p", "acme", "--foo=bar", "baz"},
+			right: []string{"gcloud", "acme", "--foo=lab", "baz"},
+			expected: DistanceResult{
+				Distance:   2,
+				Max:        5,
+				Normalized: 0.4,
+			},
+		},
+		{
+			name:  "maxdist",
+			left:  []string{"gcloud", "logging", "read", "logName=\"projects/foyle-dev/logs/hydros\" jsonPayload.image=\"carabou\"", "--freshness=1d", "--project=foyle-dev"},
+			right: []string{"docker", "build", "--progress=plain", "-t", "carabou", "."},
+			expected: DistanceResult{
+				Distance: 8,
+				// longest unnamed has 5 arguments and then there are 3 unique named arguments
+				Max:        8,
+				Normalized: 1.0,
+			},
 		},
 	}
 
@@ -43,8 +62,14 @@ func Test_Distance(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if actual != c.expected {
-				t.Errorf("Expected %d but got %d", c.expected, actual)
+			if actual.Distance != c.expected.Distance {
+				t.Errorf("Expected %d but got %d", c.expected.Distance, actual.Distance)
+			}
+			if actual.Max != c.expected.Max {
+				t.Errorf("Expected %d but got %d", c.expected.Max, actual.Max)
+			}
+			if actual.Normalized != c.expected.Normalized {
+				t.Errorf("Expected normalized %f but got %f", c.expected.Normalized, actual.Normalized)
 			}
 		})
 	}

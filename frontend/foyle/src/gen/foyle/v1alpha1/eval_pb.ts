@@ -69,6 +69,11 @@ export class EvalResult extends Message<EvalResult> {
   distance = 0;
 
   /**
+   * @generated from field: float normalized_distance = 7;
+   */
+  normalizedDistance = 0;
+
+  /**
    * @generated from field: string error = 5;
    */
   error = "";
@@ -92,6 +97,7 @@ export class EvalResult extends Message<EvalResult> {
     { no: 2, name: "example_file", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "actual", kind: "message", T: Block, repeated: true },
     { no: 4, name: "distance", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 7, name: "normalized_distance", kind: "scalar", T: 2 /* ScalarType.FLOAT */ },
     { no: 5, name: "error", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 6, name: "status", kind: "enum", T: proto3.getEnumType(EvalResultStatus) },
   ]);

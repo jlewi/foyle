@@ -26,7 +26,7 @@ message EvalResult {
 
   // The distance between the actual and expected response
   int32 distance = 4;
-
+  float normalized_distance = 7;
   string error = 5;
 
   // Status of the evaluation

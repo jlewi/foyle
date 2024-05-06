@@ -2,6 +2,7 @@ package eval
 
 import (
 	"errors"
+	"math"
 	"strings"
 
 	"github.com/agnivade/levenshtein"
@@ -17,23 +18,60 @@ type command struct {
 	named   map[string]string
 }
 
+type DistanceResult struct {
+	Distance   int
+	Max        int
+	Normalized float32
+}
+
 // Distance computes the distance between two instructions
 //
 // For details refer to tn003_learning_eval.md.
-func Distance(left executor.Instruction, right executor.Instruction) (int, error) {
+func Distance(left executor.Instruction, right executor.Instruction) (DistanceResult, error) {
 	// Split each instruction into named and unnamed arguments
 	leftArgs := splitInstruction(left)
 	rightArgs := splitInstruction(right)
 
+	result := DistanceResult{
+		Distance:   -1,
+		Max:        -1,
+		Normalized: -1,
+	}
+
 	// Compute the distance of the unnamed arguments
 	unamedDistance, err := editDistance(leftArgs.unnamed, rightArgs.unnamed)
 	if err != nil {
-		return -1, err
+		return result, err
 	}
 
 	// Compute the distance of the named arguments
 	namedDistance := dictDistance(leftArgs.named, rightArgs.named)
-	return unamedDistance + namedDistance, nil
+
+	totalDistance := unamedDistance + namedDistance
+
+	result.Distance = totalDistance
+
+	// Compute the max distance.
+	// For the unnamed arguments the maximum distance is the length of which ever command is longer
+	// For the named arguments the maximum distance is the number of unique keys in the dictionaries.
+	max := int(math.Max(float64(len(leftArgs.unnamed)), float64(len(rightArgs.unnamed))))
+
+	// Need to count the number of unique keys in the dictionaries.
+	unique := map[string]string{}
+
+	for k := range leftArgs.named {
+		unique[k] = ""
+	}
+	for k := range rightArgs.named {
+		unique[k] = ""
+	}
+
+	max += len(unique)
+	normalizedDistance := float32(totalDistance) / float32(max)
+
+	result.Max = max
+	result.Normalized = normalizedDistance
+	return result, nil
 }
 
 // editDistance computes the edit distance between two slices of strings.
