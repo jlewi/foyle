@@ -10,6 +10,7 @@ import (
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/encoding/protojson"
 	"net/http"
 	"strings"
 )
@@ -25,6 +26,7 @@ const (
 	evalQueryView          evalViews = "evalQueryView"
 	evalActualAnswerView   evalViews = "evalActualAnswerView"
 	evalExpectedAnswerView evalViews = "evalExpectedAnswerView"
+	evalRawView            evalViews = "evalRawView"
 )
 
 var (
@@ -95,16 +97,16 @@ func (s *evalSideBar) Render() app.UI {
 		),
 		app.Div().Body(
 			app.Button().Text("Actual Answer").OnClick(func(ctx app.Context, e app.Event) {
-				//ctx.NewActionWithValue(getAction, generatedBlockView)
+				ctx.NewActionWithValue(setEvalView, evalActualAnswerView)
 			}),
 		),
 		app.Div().Body(
 			app.Button().Text("Expected Answer")).OnClick(func(ctx app.Context, e app.Event) {
-			//ctx.NewActionWithValue(getAction, executedBlockView)
+			ctx.NewActionWithValue(setEvalView, evalExpectedAnswerView)
 		}),
 		app.Div().Body(
 			app.Button().Text("Raw")).OnClick(func(ctx app.Context, e app.Event) {
-			//ctx.NewActionWithValue(getAction, rawView)
+			ctx.NewActionWithValue(setEvalView, evalRawView)
 		}))
 }
 
@@ -246,6 +248,7 @@ func (m *evalView) handleSetEvalView(ctx app.Context, action app.Action) {
 		current := resultSet.GetSelected()
 		if current == nil {
 			m.HTMLContent = fmt.Sprintf("No evaluation result is currently selected")
+			break
 		}
 		value, err := docToHTML(current.Example.Query)
 		if err == nil {
@@ -254,27 +257,55 @@ func (m *evalView) handleSetEvalView(ctx app.Context, action app.Action) {
 			log.Error(err, "Failed to convert generated block to html")
 			m.HTMLContent = fmt.Sprintf("Failed to convert generated block to html : error %+v", err)
 		}
-	//case executedBlockView:
-	//	block := &api.BlockLog{}
-	//	ctx.GetState(blockLogState, block)
-	//	value, err := renderExecutedBlock(block)
-	//	if err == nil {
-	//		m.HTMLContent = value
-	//	} else {
-	//		log.Error(err, "Failed to convert executed block to html")
-	//		m.HTMLContent = fmt.Sprintf("Failed to convert executed block to html: error %+v", err)
-	//	}
-	//case rawView:
-	//	block := &api.BlockLog{}
-	//	ctx.GetState(blockLogState, block)
-	//	blockJson, err := json.MarshalIndent(block, "", " ")
-	//	if err != nil {
-	//		log.Error(err, "Failed to turn blocklog into json")
-	//		m.HTMLContent = fmt.Sprintf("Failed to turn blocklog into json: error %+v", err)
-	//	} else {
-	//		raw := "<pre>" + string(blockJson) + "</pre>"
-	//		m.HTMLContent = raw
-	//	}
+	case evalActualAnswerView:
+		current := resultSet.GetSelected()
+		if current == nil {
+			m.HTMLContent = fmt.Sprintf("No evaluation result is currently selected")
+			break
+		}
+		doc := &v1alpha1.Doc{
+			Blocks: current.Actual,
+		}
+		value, err := docToHTML(doc)
+		if err == nil {
+			m.HTMLContent = value
+		} else {
+			log.Error(err, "Failed to convert actual answer to html")
+			m.HTMLContent = fmt.Sprintf("Failed to convert actual answer to html : error %+v", err)
+		}
+	case evalExpectedAnswerView:
+		current := resultSet.GetSelected()
+		if current == nil {
+			m.HTMLContent = fmt.Sprintf("No evaluation result is currently selected")
+			break
+		}
+		doc := &v1alpha1.Doc{
+			Blocks: current.Example.Answer,
+		}
+		value, err := docToHTML(doc)
+		if err == nil {
+			m.HTMLContent = value
+		} else {
+			log.Error(err, "Failed to convert expected blocks to html")
+			m.HTMLContent = fmt.Sprintf("Failed to convert expected blocks to html : error %+v", err)
+		}
+	case evalRawView:
+		current := resultSet.GetSelected()
+		if current == nil {
+			m.HTMLContent = fmt.Sprintf("No evaluation result is currently selected")
+			break
+		}
+		marshaler := protojson.MarshalOptions{
+			Indent: "  ",
+		}
+		blockJson, err := marshaler.Marshal(current)
+		if err != nil {
+			log.Error(err, "Failed to turn result into json")
+			m.HTMLContent = fmt.Sprintf("Failed to turn blocklog into json: error %+v", err)
+		} else {
+			raw := "<pre>" + string(blockJson) + "</pre>"
+			m.HTMLContent = raw
+		}
 	default:
 		m.HTMLContent = "Unknown view: " + string(viewValue)
 	}
