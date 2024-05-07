@@ -248,7 +248,7 @@ func (m *evalView) handleSetEvalView(ctx app.Context, action app.Action) {
 	case evalQueryView:
 		current := resultSet.GetSelected()
 		if current == nil {
-			m.HTMLContent = fmt.Sprintf("No evaluation result is currently selected")
+			m.HTMLContent = "No evaluation result is currently selected"
 			break
 		}
 		value, err := docToHTML(current.Example.Query)
