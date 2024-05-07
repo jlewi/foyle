@@ -13,12 +13,12 @@ func (s *navigationBar) Render() app.UI {
 		// Each button needs to be enclosed in a div. Otherwise events get triggered for all the buttons.
 		app.Div().Body(
 			app.Button().Text("Block Logs").OnClick(func(ctx app.Context, e app.Event) {
-				//ctx.NewActionWithValue(getAction, generatedBlockView)
+				ctx.NewActionWithValue(setPage, blockLogsView)
 			}),
 		),
 		app.Div().Body(
 			app.Button().Text("Eval Results")).OnClick(func(ctx app.Context, e app.Event) {
-			//ctx.NewActionWithValue(getAction, executedBlockView)
+			ctx.NewActionWithValue(setPage, evalsView)
 		}),
 		//app.Div().Body(
 		//	app.Button().Text("Raw")).OnClick(func(ctx app.Context, e app.Event) {
