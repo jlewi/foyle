@@ -26,16 +26,12 @@ const (
 	blockLogState = "/blocklog"
 )
 
-// How it works:
-// Clicking load fetches the blocklog from the server.
-// The log is then stored in the application context (https://go-app.dev/states)
-// this allows other components to use it. Load then fires off an UpdateView event to trigger
-// the mainWindow to update its content.
-// The UpdateView event takes a string argument which is what view should be rendered.
-// There is a left hand navigation bar  with buttons to display different views of the current log.
-// Changing the view is achieved by sending UpdateView events to change the view
-
 // MainApp is the main window of the application.
+//
+// The main application consists of a left hand navigation bar and a right hand side component that is the page
+// to display. When you click on one of the left hand navigation buttons it fires of an action setPage to change the
+// view. The handler for this action loads the appropriate page and sets MainApp.page to the component for that
+// page.
 type MainApp struct {
 	app.Compo
 	// Page keeps track of the page to display in the right hand side.
@@ -44,7 +40,9 @@ type MainApp struct {
 
 func (m *MainApp) Render() app.UI {
 	if m.page == nil {
-		// Default to the Blockviewer
+		// TODO(jeremy): Could we keep track of the last view so if we refresh we show the same data?
+		// One way to do that is to update the URL with query arguments containing the relevant state information.
+		// Then when we click refresh we could get the information directly from the URL
 		m.page = &BlockViewer{}
 	}
 	return app.Div().Class("main-layout").Body(
@@ -53,8 +51,6 @@ func (m *MainApp) Render() app.UI {
 				&navigationBar{},
 			),
 			app.Div().Class("page-window").Body(
-				// TODO(jeremy): How do we change this when the user clicks the left hand navigation bar?
-				// Do we need to find and update the div?
 				m.page,
 			),
 		), &StatusBar{},
@@ -69,7 +65,7 @@ func (m *MainApp) OnMount(ctx app.Context) {
 // handleSetPage handles the setPage action. The event will tell us which view to display.
 func (m *MainApp) handleSetPage(ctx app.Context, action app.Action) {
 	log := zapr.NewLogger(zap.L())
-	pageValue, ok := action.Value.(page) // Checks if a name was given.
+	pageValue, ok := action.Value.(page)
 	if !ok {
 		log.Error(errors.New("No page provided"), "Invalid action")
 		return
