@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO(jeremy): This is just the viewer for blog log view. We should probably rename it.
+
 // mainWindow is the main window of the application.
 // What it displays will change depending on the view selected.
 // The content of the main window is HTML which gets set by the action handler for different events.

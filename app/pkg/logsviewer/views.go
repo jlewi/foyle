@@ -2,6 +2,8 @@ package logsviewer
 
 import (
 	"bytes"
+	"github.com/jlewi/foyle/app/pkg/docs"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
@@ -43,6 +45,26 @@ func renderExecutedBlock(block *api.BlockLog) (string, error) {
 
 	var buf bytes.Buffer
 	if err := goldmark.Convert([]byte(block.ExecutedBlock.Contents), &buf); err != nil {
+		log.Error(err, "Failed to convert markdown")
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
+// docToHTML returns the dock as html
+func docToHTML(doc *v1alpha1.Doc) (string, error) {
+	if doc == nil {
+		return "", errors.New("doc is nil")
+	}
+	log := zapr.NewLogger(zap.L())
+
+	// Convert it to markdown
+	md := docs.DocToMarkdown(doc)
+
+	// Conver the markdown to html
+	var buf bytes.Buffer
+	if err := goldmark.Convert([]byte(md), &buf); err != nil {
 		log.Error(err, "Failed to convert markdown")
 		return "", err
 	}
