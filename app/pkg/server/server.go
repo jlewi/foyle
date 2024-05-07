@@ -220,8 +220,22 @@ func (s *Server) createGinEngine() error {
 		router.Use(corsMiddleWare)
 	}
 
+	// N.B. don't include leading or trailing slashes in the prefix because the code below assumes there isn't any
+	apiPrefix := "api"
 	// Add REST handlers for blocklogs
-	router.GET("api/blocklogs/:id", s.logsCrud.GetBlockLog)
+	// TODO(jeremy): We should probably standardize on connect-rpc
+	router.GET(apiPrefix+"/blocklogs/:id", s.logsCrud.GetBlockLog)
+
+	// Set  up the connect-rpc handlers for the EvalServer
+	path, handler := v1alpha1connect.NewEvalServiceHandler(&eval.EvalServer{})
+	log.Info("Setting up eval service", "path", path)
+	// Since we want to add the prefix apiPrefix we need to strip it before passing it to the connect-rpc handler
+	// Refer to https://connectrpc.com/docs/go/routing#prefixing-routes. Note that grpc-go clients don't
+	// support prefixes.
+	router.Any(apiPrefix+"/"+path+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, handler)))
+	s.engine = router
+
+	// Setup the logs viewer
 
 	app.Route("/", &logsviewer.MainApp{})
 
@@ -251,12 +265,6 @@ func (s *Server) createGinEngine() error {
 	// because we need to leave the final slash in the path so that the route ends up matching.
 	router.Any(logsviewer.AppPath+"/*any", gin.WrapH(http.StripPrefix(logsviewer.AppPath, viewerApp)))
 
-	path, handler := v1alpha1connect.NewEvalServiceHandler(&eval.EvalServer{})
-	log.Info("Setting up eval service", "path", path)
-	router.Any(path+"*any", func(c *gin.Context) {
-		handler.ServeHTTP(c.Writer, c.Request)
-	})
-	s.engine = router
 	return nil
 }
 
