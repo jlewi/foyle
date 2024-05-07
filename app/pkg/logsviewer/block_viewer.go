@@ -3,6 +3,7 @@ package logsviewer
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
