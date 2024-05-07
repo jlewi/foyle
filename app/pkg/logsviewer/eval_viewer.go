@@ -1,28 +1,50 @@
 package logsviewer
 
 import (
-	"fmt"
+	"connectrpc.com/connect"
+	"context"
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 	"go.uber.org/zap"
+	"net/http"
+	"strings"
+)
+
+const (
+	loadEvalResults = "/loadEvalResults"
+	databaseInputID = "databaseInput"
 )
 
 // EvalViewer is the page that displays an eval result.
 type EvalViewer struct {
 	app.Compo
-	main *mainWindow
+	main         *mainWindow
+	resultsTable *EvalResultsTable
 }
 
 func (c *EvalViewer) Render() app.UI {
 	if c.main == nil {
 		c.main = &mainWindow{}
 	}
+	if c.resultsTable == nil {
+		c.resultsTable = &EvalResultsTable{}
+	}
+	loadButton := app.Button().
+		Text("Load").
+		OnClick(func(ctx app.Context, e app.Event) {
+			ctx.NewAction(loadEvalResults)
+		})
+
 	return app.Div().Class("main-layout").Body(
 		app.Div().Class("header").Body(
-			&EvalResultsTable{
-				SelectedRow: 1,
-			},
+			app.Input().
+				Type("text").
+				ID(databaseInputID).
+				Value("/Users/jlewi/foyle_experiments/learning"),
+			loadButton,
+			c.resultsTable,
 		),
 		app.Div().Class("content").Body(
 			app.Div().Class("sidebar").Body(
@@ -69,18 +91,56 @@ type EvalResultsTable struct {
 	SelectedRow int
 }
 
-func (c *EvalResultsTable) Render() app.UI {
-	c.Data = make([]*v1alpha1.EvalResult, 0, 20)
+func (c *EvalResultsTable) OnMount(ctx app.Context) {
+	ctx.Handle(loadEvalResults, c.handleLoadEvalResults)
+}
 
-	for i := 0; i < 20; i++ {
-		c.Data = append(c.Data, &v1alpha1.EvalResult{
-			Example: &v1alpha1.Example{
-				Id: fmt.Sprintf("%d", i),
-			},
-			ExampleFile:        fmt.Sprintf("file%d", i),
-			Distance:           1,
-			NormalizedDistance: 0.2,
-		})
+func (c *EvalResultsTable) handleLoadEvalResults(ctx app.Context, action app.Action) {
+	log := zapr.NewLogger(zap.L())
+	log.Info("Handling loadEvalResults")
+
+	database := app.Window().GetElementByID(databaseInputID).Get("value").String()
+	database = strings.TrimSpace(database)
+	if database == "" {
+		// TODO(jeremy): We should surface an error message. We could use the status bar to show the error message
+		log.Info("No database provided; can't load eval results")
+		return
+	}
+
+	// TODO(jeremy): We should cache the client; see GetClient in block_viewer.go for an example.
+	client := v1alpha1connect.NewEvalServiceClient(
+		http.DefaultClient,
+		// TODO(jeremy): How should we make this configurable?
+		"http://localhost:8080/api",
+	)
+
+	listRequest := &v1alpha1.EvalResultListRequest{
+		// TODO(jeremy): We need a UI element to let you enter this
+		Database: database,
+	}
+
+	res, err := client.List(
+		context.Background(),
+		connect.NewRequest(listRequest),
+	)
+
+	if err != nil {
+		log.Error(err, "Error listing eval results")
+		return
+	}
+
+	c.Data = res.Msg.Items
+	log.Info("Loaded eval results", "numResults", len(c.Data), "instance", c)
+	c.SelectedRow = 1
+	c.Update()
+}
+
+func (c *EvalResultsTable) Render() app.UI {
+	log := zapr.NewLogger(zap.L())
+	log.Info("Rendering EvalResultsTable", "instance", c)
+	if c.Data == nil {
+		log.Info("Data is nil", "instance", c)
+		c.Data = make([]*v1alpha1.EvalResult, 0)
 	}
 
 	table := app.Table().Body(
