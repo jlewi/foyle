@@ -1,3 +1,25 @@
+/* We want to dive the eval panel into a column with two rows.
+   The top row will be a table with the evaluation results, and the bottom row will be the viewer
+   showing the current selected row.
+   We will use flexbox to achieve this and specify the heights in percentages.
+ */
+.row {
+    flex: 1; /* Take up all available space */
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+.row:first-child {
+    flex: 0 0 10%; /* 10% height, no grow, no shrink */
+}
+
+.row:last-child {
+    flex: 0 0 90%; /* 90% height, no grow, no shrink */
+}
+
+
 /* make the table scrollable */
 .scrollable-table {
     height: 300px; /* Adjust as needed */

@@ -37,24 +37,31 @@ func (c *EvalViewer) Render() app.UI {
 			ctx.NewAction(loadEvalResults)
 		})
 
-	return app.Div().Class("main-layout").Body(
-		app.Div().Class("header").Body(
+	// The top row will contain the input box to select the database
+	// and the results table to scroll though them.
+	// These will be arranged vertically in the row
+	topRow := app.Div().Class("row").Body(
+		app.Div().Body(
 			app.Input().
 				Type("text").
 				ID(databaseInputID).
 				Value("/Users/jlewi/foyle_experiments/learning"),
 			loadButton,
-			c.resultsTable,
 		),
-		app.Div().Class("content").Body(
-			app.Div().Class("sidebar").Body(
-				&evalSideBar{},
-			),
-			app.Div().Class("main-window").Body(
-				c.main,
-			),
+		app.Div().Body(
+			c.resultsTable,
+		))
+
+	// The bottom row will contain the main window.
+	bottomRow := app.Div().Class("row").Body(
+		app.Div().Class("sidebar").Body(
+			&evalSideBar{},
+		),
+		app.Div().Class("main-window").Body(
+			c.main,
 		),
 	)
+	return app.Div().Body(topRow, bottomRow)
 }
 
 // evalSideBar adds a navigation bar between the views to the left side.
