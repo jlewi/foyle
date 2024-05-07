@@ -1,3 +1,9 @@
+/* make the table scrollable */
+.scrollable-table {
+    height: 300px; /* Adjust as needed */
+    overflow-y: auto;
+}
+
 /* This styles the selected row in a table */
 .selected-row {
     background-color: #f0f0f0;

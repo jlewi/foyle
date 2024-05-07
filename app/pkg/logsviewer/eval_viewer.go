@@ -2,8 +2,10 @@ package logsviewer
 
 import (
 	"fmt"
+	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
+	"go.uber.org/zap"
 )
 
 // EvalViewer is the page that displays an eval result.
@@ -81,7 +83,7 @@ func (c *EvalResultsTable) Render() app.UI {
 		})
 	}
 
-	return app.Table().Body(
+	table := app.Table().Body(
 		app.Tr().Body(
 			app.Th().Text("ID"),
 			app.Th().Text("File"),
@@ -102,6 +104,8 @@ func (c *EvalResultsTable) Render() app.UI {
 
 			// For each row we add a click handler to display the corresponding example.
 			row.OnClick(func(ctx app.Context, e app.Event) {
+				log := zapr.NewLogger(zap.L())
+				log.Info("Selected row", "row", i)
 				// Mark the selected row and trigger the update.
 				// This will redraw the table and change the style on the selected row.
 				c.SelectedRow = i
@@ -112,4 +116,6 @@ func (c *EvalResultsTable) Render() app.UI {
 			return row
 		}),
 	)
+	div := app.Div().Class("scrollable-table").Body(table)
+	return div
 }
