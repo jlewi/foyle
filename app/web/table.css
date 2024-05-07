@@ -1,0 +1,4 @@
+/* This styles the selected row in a table */
+.selected-row {
+    background-color: #f0f0f0;
+}

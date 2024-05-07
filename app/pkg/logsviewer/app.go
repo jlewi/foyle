@@ -44,7 +44,7 @@ type MainApp struct {
 
 func (m *MainApp) Render() app.UI {
 	if m.page == nil {
-		// Default to the Blockvier
+		// Default to the Blockviewer
 		m.page = &BlockViewer{}
 	}
 	return app.Div().Class("main-layout").Body(
@@ -57,7 +57,7 @@ func (m *MainApp) Render() app.UI {
 				// Do we need to find and update the div?
 				m.page,
 			),
-		),
+		), &StatusBar{},
 	)
 }
 
@@ -89,4 +89,15 @@ func (m *MainApp) handleSetPage(ctx app.Context, action app.Action) {
 	}
 	// We need to call update to trigger a re-render of the component.
 	m.Update()
+}
+
+// StatusBar at the bottom of the page. Inspired by the vscode/intellij status bar.
+// We use this to show useful information like the version number.
+type StatusBar struct {
+	app.Compo
+}
+
+func (s *StatusBar) Render() app.UI {
+	version := app.Getenv("GOAPP_VERSION")
+	return app.Div().Class("status-bar").Text("goapp version: " + version)
 }

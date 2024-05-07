@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/jlewi/foyle/app/pkg/eval"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"time"
@@ -263,7 +264,18 @@ func (s *Server) createGinEngine() error {
 	}
 	// N.B. We need a trailing slash for the relativePath passed to router. Any but not in the stripprefix
 	// because we need to leave the final slash in the path so that the route ends up matching.
-	router.Any(logsviewer.AppPath+"/*any", gin.WrapH(http.StripPrefix(logsviewer.AppPath, viewerApp)))
+	router.Any(logsviewer.AppPath+"/*any", func(c *gin.Context) {
+		// Ref: https://github.com/jlewi/foyle/issues/64
+		// We update the version each time the app is served so that the browser doesn't cache the app.
+		// TODO(jeremy): I think this is a hack which might be ok during debugging but might cause pathological issues
+		// because the version number isn't stable. A better approach would be to do something like a hash
+		// of the app.wasm file. We could potentially watch the filesystem for changes to the app.wasm file and then
+		// update the version number.
+		viewerApp.Version = uuid.NewString()
+		log.Info("Serving logs viewer", "version", viewerApp.Version)
+		h := http.StripPrefix(logsviewer.AppPath, viewerApp)
+		h.ServeHTTP(c.Writer, c.Request)
+	})
 
 	return nil
 }
