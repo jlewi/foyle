@@ -4,7 +4,7 @@ import "foyle/v1alpha1/doc.proto";
 
 import "google/protobuf/struct.proto";
 
-option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
 
 // Example represents an example to be used in few shot learning
 message Example {

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/struct.proto";
 
-option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
 
 // Doc represents a document in the editor.
 message Doc {

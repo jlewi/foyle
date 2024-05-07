@@ -19,7 +19,22 @@
     background-color: #57d2ed;
 }
 
+.page-window {
+    flex: 1;
+    background-color: #fff;
+}
+
 .main-window {
     flex: 1;
     background-color: #fff;
+}
+
+/* style the status bar at the bottom */
+.status-bar {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: #f0f0f0;
+    text-align: center;
+    padding: 10px 0;
 }

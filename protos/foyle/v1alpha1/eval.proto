@@ -5,7 +5,7 @@ import "foyle/v1alpha1/trainer.proto";
 
 import "google/protobuf/struct.proto";
 
-option go_package = "github.com/jlewi/foyle/protos/go/v1alpha1";
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
 
 enum EvalResultStatus {
   UNKNOWN_EVAL_RESULT_STATUS = 0;
@@ -31,4 +31,18 @@ message EvalResult {
 
   // Status of the evaluation
   EvalResultStatus status = 6;
+}
+
+message EvalResultListRequest {
+  // The path of the database to fetch results for
+  string database = 1;
+}
+
+message EvalResultListResponse {
+  repeated EvalResult items = 1;
+}
+
+
+service EvalService {
+  rpc List(EvalResultListRequest) returns (EvalResultListResponse) {}
 }

@@ -28,3 +28,6 @@ plugins:
   - name: zap-marshaler
     out: go/
     opt: paths=source_relative
+  - plugin: connect-go
+    out: go/
+    opt: paths=source_relative

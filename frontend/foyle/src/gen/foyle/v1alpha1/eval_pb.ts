@@ -119,3 +119,79 @@ export class EvalResult extends Message<EvalResult> {
   }
 }
 
+/**
+ * @generated from message EvalResultListRequest
+ */
+export class EvalResultListRequest extends Message<EvalResultListRequest> {
+  /**
+   * The path of the database to fetch results for
+   *
+   * @generated from field: string database = 1;
+   */
+  database = "";
+
+  constructor(data?: PartialMessage<EvalResultListRequest>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "EvalResultListRequest";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "database", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): EvalResultListRequest {
+    return new EvalResultListRequest().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): EvalResultListRequest {
+    return new EvalResultListRequest().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): EvalResultListRequest {
+    return new EvalResultListRequest().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: EvalResultListRequest | PlainMessage<EvalResultListRequest> | undefined, b: EvalResultListRequest | PlainMessage<EvalResultListRequest> | undefined): boolean {
+    return proto3.util.equals(EvalResultListRequest, a, b);
+  }
+}
+
+/**
+ * @generated from message EvalResultListResponse
+ */
+export class EvalResultListResponse extends Message<EvalResultListResponse> {
+  /**
+   * @generated from field: repeated EvalResult items = 1;
+   */
+  items: EvalResult[] = [];
+
+  constructor(data?: PartialMessage<EvalResultListResponse>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "EvalResultListResponse";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "items", kind: "message", T: EvalResult, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): EvalResultListResponse {
+    return new EvalResultListResponse().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): EvalResultListResponse {
+    return new EvalResultListResponse().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): EvalResultListResponse {
+    return new EvalResultListResponse().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: EvalResultListResponse | PlainMessage<EvalResultListResponse> | undefined, b: EvalResultListResponse | PlainMessage<EvalResultListResponse> | undefined): boolean {
+    return proto3.util.equals(EvalResultListResponse, a, b);
+  }
+}
+

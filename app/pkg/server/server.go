@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jlewi/foyle/app/pkg/eval"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
+
 	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/logsviewer"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
@@ -218,9 +221,31 @@ func (s *Server) createGinEngine() error {
 		router.Use(corsMiddleWare)
 	}
 
+	// N.B. don't include leading or trailing slashes in the prefix because the code below assumes there isn't any
+	apiPrefix := "api"
 	// Add REST handlers for blocklogs
-	router.GET("api/blocklogs/:id", s.logsCrud.GetBlockLog)
+	// TODO(jeremy): We should probably standardize on connect-rpc
+	router.GET(apiPrefix+"/blocklogs/:id", s.logsCrud.GetBlockLog)
 
+	// Set  up the connect-rpc handlers for the EvalServer
+	path, handler := v1alpha1connect.NewEvalServiceHandler(&eval.EvalServer{})
+	log.Info("Setting up eval service", "path", path)
+	// Since we want to add the prefix apiPrefix we need to strip it before passing it to the connect-rpc handler
+	// Refer to https://connectrpc.com/docs/go/routing#prefixing-routes. Note that grpc-go clients don't
+	// support prefixes.
+	router.Any(apiPrefix+"/"+path+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, handler)))
+	s.engine = router
+
+	// Setup the logs viewer
+	if err := s.setupViewerApp(router); err != nil {
+		return err
+	}
+	return nil
+}
+
+// setupViewerApp sets up the viewer app
+func (s *Server) setupViewerApp(router *gin.Engine) error {
+	log := zapr.NewLogger(zap.L())
 	app.Route("/", &logsviewer.MainApp{})
 
 	if strings.HasSuffix(logsviewer.AppPath, "/") {
@@ -233,6 +258,7 @@ func (s *Server) createGinEngine() error {
 
 	endpoint := fmt.Sprintf("http://%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
 	log.Info("Setting up logs viewer", "endpoint", endpoint, "path", logsviewer.AppPath)
+
 	viewerApp := &app.Handler{
 		Name:        "FoyleLogsViewer",
 		Description: "View Foyle Logs",
@@ -240,16 +266,17 @@ func (s *Server) createGinEngine() error {
 		Resources: app.CustomProvider("", logsviewer.AppPath),
 		Styles: []string{
 			"/web/viewer.css", // Loads traceSelector.css file.
+			"/web/table.css",  // Loads table.css file.
 		},
 		Env: map[string]string{
 			logsviewer.EndpointEnvVar: endpoint,
 		},
 	}
+
 	// N.B. We need a trailing slash for the relativePath passed to router. Any but not in the stripprefix
 	// because we need to leave the final slash in the path so that the route ends up matching.
 	router.Any(logsviewer.AppPath+"/*any", gin.WrapH(http.StripPrefix(logsviewer.AppPath, viewerApp)))
 
-	s.engine = router
 	return nil
 }
 

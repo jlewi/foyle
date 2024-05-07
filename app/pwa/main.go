@@ -51,7 +51,8 @@ func main() {
 		Description: "An Hello World! example",
 		Resources:   app.CustomProvider("", "/viewer"),
 		Styles: []string{
-			"/web/viewer.css", // Loads traceSelector.css file.
+			"/web/table.css",
+			"/web/viewer.css",
 		},
 		Env: map[string]string{
 			logsviewer.EndpointEnvVar: "http://localhost:8000",
