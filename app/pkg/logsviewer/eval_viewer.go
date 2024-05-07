@@ -1,9 +1,12 @@
 package logsviewer
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
+
+	"connectrpc.com/connect"
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
@@ -11,8 +14,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
-	"net/http"
-	"strings"
 )
 
 type evalViews string

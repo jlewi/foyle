@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/jlewi/foyle/app/pkg/eval"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
-	"time"
 
 	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/logsviewer"

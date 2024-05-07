@@ -2,6 +2,7 @@ package logsviewer
 
 import (
 	"bytes"
+
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 
