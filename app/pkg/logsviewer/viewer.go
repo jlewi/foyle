@@ -43,6 +43,9 @@ func (c *MainApp) Render() app.UI {
 		),
 		app.Div().Class("content").Body(
 			app.Div().Class("sidebar").Body(
+				&navigationBar{},
+			),
+			app.Div().Class("sidebar").Body(
 				&sideBar{},
 			),
 			app.Div().Class("main-window").Body(
