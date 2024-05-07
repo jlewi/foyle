@@ -8,18 +8,18 @@ import "github.com/maxence-charriere/go-app/v9/pkg/app"
 // Clicking load fetches the blocklog from the server.
 // The log is then stored in the application context (https://go-app.dev/states)
 // this allows other components to use it. Load then fires off an UpdateView event to trigger
-// the mainWindow to update its content.
+// the blockLogView to update its content.
 // The UpdateView event takes a string argument which is what view should be rendered.
 // There is a left hand navigation bar  with buttons to display different views of the current log.
 // Changing the view is achieved by sending UpdateView events to change the view
 type BlockViewer struct {
 	app.Compo
-	main *mainWindow
+	main *blockLogView
 }
 
 func (c *BlockViewer) Render() app.UI {
 	if c.main == nil {
-		c.main = &mainWindow{}
+		c.main = &blockLogView{}
 	}
 	return app.Div().Class("main-layout").Body(
 		app.Div().Class("header").Body(

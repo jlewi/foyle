@@ -11,30 +11,28 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO(jeremy): This is just the viewer for blog log view. We should probably rename it.
-
-// mainWindow is the main window of the application.
+// blockLogView is the main window of the application.
 // What it displays will change depending on the view selected.
 // The content of the main window is HTML which gets set by the action handler for different events.
 //
 // The main window registers a handler for the getAction event. The getAction event is triggered when ever
 // a blockLog is loaded. The handler for the getAction event will set the HTML content of the main windowß
-type mainWindow struct {
+type blockLogView struct {
 	app.Compo
 	HTMLContent string
 }
 
-func (m *mainWindow) Render() app.UI {
+func (m *blockLogView) Render() app.UI {
 	// Raw requires the value to have a single root element. So we enclose the HTML content in a div to ensure
 	// that is all ways true.
 	return app.Raw("<div>" + m.HTMLContent + "</div>")
 }
 
-func (m *mainWindow) OnMount(ctx app.Context) {
+func (m *blockLogView) OnMount(ctx app.Context) {
 	ctx.Handle(getAction, m.handleGetAction)
 }
 
-func (m *mainWindow) handleGetAction(ctx app.Context, action app.Action) {
+func (m *blockLogView) handleGetAction(ctx app.Context, action app.Action) {
 	log := zapr.NewLogger(zap.L())
 	viewValue, ok := action.Value.(view) // Checks if a name was given.
 	if !ok {
