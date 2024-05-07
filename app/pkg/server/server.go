@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jlewi/foyle/app/pkg/eval"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"time"
 
 	"github.com/jlewi/foyle/app/pkg/analyze"
@@ -249,6 +251,11 @@ func (s *Server) createGinEngine() error {
 	// because we need to leave the final slash in the path so that the route ends up matching.
 	router.Any(logsviewer.AppPath+"/*any", gin.WrapH(http.StripPrefix(logsviewer.AppPath, viewerApp)))
 
+	path, handler := v1alpha1connect.NewEvalServiceHandler(&eval.EvalServer{})
+	log.Info("Setting up eval service", "path", path)
+	router.Any(path+"*any", func(c *gin.Context) {
+		handler.ServeHTTP(c.Writer, c.Request)
+	})
 	s.engine = router
 	return nil
 }
