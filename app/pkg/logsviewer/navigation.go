@@ -20,9 +20,5 @@ func (s *navigationBar) Render() app.UI {
 			app.Button().Text("Eval Results")).OnClick(func(ctx app.Context, e app.Event) {
 			ctx.NewActionWithValue(setPage, evalsView)
 		}),
-		//app.Div().Body(
-		//	app.Button().Text("Raw")).OnClick(func(ctx app.Context, e app.Event) {
-		//	ctx.NewActionWithValue(getAction, rawView)
-		//})
 	)
 }
