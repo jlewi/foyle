@@ -1,10 +1,12 @@
 package logsviewer
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -123,7 +125,7 @@ func (m *blockLogView) handleGetAction(ctx app.Context, action app.Action) {
 	case rawView:
 		block := &api.BlockLog{}
 		ctx.GetState(blockLogState, block)
-		blockJson, err := jsßon.MarshalIndent(block, "", " ")
+		blockJson, err := json.MarshalIndent(block, "", " ")
 		if err != nil {
 			log.Error(err, "Failed to turn blocklog into json")
 			m.HTMLContent = fmt.Sprintf("Failed to turn blocklog into json: error %+v", err)
