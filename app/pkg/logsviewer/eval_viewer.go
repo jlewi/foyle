@@ -261,7 +261,7 @@ func (m *evalView) handleSetEvalView(ctx app.Context, action app.Action) {
 	case evalActualAnswerView:
 		current := resultSet.GetSelected()
 		if current == nil {
-			m.HTMLContent = fmt.Sprintf("No evaluation result is currently selected")
+			m.HTMLContent = "No evaluation result is currently selected"
 			break
 		}
 		doc := &v1alpha1.Doc{
@@ -277,7 +277,7 @@ func (m *evalView) handleSetEvalView(ctx app.Context, action app.Action) {
 	case evalExpectedAnswerView:
 		current := resultSet.GetSelected()
 		if current == nil {
-			m.HTMLContent = fmt.Sprintf("No evaluation result is currently selected")
+			m.HTMLContent = "No evaluation result is currently selected"
 			break
 		}
 		doc := &v1alpha1.Doc{
@@ -293,7 +293,7 @@ func (m *evalView) handleSetEvalView(ctx app.Context, action app.Action) {
 	case evalRawView:
 		current := resultSet.GetSelected()
 		if current == nil {
-			m.HTMLContent = fmt.Sprintf("No evaluation result is currently selected")
+			m.HTMLContent = "No evaluation result is currently selected"
 			break
 		}
 		marshaler := protojson.MarshalOptions{
