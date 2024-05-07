@@ -19,6 +19,11 @@
     background-color: #57d2ed;
 }
 
+.page-window {
+    flex: 1;
+    background-color: #fff;
+}
+
 .main-window {
     flex: 1;
     background-color: #fff;

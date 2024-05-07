@@ -30,50 +30,19 @@ const (
 // MainApp is the main window of the application.
 type MainApp struct {
 	app.Compo
-	main *mainWindow
 }
 
 func (c *MainApp) Render() app.UI {
-	if c.main == nil {
-		c.main = &mainWindow{}
-	}
 	return app.Div().Class("main-layout").Body(
-		app.Div().Class("header").Body(
-			&blockSelector{},
-		),
 		app.Div().Class("content").Body(
 			app.Div().Class("sidebar").Body(
 				&navigationBar{},
 			),
-			app.Div().Class("sidebar").Body(
-				&sideBar{},
-			),
-			app.Div().Class("main-window").Body(
-				c.main,
+			app.Div().Class("page-window").Body(
+				// TODO(jeremy): How do we change this when the user clicks the left hand navigation bar?
+				// Do we need to find and update the div?
+				&BlockViewer{},
 			),
 		),
 	)
-}
-
-// sideBar adds a navigation bar between the views to the left side.
-type sideBar struct {
-	app.Compo
-}
-
-func (s *sideBar) Render() app.UI {
-	return app.Div().Body(
-		// Each button needs to be enclosed in a div. Otherwise events get triggered for all the buttons.
-		app.Div().Body(
-			app.Button().Text("Generated Block").OnClick(func(ctx app.Context, e app.Event) {
-				ctx.NewActionWithValue(getAction, generatedBlockView)
-			}),
-		),
-		app.Div().Body(
-			app.Button().Text("Executed Block")).OnClick(func(ctx app.Context, e app.Event) {
-			ctx.NewActionWithValue(getAction, executedBlockView)
-		}),
-		app.Div().Body(
-			app.Button().Text("Raw")).OnClick(func(ctx app.Context, e app.Event) {
-			ctx.NewActionWithValue(getAction, rawView)
-		}))
 }
