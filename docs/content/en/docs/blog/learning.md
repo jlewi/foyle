@@ -104,7 +104,7 @@ This fragmented experience for operations is a barrier to collecting data that w
 I think this is an opportunity to create a better experience for devops even in the absence of AI. A great example of this is what the [Runme.dev](https://runme.dev/) project is doing. Below is a screenshot of a Runme.dev interactive widget for VMs rendered directly in the notebook.
 
 
-![runme gce renderer](runme_gce_renderer.webp)
+![runme gce renderer](runme_gce_renderer.png)
 
 
 This illustrates a UX where users don’t need to choose between the convenience of ClickOps and being able to log intent and action. Another great example is [Datadog Notebooks](https://docs.datadoghq.com/notebooks/). When I was at Primer, I found using Datadog notebooks to troubleshoot and document issues was far superior to copying and pasting links and images into tickets or Google Docs.  
