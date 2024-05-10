@@ -69,15 +69,14 @@ Foyle relies on a UX which prioritizes collecting implicit feedback to improve t
 
 
 
-<p id="gdcalert1" ><span style="color: red; font-weight: bold">>>>>>  gd2md-html alert: inline image link here (to images/image1.png). Store image on your image server and adjust path/filename/extension if necessary. </span><br>(<a href="#">Back to top</a>)(<a href="#gdcalert2">Next alert</a>)<br><span style="color: red; font-weight: bold">>>>>> </span></p>
-
-
-![alt_text](images/image1.png "image_tooltip")
+![implicit feedback interaction diagram](../implicit_feedback_interaction_diagram.svg)
 
 
 In this interaction, a user asks an AI to translate their intent into one or more tools the user can invoke. The tools are rendered in executable, editable cells inside the notebook. Here’s a video illustrating that interaction.
 
-https://youtu.be/gU1XyRsV2n4
+<!-- cc_load_policy turns on captions by default-->
+<iframe width="560" height="315" src="https://www.youtube.com/embed/gU1XyRsV2n4?cc_load_policy=1&si=SNlYWKlgCmo4vXPi" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 
 This experience allows the user to iterate on the commands if necessary to arrive at the correct answer. Foyle logs these iterations (see this previous [blog post](https://foyle.io/docs/blog/logfeedback/) for a detailed discussion) so it can learn from them.
 
@@ -105,11 +104,7 @@ This fragmented experience for operations is a barrier to collecting data that w
 I think this is an opportunity to create a better experience for devops even in the absence of AI. A great example of this is what the [Runme.dev](https://runme.dev/) project is doing. Below is a screenshot of a Runme.dev interactive widget for VMs rendered directly in the notebook.
 
 
-
-<p id="gdcalert2" ><span style="color: red; font-weight: bold">>>>>>  gd2md-html alert: inline image link here (to images/image2.png). Store image on your image server and adjust path/filename/extension if necessary. </span><br>(<a href="#">Back to top</a>)(<a href="#gdcalert3">Next alert</a>)<br><span style="color: red; font-weight: bold">>>>>> </span></p>
-
-
-![alt_text](images/image2.png "image_tooltip")
+![runme gce renderer](runme_gce_renderer.webp)
 
 
 This illustrates a UX where users don’t need to choose between the convenience of ClickOps and being able to log intent and action. Another great example is [Datadog Notebooks](https://docs.datadoghq.com/notebooks/). When I was at Primer, I found using Datadog notebooks to troubleshoot and document issues was far superior to copying and pasting links and images into tickets or Google Docs.  
@@ -118,3 +113,7 @@ This illustrates a UX where users don’t need to choose between the convenience
 # Conclusion: Leading the AI Wave
 
 If you’re a platform engineer like me you’ve probably spent previous waves of AI building tools to support AI builders; e.g. by exposing GPUs or deploying critical applications like Jupyter. Now we, platform engineers, are in a position to use AI to solve our own problems and better serve our customers. Despite all the excitement about AI, there’s a shortage of examples of AI positively transforming how we work. Let's make platform engineering a success story for AI.
+
+## Acknowledgements
+
+I really appreciate [Hamel Husain](https://hamel.dev/) reviewing and editing this post.
