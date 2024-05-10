@@ -20,6 +20,10 @@ Foyle is an OSS project that aims to simplify software operations with AI. Foyle
 
 # Demo 
 
+<!-- cc_load_policy turns on captions by default-->
+<iframe width="560" height="315" src="https://www.youtube.com/embed/RsHL8g6HYuA?cc_load_policy=1&si=XD9LZj_Yc6XDt6zW" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+
 Let’s consider one of the most basic operations; fetching the logs to understand why something isn’t working. Observability is critical but at least for me a constant headache. Each observability tool has their own hard to remember query language and queries depend on how applications were instrumented. As an example, [Hydros](https://github.com/jlewi/hydros) is a tool I built for CICD. To figure out whether hydros successfully built an image or hydrated some manifests I need to query its logs. 
 
 A convenient and easy way for me to express my intent is with the query
@@ -67,18 +71,9 @@ I have intentionally asked for an image that doesn’t exist because I wanted to
 
 Foyle relies on a UX which prioritizes collecting implicit feedback to improve the AI. 
 
-
-
 ![implicit feedback interaction diagram](../implicit_feedback_interaction_diagram.svg)
 
-
-In this interaction, a user asks an AI to translate their intent into one or more tools the user can invoke. The tools are rendered in executable, editable cells inside the notebook. Here’s a video illustrating that interaction.
-
-<!-- cc_load_policy turns on captions by default-->
-<iframe width="560" height="315" src="https://www.youtube.com/embed/gU1XyRsV2n4?cc_load_policy=1&si=SNlYWKlgCmo4vXPi" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-
-
-This experience allows the user to iterate on the commands if necessary to arrive at the correct answer. Foyle logs these iterations (see this previous [blog post](https://foyle.io/docs/blog/logfeedback/) for a detailed discussion) so it can learn from them.
+In this interaction, a user asks an AI to translate their intent into one or more tools the user can invoke. The tools are rendered in executable, editable cells inside the notebook. This experience allows the user to iterate on the commands if necessary to arrive at the correct answer. Foyle logs these iterations (see this previous [blog post](https://foyle.io/docs/blog/logfeedback/) for a detailed discussion) so it can learn from them.
 
 The learning mechanism is quite simple. As denoted above we have the original query, Q, the initial answer from the AI, A, and then the final command, A’, the user executed. This gives us a triplet (Q, A, A’). If A=A’ the AI got the answer right; otherwise the AI made a mistake the user had to fix. 
 
@@ -114,6 +109,6 @@ This illustrates a UX where users don’t need to choose between the convenience
 
 If you’re a platform engineer like me you’ve probably spent previous waves of AI building tools to support AI builders; e.g. by exposing GPUs or deploying critical applications like Jupyter. Now we, platform engineers, are in a position to use AI to solve our own problems and better serve our customers. Despite all the excitement about AI, there’s a shortage of examples of AI positively transforming how we work. Let's make platform engineering a success story for AI.
 
-## Acknowledgements
+# Acknowledgements
 
 I really appreciate [Hamel Husain](https://hamel.dev/) reviewing and editing this post.
