@@ -1,7 +1,7 @@
 ---
 title: "Copilots for Devops; because you need to operate your service not just write it"
 linkTitle: "Copilots for Devops"
-date: 2024-04-24
+date: 2024-05-10
 author: "[Jeremy Lewi](https://lewi.us/about)"
 type: blog
 descrption: Foyle is an open source assistant to help software developers deal with the pain of devops. One of Foyle's central premises is that creating a UX that implicitly captures human feedback is critical to building AIs that effectively assist us with operations. This post describes how Foyle logs that feedback.
