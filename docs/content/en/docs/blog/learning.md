@@ -1,5 +1,5 @@
 ---
-title: "Copilots for Devops; because you need to operate your service not just write it"
+title: "We need copilots for devops so we can run all this software"
 linkTitle: "Copilots for Devops"
 date: 2024-05-10
 author: "[Jeremy Lewi](https://lewi.us/about)"
