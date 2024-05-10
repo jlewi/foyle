@@ -4,7 +4,7 @@ metadata:
   name: vscode
   namespace: foyle
   labels:
-    env: dev
+    env: release
 spec:
   image: us-west1-docker.pkg.dev/foyle-public/images/vscode-web-assets
   source:
