@@ -1,5 +1,5 @@
 ---
-title: "We need copilots for devops so we can run all this software"
+title: "Without a copilot for devops we won't keep up"
 linkTitle: "Copilots for Devops"
 date: 2024-05-10
 author: "[Jeremy Lewi](https://lewi.us/about)"
@@ -96,7 +96,7 @@ One of the biggest barriers to building copilots for devops is that when it come
 
 This fragmented experience for operations is a barrier to collecting data that would let us train powerful assistants. Compare this to writing software where a developer can use a single IDE to write, build, and test their software. When these systems are well instrumented you can train really valuable software assistants like Google’s [DIDACT](https://research.google/blog/large-sequence-models-for-software-development-activities/) and [Replit Code Repair](https://blog.replit.com/code-repair).
 
-I think this is an opportunity to create a better experience for devops even in the absence of AI. A great example of this is what the [Runme.dev](https://runme.dev/) project is doing. Below is a screenshot of a Runme.dev interactive widget for VMs rendered directly in the notebook.
+This is an opportunity to create a better experience for devops even in the absence of AI. A great example of this is what the [Runme.dev](https://runme.dev/) project is doing. Below is a screenshot of a Runme.dev interactive widget for VMs rendered directly in the notebook.
 
 
 ![runme gce renderer](../runme_gce_renderer.png)
