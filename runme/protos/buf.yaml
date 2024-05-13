@@ -1,0 +1,8 @@
+version: v1
+name: buf.build/jlewi/foyle-runme
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - DEFAULT

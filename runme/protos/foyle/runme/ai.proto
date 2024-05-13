@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package foyle.runme;
+
+import "foyle/runme/parser.proto";
+option go_package = "github.com/jlewi/foyle/runme/gen/foyle/runme";
+
+message RunmeGenerateRequest {
+  Notebook notebook = 1;
+}
+
+message RunmeGenerateResponse {
+  repeated Cell cells = 1;
+}
+
+// The Runme service is used to integrate with Runme.
+service RunmeGenerateService {
+  rpc Generate (RunmeGenerateRequest) returns (RunmeGenerateResponse) {}
+}

@@ -109,7 +109,7 @@ message RunmeGenerateRequest {
   runme.parser.v1.Notebook notebook;
 }
 
-message RunmeGenerateRequest {
+message RunmeGenerateResponse {
   repeated runme.parser.v1.Cell cells = 1;
 }
 
