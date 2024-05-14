@@ -194,7 +194,13 @@ func (c *Config) GetLogLevel() string {
 
 // GetConfigDir returns the configuration directory
 func (c *Config) GetConfigDir() string {
-	return filepath.Dir(viper.ConfigFileUsed())
+	configFile := viper.ConfigFileUsed()
+	if configFile != "" {
+		return filepath.Dir(configFile)
+	}
+
+	// Since there is no config file we will use the default config directory.
+	return binHome()
 }
 
 // IsValid validates the configuration and returns any errors.
