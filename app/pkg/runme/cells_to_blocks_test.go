@@ -9,15 +9,17 @@ import (
 	"testing"
 )
 
-func Test_NotebookToDoc(t *testing.T) {
-	type testCase struct {
-		Input    *parserv1.Notebook
-		Expected *v1alpha1.Doc
-	}
+type testCase struct {
+	name     string
+	Notebook *parserv1.Notebook
+	Doc      *v1alpha1.Doc
+}
 
-	cases := []testCase{
+var (
+	cases = []testCase{
 		{
-			Input: &parserv1.Notebook{
+			name: "Simple",
+			Notebook: &parserv1.Notebook{
 				Cells: []*parserv1.Cell{
 					{
 						Kind:       parserv1.CellKind_CELL_KIND_CODE,
@@ -36,7 +38,7 @@ func Test_NotebookToDoc(t *testing.T) {
 					},
 				},
 			},
-			Expected: &v1alpha1.Doc{
+			Doc: &v1alpha1.Doc{
 				Blocks: []*v1alpha1.Block{
 					{
 						Language: "python",
@@ -57,16 +59,18 @@ func Test_NotebookToDoc(t *testing.T) {
 			},
 		},
 	}
+)
 
+func Test_NotebookToDoc(t *testing.T) {
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("Case %d", i), func(t *testing.T) {
-			actual, err := NotebookToDoc(c.Input)
+			actual, err := NotebookToDoc(c.Notebook)
 			if err != nil {
 				t.Errorf("Case %v: Error %v", i, err)
 				return
 			}
 
-			if diff := cmp.Diff(c.Expected, actual, testutil.DocComparer); diff != "" {
+			if diff := cmp.Diff(c.Doc, actual, testutil.DocComparer); diff != "" {
 				t.Errorf("Unexpected Diff:\n%v", diff)
 			}
 		})
