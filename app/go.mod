@@ -2,7 +2,10 @@ module github.com/jlewi/foyle/app
 
 go 1.22.1
 
-replace github.com/jlewi/foyle/protos/go => ../protos/go
+replace (
+	github.com/jlewi/foyle/protos/go => ../protos/go
+	github.com/jlewi/foyle/runme/gen/proto/go => ../runme/gen/proto/go
+)
 
 require (
 	connectrpc.com/connect v1.16.1
@@ -22,6 +25,7 @@ require (
 	github.com/honeycombio/honeycomb-opentelemetry-go v0.10.0
 	github.com/honeycombio/otel-config-go v1.15.0
 	github.com/jlewi/foyle/protos/go v0.0.0-00010101000000-000000000000
+	github.com/jlewi/foyle/runme/gen/proto/go v0.0.0-00010101000000-000000000000
 	github.com/jlewi/hydros v0.0.7-0.20240503183011-8f99ead373fb
 	github.com/jlewi/monogo v0.0.0-20240123191147-401afe194d74
 	github.com/maxence-charriere/go-app/v9 v9.8.0
@@ -40,7 +44,7 @@ require (
 	gonum.org/v1/gonum v0.15.0
 	google.golang.org/api v0.162.0
 	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.34.1
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.27.3
 	sigs.k8s.io/kustomize/kyaml v0.13.9
