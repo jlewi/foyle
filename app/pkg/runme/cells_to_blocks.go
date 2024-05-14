@@ -3,11 +3,11 @@ package runme
 import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 )
-import "github.com/jlewi/foyle/runme/gen/proto/go/foyle/runme"
 
 // NotebookToDoc converts a runme Notebook to a foyle Doc
-func NotebookToDoc(nb *runme.Notebook) (*v1alpha1.Doc, error) {
+func NotebookToDoc(nb *parserv1.Notebook) (*v1alpha1.Doc, error) {
 	if nb == nil {
 		return nil, errors.New("Notebook is nil")
 	}
@@ -30,7 +30,7 @@ func NotebookToDoc(nb *runme.Notebook) (*v1alpha1.Doc, error) {
 // CellToBlock converts a runme Cell to a foyle Block
 //
 // N.B. cell metadata is currently ignored.
-func CellToBlock(cell *runme.Cell) (*v1alpha1.Block, error) {
+func CellToBlock(cell *parserv1.Cell) (*v1alpha1.Block, error) {
 	if cell == nil {
 		return nil, errors.New("Cell is nil")
 	}
@@ -53,18 +53,18 @@ func CellToBlock(cell *runme.Cell) (*v1alpha1.Block, error) {
 	}, nil
 }
 
-func CellKindToBlockKind(kind runme.CellKind) v1alpha1.BlockKind {
+func CellKindToBlockKind(kind parserv1.CellKind) v1alpha1.BlockKind {
 	switch kind {
-	case runme.CellKind_CELL_KIND_CODE:
+	case parserv1.CellKind_CELL_KIND_CODE:
 		return v1alpha1.BlockKind_CODE
-	case runme.CellKind_CELL_KIND_MARKUP:
+	case parserv1.CellKind_CELL_KIND_MARKUP:
 		return v1alpha1.BlockKind_MARKUP
 	default:
 		return v1alpha1.BlockKind_UNKNOWN_BLOCK_KIND
 	}
 }
 
-func CellOutputToBlockOutput(output *runme.CellOutput) (*v1alpha1.BlockOutput, error) {
+func CellOutputToBlockOutput(output *parserv1.CellOutput) (*v1alpha1.BlockOutput, error) {
 	if output == nil {
 		return nil, errors.New("CellOutput is nil")
 	}

@@ -5,27 +5,27 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/jlewi/foyle/app/pkg/testutil"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"github.com/jlewi/foyle/runme/gen/proto/go/foyle/runme"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"testing"
 )
 
 func Test_NotebookToDoc(t *testing.T) {
 	type testCase struct {
-		Input    *runme.Notebook
+		Input    *parserv1.Notebook
 		Expected *v1alpha1.Doc
 	}
 
 	cases := []testCase{
 		{
-			Input: &runme.Notebook{
-				Cells: []*runme.Cell{
+			Input: &parserv1.Notebook{
+				Cells: []*parserv1.Cell{
 					{
-						Kind:       runme.CellKind_CELL_KIND_CODE,
+						Kind:       parserv1.CellKind_CELL_KIND_CODE,
 						LanguageId: "python",
 						Value:      "print('Hello World')",
-						Outputs: []*runme.CellOutput{
+						Outputs: []*parserv1.CellOutput{
 							{
-								Items: []*runme.CellOutputItem{
+								Items: []*parserv1.CellOutputItem{
 									{
 										Data: []byte("Hello World\n"),
 										Mime: "text/plain",
