@@ -1,0 +1,11 @@
+apiVersion: hydros.dev/v1alpha1
+kind: ReplicatedImage
+metadata:
+  name: replicate-web-assets
+  labels:
+    env: release
+spec:
+  source:
+    repository: "us-west1-docker.pkg.dev/foyle-public/images/vscode-web-assets"
+  destinations:
+    - "ghcr.io/jlewi/vscode-web-assets"
