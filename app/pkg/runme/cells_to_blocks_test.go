@@ -2,11 +2,12 @@ package runme
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/jlewi/foyle/app/pkg/testutil"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	"testing"
 )
 
 type testCase struct {

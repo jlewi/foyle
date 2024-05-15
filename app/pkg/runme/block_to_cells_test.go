@@ -2,10 +2,11 @@ package runme
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	"testing"
 )
 
 func Test_BlocksToCells(t *testing.T) {

@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/jlewi/foyle/app/pkg/runme"
 	aiv1alpha1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/ai/v1alpha1"
-	"time"
 
 	"github.com/jlewi/foyle/app/pkg/eval"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
