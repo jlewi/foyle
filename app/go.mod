@@ -4,8 +4,7 @@ go 1.22.1
 
 replace (
 	github.com/jlewi/foyle/protos/go => ../protos/go
-	// DO NOT COMMIT
-	github.com/stateful/runme/v3 => ../../git_runme/
+
 )
 
 require (

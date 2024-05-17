@@ -36,9 +36,9 @@ func (p *Proxy) GenerateCells(ctx context.Context, req *aiv1alpha1.GenerateCells
 	// Convert the request to the agent format
 	doc, err := NotebookToDoc(req.Notebook)
 	if err != nil {
-		reqJson, err := protojson.Marshal(req)
+		reqJson, jsonErr := protojson.Marshal(req)
 		if err != nil {
-			log.Error(err, "Failed to marshal request")
+			log.Error(jsonErr, "Failed to marshal request")
 		}
 		log.Error(err, "Failed to convert runme notebook to doc", "request", reqJson)
 		return nil, err
