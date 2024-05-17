@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jlewi/foyle/app/pkg/runme"
+	aiv1alpha1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/ai/v1alpha1"
+
 	"github.com/jlewi/foyle/app/pkg/eval"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 
@@ -55,6 +58,7 @@ type Server struct {
 	builtinExtensionPaths []string
 
 	agent            *agent.Agent
+	runmeProxy       *runme.Proxy
 	executor         *executor.Executor
 	conn             *grpc.ClientConn
 	logsCrud         *analyze.CrudHandler
@@ -79,15 +83,21 @@ func NewServer(config config.Config) (*Server, error) {
 		return nil, err
 	}
 
+	runmeProxy, err := runme.NewProxy(a)
+	if err != nil {
+		return nil, err
+	}
+
 	logsCrud, err := analyze.NewCrudHandler(config)
 	if err != nil {
 		return nil, err
 	}
 	s := &Server{
-		config:   config,
-		executor: e,
-		agent:    a,
-		logsCrud: logsCrud,
+		config:     config,
+		executor:   e,
+		agent:      a,
+		runmeProxy: runmeProxy,
+		logsCrud:   logsCrud,
 	}
 
 	if err := s.createGinEngine(); err != nil {
@@ -453,6 +463,7 @@ func (s *Server) startGRPCServer(lis net.Listener) error {
 
 	v1alpha1.RegisterExecuteServiceServer(s.grpcServer, s.executor)
 	v1alpha1.RegisterGenerateServiceServer(s.grpcServer, s.agent)
+	aiv1alpha1.RegisterAIServiceServer(s.grpcServer, s.runmeProxy)
 
 	// So that gRPC curl can be used to inspect it
 	reflection.Register(s.grpcServer)

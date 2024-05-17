@@ -7,4 +7,5 @@ import (
 
 var (
 	BlockComparer = cmpopts.IgnoreUnexported(v1alpha1.Block{}, v1alpha1.BlockOutput{}, v1alpha1.BlockOutputItem{})
+	DocComparer   = cmpopts.IgnoreUnexported(v1alpha1.Doc{}, v1alpha1.Block{}, v1alpha1.BlockOutput{}, v1alpha1.BlockOutputItem{})
 )
