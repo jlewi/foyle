@@ -67,6 +67,7 @@ func MarkdownToBlocks(mdText string) ([]*v1alpha1.Block, error) {
 
 	blocks := make([]*v1alpha1.Block, 0, 20)
 
+	ast.DumpHelper(root, source, 0, nil, nil)
 	err := ast.Walk(root, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			// Do nothing on leaving the block; just continue the walk
@@ -164,3 +165,136 @@ func getBlockText(fenced *ast.FencedCodeBlock, source []byte) string {
 	}
 	return sb.String()
 }
+
+//func toCells(node *document.Node, source []byte) (result []*v1alpha1.Block) {
+//	toCellsRec(node, &result, source)
+//	return
+//}
+//
+//func toCellsRec(
+//	node *ast.Node,
+//	cells *[]*v1alpha1.Block,
+//	source []byte,
+//) {
+//	if node == nil {
+//		return
+//	}
+//
+//	for childIdx, child := range node.Children()
+//		switch block := child.Item().(type) {
+//		case *document.InnerBlock:
+//			switch block.Unwrap().Kind() {
+//			case ast.KindList:
+//				nodeWithCode := document.FindNode(child, func(n *document.Node) bool {
+//					return n.Item().Kind() == document.CodeBlockKind
+//				})
+//				if nodeWithCode == nil {
+//					*cells = append(*cells, &Cell{
+//						Kind:  MarkupKind,
+//						Value: fmtValue(block.Value()),
+//					})
+//				} else {
+//					for _, listItemNode := range child.Children() {
+//						nodeWithCode := document.FindNode(listItemNode, func(n *document.Node) bool {
+//							return n.Item().Kind() == document.CodeBlockKind
+//						})
+//						if nodeWithCode != nil {
+//							toCellsRec(doc, listItemNode, cells, source)
+//						} else {
+//							*cells = append(*cells, &Cell{
+//								Kind:  MarkupKind,
+//								Value: fmtValue(listItemNode.Item().Value()),
+//							})
+//						}
+//					}
+//				}
+//
+//			case ast.KindBlockquote:
+//				nodeWithCode := document.FindNode(child, func(n *document.Node) bool {
+//					return n.Item().Kind() == document.CodeBlockKind
+//				})
+//				if nodeWithCode != nil {
+//					toCellsRec(doc, child, cells, source)
+//				} else {
+//					*cells = append(*cells, &Cell{
+//						Kind:  MarkupKind,
+//						Value: fmtValue(block.Value()),
+//					})
+//				}
+//			}
+//
+//		case *document.CodeBlock:
+//			textRange := block.TextRange()
+//
+//			// In the future, we will include language detection (#77).
+//			metadata := block.Attributes()
+//			cellID := block.ID()
+//			if cellID != "" {
+//				metadata[PrefixAttributeName(InternalAttributePrefix, "id")] = cellID
+//			}
+//			metadata[PrefixAttributeName(InternalAttributePrefix, "name")] = block.Name()
+//
+//			nameGeneratedStr := "false"
+//			if block.IsUnnamed() {
+//				nameGeneratedStr = "true"
+//			}
+//			metadata[PrefixAttributeName(InternalAttributePrefix, "nameGenerated")] = nameGeneratedStr
+//
+//			*cells = append(*cells, &Cell{
+//				Kind:       CodeKind,
+//				Value:      string(block.Content()),
+//				LanguageID: block.Language(),
+//				Metadata:   metadata,
+//				TextRange: &TextRange{
+//					Start: textRange.Start + doc.ContentOffset(),
+//					End:   textRange.End + doc.ContentOffset(),
+//				},
+//			})
+//
+//		case *document.MarkdownBlock:
+//			value := block.Value()
+//			astNode := block.Unwrap()
+//
+//			metadata := make(map[string]string)
+//			_, includeAstMetadata := os.LookupEnv("RUNME_AST_METADATA")
+//
+//			if includeAstMetadata {
+//				astMetadata := DumpToMap(astNode, source, astNode.Kind().String())
+//				jsonAstMetaData, err := json.Marshal(astMetadata)
+//				if err != nil {
+//					log.Fatalf("Error converting to JSON: %s", err)
+//				}
+//
+//				metadata["runme.dev/ast"] = string(jsonAstMetaData)
+//			}
+//
+//			isListItem := node.Item() != nil && node.Item().Unwrap().Kind() == ast.KindListItem
+//			if childIdx == 0 && isListItem {
+//				listItem := node.Item().Unwrap().(*ast.ListItem)
+//				list := listItem.Parent().(*ast.List)
+//
+//				var prefix []byte
+//
+//				if !list.IsOrdered() {
+//					prefix = append(prefix, []byte{list.Marker, ' '}...)
+//				} else {
+//					itemNumber := list.Start
+//					tmp := node.Item().Unwrap()
+//					for tmp.PreviousSibling() != nil {
+//						tmp = tmp.PreviousSibling()
+//						itemNumber++
+//					}
+//					prefix = append([]byte(strconv.Itoa(itemNumber)), '.', ' ')
+//				}
+//
+//				value = append(prefix, value...)
+//			}
+//
+//			*cells = append(*cells, &Cell{
+//				Kind:     MarkupKind,
+//				Value:    fmtValue(value),
+//				Metadata: metadata,
+//			})
+//		}
+//	}
+//}

@@ -134,6 +134,30 @@ func Test_MarkdownToBlocks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:   "list-nested",
+			inFile: "list.md",
+			expected: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "Test code blocks nested in a list\n\n1. First command",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Language: "bash",
+					Contents: "echo 1",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "\n\n1. Second command",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Language: "bash",
+					Contents: "echo 2",
+				},
+			},
+		},
 	}
 
 	cwd, err := os.Getwd()
