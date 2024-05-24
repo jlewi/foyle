@@ -90,6 +90,7 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 	blocks, err := a.completeWithRetries(ctx, req, examples)
 	if err != nil {
 		// TODO(jeremy): Should we set a status code?
+		log.Error(err, "Agent.Generate failed to generate completions")
 		return nil, err
 	}
 
