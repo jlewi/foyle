@@ -1,4 +1,4 @@
-package runme
+package converters
 
 import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"

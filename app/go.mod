@@ -4,7 +4,7 @@ go 1.22.1
 
 replace (
 	github.com/jlewi/foyle/protos/go => ../protos/go
-	github.com/stateful/runme/v3 => github.com/jlewi/runme/v3 v3.0.0-20240524042602-a01f865c4617
+	github.com/stateful/runme/v3 => github.com/jlewi/runme/v3 v3.0.0-20240524044247-2657f0b08e0f
 )
 
 require (
@@ -64,6 +64,7 @@ require (
 	cloud.google.com/go/storage v1.38.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
+	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
