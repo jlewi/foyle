@@ -1,6 +1,6 @@
 Test code blocks nested in a list
 
-1. Fist command
+1. First command
     ```bash
     echo 1
     ```

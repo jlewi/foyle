@@ -104,33 +104,42 @@ func Test_MarkdownToBlocks(t *testing.T) {
 			expected: []*v1alpha1.Block{
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
-					Contents: "# Section 1\n\nThis is section 1",
+					Contents: "# Section 1",
+					Outputs:  []*v1alpha1.BlockOutput{},
+				},
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "This is section 1",
+					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_CODE,
 					Language: "go",
-					Contents: "package main\n\nfunc main() {\n...\n}\n",
+					Contents: "package main\n\nfunc main() {\n...\n}",
+					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
-					Contents: "\n\nBreaking text",
+					Contents: "Breaking text",
+					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_CODE,
 					Language: "bash",
-					Contents: "echo \"Hello, World!\"\n",
+					Contents: "echo \"Hello, World!\"",
 					Outputs: []*v1alpha1.BlockOutput{
 						{
 							Items: []*v1alpha1.BlockOutputItem{
 								{
-									TextData: "hello, world!\n",
+									TextData: "hello, world!",
 								}},
 						},
 					},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
-					Contents: "\n\n## Subsection",
+					Contents: "## Subsection",
+					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 			},
 		},
@@ -140,21 +149,30 @@ func Test_MarkdownToBlocks(t *testing.T) {
 			expected: []*v1alpha1.Block{
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
-					Contents: "Test code blocks nested in a list\n\n1. First command",
+					Contents: "Test code blocks nested in a list",
+					Outputs:  []*v1alpha1.BlockOutput{},
+				},
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "1. First command",
+					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_CODE,
 					Language: "bash",
 					Contents: "echo 1",
+					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
-					Contents: "\n\n1. Second command",
+					Contents: "2. Second command",
+					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_CODE,
 					Language: "bash",
 					Contents: "echo 2",
+					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 			},
 		},

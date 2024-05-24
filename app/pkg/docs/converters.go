@@ -57,7 +57,10 @@ func DocToMarkdown(doc *v1alpha1.Doc) string {
 }
 
 // MarkdownToBlocks converts a markdown string into a sequence of blocks.
-// This function relies on the goldmark library to parse the markdown into an AST.
+// This function relies on RunMe's Markdown->Cells conversion; underneath the hood that uses goldmark to walk the AST.
+// RunMe's deserialization function doesn't have any notion of output in markdown. However, in Foyle outputs
+// are rendered to code blocks of language "output". So we need to do some post processing to convert the outputs
+// into output items
 func MarkdownToBlocks(mdText string) ([]*v1alpha1.Block, error) {
 	// N.B. We don't need to add any identities
 	resolver := identity.NewResolver(identity.UnspecifiedLifecycleIdentity)
@@ -65,6 +68,7 @@ func MarkdownToBlocks(mdText string) ([]*v1alpha1.Block, error) {
 
 	blocks := make([]*v1alpha1.Block, 0, len(notebook.Cells))
 
+	var lastCodeBlock *v1alpha1.Block
 	for _, cell := range notebook.Cells {
 
 		var tr *parserv1.TextRange
@@ -88,6 +92,58 @@ func MarkdownToBlocks(mdText string) ([]*v1alpha1.Block, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// We need to handle the case where the block is an output code block.
+		if block.Kind == v1alpha1.BlockKind_CODE {
+			if block.Language == OUTPUTLANG {
+				// This is an output block
+				// We need to append the output to the last code block
+				if lastCodeBlock != nil {
+					if lastCodeBlock.Outputs == nil {
+						lastCodeBlock.Outputs = make([]*v1alpha1.BlockOutput, 0, 1)
+					}
+					lastCodeBlock.Outputs = append(lastCodeBlock.Outputs, &v1alpha1.BlockOutput{
+						Items: []*v1alpha1.BlockOutputItem{
+							{
+								TextData: block.Contents,
+							},
+						},
+					})
+					continue
+				}
+
+				// Since we don't have a code block to add the output to just treat it as a code block
+			} else {
+				// Update the lastCodeBlock
+				lastCodeBlock = block
+			}
+		} else {
+			// If we have a non-nil markup block then we zero out lastCodeBlock so that a subsequent output block
+			// wouldn't be added to the last code block.
+			if block.GetContents() != "" {
+				lastCodeBlock = nil
+			}
+		}
+		//} else if (block.Kind == v1alpha1.BlockKind_CODE {
+		//if block.Kind == v1alpha1.BlockKind_CODE {
+		//	lastCodeBlock = block
+		//} else {
+		//	//
+		//	if lastCodeBlock != nil {
+		//		// We need to append the output to the last block
+		//		if lastCodeBlock.Outputs == nil {
+		//			lastCodeBlock.Outputs = make([]*v1alpha1.BlockOutput, 0, 1)
+		//		}
+		//		lastCodeBlock.Outputs = append(lastCodeBlock.Outputs, &v1alpha1.BlockOutput{
+		//			Items: []*v1alpha1.BlockOutputItem{
+		//				{
+		//					TextData: block.Contents,
+		//				},
+		//			},
+		//		})
+		//	}
+		//}
+
 		blocks = append(blocks, block)
 	}
 
