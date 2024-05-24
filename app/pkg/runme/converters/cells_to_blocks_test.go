@@ -1,4 +1,4 @@
-package runme
+package converters
 
 import (
 	"fmt"

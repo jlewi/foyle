@@ -488,7 +488,7 @@ func (s *Server) registerGRPCGatewayRoutes() error {
 
 	grpcServerEndpoint := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.GRPCPort)
 	log.Info("Dialing grpc server", "endpoint", grpcServerEndpoint)
-	conn, err := grpc.DialContext(ctx, grpcServerEndpoint, opts...)
+	conn, err := grpc.NewClient(grpcServerEndpoint, opts...)
 	if err != nil {
 		return err
 	}

@@ -3,11 +3,12 @@ package docs
 import (
 	"strings"
 
-	markdownfmt "github.com/Kunde21/markdownfmt/v3/markdown"
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+	"github.com/stateful/runme/v3/pkg/document/identity"
+
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/ast"
-	"github.com/yuin/goldmark/text"
+	"github.com/stateful/runme/v3/pkg/document/editor"
 )
 
 // BlockToMarkdown converts a block to markdown
@@ -56,111 +57,76 @@ func DocToMarkdown(doc *v1alpha1.Doc) string {
 }
 
 // MarkdownToBlocks converts a markdown string into a sequence of blocks.
-// This function relies on the goldmark library to parse the markdown into an AST.
+// This function relies on RunMe's Markdown->Cells conversion; underneath the hood that uses goldmark to walk the AST.
+// RunMe's deserialization function doesn't have any notion of output in markdown. However, in Foyle outputs
+// are rendered to code blocks of language "output". So we need to do some post processing to convert the outputs
+// into output items
 func MarkdownToBlocks(mdText string) ([]*v1alpha1.Block, error) {
-	gm := goldmark.New()
-	source := []byte(mdText)
-	reader := text.NewReader(source)
-	root := gm.Parser().Parse(reader)
+	// N.B. We don't need to add any identities
+	resolver := identity.NewResolver(identity.UnspecifiedLifecycleIdentity)
+	notebook, err := editor.Deserialize([]byte(mdText), resolver)
 
-	renderer := markdownfmt.NewRenderer()
+	blocks := make([]*v1alpha1.Block, 0, len(notebook.Cells))
 
-	blocks := make([]*v1alpha1.Block, 0, 20)
+	var lastCodeBlock *v1alpha1.Block
+	for _, cell := range notebook.Cells {
 
-	err := ast.Walk(root, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
-		if !entering {
-			// Do nothing on leaving the block; just continue the walk
-			return ast.WalkContinue, nil
-		}
+		var tr *parserv1.TextRange
 
-		if node.Kind() == ast.KindDocument {
-			// Ignore the document node
-			return ast.WalkContinue, nil
-		}
-
-		if node.Kind() != ast.KindFencedCodeBlock {
-			// Since we aren't in a code block render the node and its children to markdown
-			// so we can add them as a block
-			var sb strings.Builder
-			if err := renderer.Render(&sb, source, node); err != nil {
-				return ast.WalkStop, err
+		if cell.TextRange != nil {
+			tr = &parserv1.TextRange{
+				Start: uint32(cell.TextRange.Start),
+				End:   uint32(cell.TextRange.End),
 			}
-
-			newBlock := &v1alpha1.Block{
-				Kind:     v1alpha1.BlockKind_MARKUP,
-				Contents: sb.String(),
-			}
-			blocks = append(blocks, newBlock)
-			// Skip the children because we've already rendered the children to markdown so there's no need
-			// to visit the children nodes
-			return ast.WalkSkipChildren, nil
-
 		}
 
-		// Since we encountered a fenced code block we need to extract the code block
-		fenced := node.(*ast.FencedCodeBlock)
-		lang := string(fenced.Language(source))
-		textData := getBlockText(fenced, source)
-
-		lastBlock := len(blocks) - 1
-		lastWasCode := false
-		if lastBlock >= 0 && blocks[lastBlock].Kind == v1alpha1.BlockKind_CODE {
-			lastWasCode = true
+		cellPb := &parserv1.Cell{
+			Kind:       parserv1.CellKind(cell.Kind),
+			Value:      cell.Value,
+			LanguageId: cell.LanguageID,
+			Metadata:   cell.Metadata,
+			TextRange:  tr,
 		}
 
-		if lang == OUTPUTLANG && lastWasCode {
-			// Since its an output block and the last block was a code block we should append the output to the last block
-			if blocks[lastBlock].Outputs == nil {
-				blocks[lastBlock].Outputs = make([]*v1alpha1.BlockOutput, 0, 1)
+		block, err := converters.CellToBlock(cellPb)
+		if err != nil {
+			return nil, err
+		}
+
+		// We need to handle the case where the block is an output code block.
+		if block.Kind == v1alpha1.BlockKind_CODE {
+			if block.Language == OUTPUTLANG {
+				// This is an output block
+				// We need to append the output to the last code block
+				if lastCodeBlock != nil {
+					if lastCodeBlock.Outputs == nil {
+						lastCodeBlock.Outputs = make([]*v1alpha1.BlockOutput, 0, 1)
+					}
+					lastCodeBlock.Outputs = append(lastCodeBlock.Outputs, &v1alpha1.BlockOutput{
+						Items: []*v1alpha1.BlockOutputItem{
+							{
+								TextData: block.Contents,
+							},
+						},
+					})
+					continue
+				}
+
+				// Since we don't have a code block to add the output to just treat it as a code block
+			} else {
+				// Update the lastCodeBlock
+				lastCodeBlock = block
 			}
-			blocks[lastBlock].Outputs = append(blocks[lastBlock].Outputs, &v1alpha1.BlockOutput{
-				Items: []*v1alpha1.BlockOutputItem{
-					{
-						TextData: textData,
-					},
-				},
-			})
 		} else {
-			block := &v1alpha1.Block{
-				Kind:     v1alpha1.BlockKind_CODE,
-				Contents: textData,
-				Language: lang,
+			// If we have a non-nil markup block then we zero out lastCodeBlock so that a subsequent output block
+			// wouldn't be added to the last code block.
+			if block.GetContents() != "" {
+				lastCodeBlock = nil
 			}
-			blocks = append(blocks, block)
 		}
 
-		// We can skip walking the children of the code block since we've already ingested the code block
-		return ast.WalkSkipChildren, nil
-	})
-
-	// The way we walk the AST above we potentially end up segmenting continuous markdown without code blocks
-	// into more than one block. So we merge these blocks.
-	final := make([]*v1alpha1.Block, 0, len(blocks))
-	i := 0
-	for _, block := range blocks {
-		lastBlock := i - 1
-		addToLastBlock := false
-		if lastBlock >= 0 && block.Kind == v1alpha1.BlockKind_MARKUP && final[lastBlock].Kind == v1alpha1.BlockKind_MARKUP {
-			addToLastBlock = true
-		}
-
-		if addToLastBlock {
-			final[lastBlock].Contents += block.Contents
-		} else {
-			final = append(final, block)
-			i++
-		}
+		blocks = append(blocks, block)
 	}
 
-	return final, err
-}
-
-func getBlockText(fenced *ast.FencedCodeBlock, source []byte) string {
-	var sb strings.Builder
-	for i := 0; i < fenced.Lines().Len(); i++ {
-		// Get the i'th line
-		line := fenced.Lines().At(i)
-		sb.WriteString(string(line.Value(source)))
-	}
-	return sb.String()
+	return blocks, err
 }

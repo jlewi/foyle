@@ -3,6 +3,8 @@ package runme
 import (
 	"context"
 
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
+
 	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/app/pkg/runme/ulid"
@@ -34,7 +36,7 @@ func (p *Proxy) GenerateCells(ctx context.Context, req *aiv1alpha1.GenerateCells
 	log.Info("Runme.Generate")
 
 	// Convert the request to the agent format
-	doc, err := NotebookToDoc(req.Notebook)
+	doc, err := converters.NotebookToDoc(req.Notebook)
 	if err != nil {
 		reqJson, jsonErr := protojson.Marshal(req)
 		if err != nil {
@@ -55,7 +57,7 @@ func (p *Proxy) GenerateCells(ctx context.Context, req *aiv1alpha1.GenerateCells
 	}
 
 	// Convert the agent response to the runme format
-	cells, err := BlocksToCells(agentResp.GetBlocks())
+	cells, err := converters.BlocksToCells(agentResp.GetBlocks())
 	if err != nil {
 		log.Error(err, "Failed to convert agent blocks to cells")
 		return nil, err
