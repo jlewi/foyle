@@ -1,10 +1,11 @@
 package docs
 
 import (
+	"strings"
+
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"github.com/stateful/runme/v3/pkg/document/identity"
-	"strings"
 
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/stateful/runme/v3/pkg/document/editor"
