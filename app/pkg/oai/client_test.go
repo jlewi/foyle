@@ -77,3 +77,49 @@ func Test_Ollama(t *testing.T) {
 
 	t.Logf("Response: %+v", resp)
 }
+
+func Test_OpenAIErrors(t *testing.T) {
+	// We want to test how OpenAI errors are processed so that we ensure we surface actionable error messages.
+	// E.g. if the API key is invalid, we want to surface that error message to the user.
+	if os.Getenv("GITHUB_ACTIONS") != "" {
+		t.Skipf("Test_OpenAIErrors is a manual test that is skipped in CICD")
+	}
+
+	if err := config.InitViper(nil); err != nil {
+		t.Fatalf("Failed to initialize viper: %v", err)
+	}
+
+	cfg := config.GetConfig()
+	cfg.AzureOpenAI = nil
+
+	//  Use a key file that should be deprecated
+	cfg.OpenAI.APIKeyFile = "/Users/jlewi/secrets/openapi.api.key.20230207"
+
+	client, err := NewClient(*cfg)
+	if err != nil {
+		t.Fatalf("Failed to create OpenAI client: %v", err)
+	}
+
+	messages := []openai.ChatCompletionMessage{
+		{Role: openai.ChatMessageRoleSystem,
+			Content: "You are a helpful assistant.",
+		},
+		{Role: openai.ChatMessageRoleUser,
+			Content: "hello",
+		},
+	}
+
+	request := openai.ChatCompletionRequest{
+		Model:       "llama2",
+		Messages:    messages,
+		MaxTokens:   2000,
+		Temperature: 0.9,
+	}
+
+	resp, err := client.CreateChatCompletion(context.Background(), request)
+	if err != nil {
+		t.Fatalf("Failed to create chat completion: %v", err)
+	}
+
+	t.Logf("Response: %+v", resp)
+}
