@@ -9,7 +9,6 @@ import (
 
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/stateful/runme/v3/pkg/document/editor"
-	"github.com/yuin/goldmark/ast"
 )
 
 // BlockToMarkdown converts a block to markdown
@@ -130,14 +129,4 @@ func MarkdownToBlocks(mdText string) ([]*v1alpha1.Block, error) {
 	}
 
 	return blocks, err
-}
-
-func getBlockText(fenced *ast.FencedCodeBlock, source []byte) string {
-	var sb strings.Builder
-	for i := 0; i < fenced.Lines().Len(); i++ {
-		// Get the i'th line
-		line := fenced.Lines().At(i)
-		sb.WriteString(string(line.Value(source)))
-	}
-	return sb.String()
 }
