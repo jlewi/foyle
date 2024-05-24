@@ -16,6 +16,8 @@ export async function generateCompletion() {
     return;
   }
   
+  // TODO(https://github.com/jlewi/foyle/issues/111): Properly support fill in the middle
+  // prompt strategy. Likely means we need to provide the position of the cursor.
   // We subtract 1 because end is non-inclusive
   const lastSelectedCell = editor?.selection.end - 1;
   var lastActiveCell = editor?.notebook.cellAt(lastSelectedCell);  

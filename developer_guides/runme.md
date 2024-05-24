@@ -32,6 +32,10 @@ ls -la ~/git_vscode-runme/
 
 Now we can install the extension using the vscode binary
 
+* I had to uninstall the RunMe extension first before installing the new one
+* If you search for the extension in the extensions view, you can click on the arrow next to the update button and uncheck auto-update
+  if you don't do that it may continue to auto update
+
 ```sh {"id":"01HY25NW7H5RRC50HJBJJ0XYDM"}
 /Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --force --install-extension ~/git_vscode-runme/runme-3.5.3.vsix
 ```
@@ -41,5 +45,15 @@ ls -la ~/git_vscode-runme/dist
 ```
 
 So it looks like my runme install is messed up
-Lets try installing and reinstalling it 
+Lets try installing and reinstalling it
+
 * Now everything is working; I can generate completions using Foyle
+
+```bash {"id":"01HY74YTEZDZVJYPMB0VMCE84S"}
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --uninstall-extension stateful.runme
+
+```
+
+```bash {"id":"01HY75KYKE3SFAM5EXMDAVJDTQ"}
+echo "hello world"
+```
