@@ -23,6 +23,9 @@ var (
 			Notebook: &parserv1.Notebook{
 				Cells: []*parserv1.Cell{
 					{
+						Metadata: map[string]string{
+							"id": "1234",
+						},
 						Kind:       parserv1.CellKind_CELL_KIND_CODE,
 						LanguageId: "python",
 						Value:      "print('Hello World')",
@@ -42,6 +45,7 @@ var (
 			Doc: &v1alpha1.Doc{
 				Blocks: []*v1alpha1.Block{
 					{
+						Id:       "1234",
 						Language: "python",
 						Contents: "print('Hello World')",
 						Kind:     v1alpha1.BlockKind_CODE,

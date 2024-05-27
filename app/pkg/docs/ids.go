@@ -1,7 +1,7 @@
 package docs
 
 import (
-	"github.com/google/uuid"
+	"github.com/jlewi/foyle/app/pkg/runme/ulid"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )
 
@@ -13,11 +13,8 @@ func SetBlockIds(blocks []*v1alpha1.Block) ([]string, error) {
 
 	for i := range blocks {
 		if blocks[i].Id == "" {
-			newUid, err := uuid.NewRandom()
-			if err != nil {
-				return nil, err
-			}
-			blocks[i].Id = newUid.String()
+			// We use ULIDs for block ids because that's what RunMe expects
+			blocks[i].Id = ulid.GenerateID()
 		}
 		blockIds = append(blockIds, blocks[i].Id)
 	}
