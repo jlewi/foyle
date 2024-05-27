@@ -135,13 +135,12 @@ type Trace interface {
 // GenerateTrace is the trace of a generation request.
 type GenerateTrace struct {
 	// ID is the id of this trace
-	TraceID    string                     `json:"traceId"`
-	StartTime  time.Time                  `json:"startTime"`
-	EndTime    time.Time                  `json:"endTime"`
-	Request    *v1alpha1.GenerateRequest  `json:"request"`
-	Response   *v1alpha1.GenerateResponse `json:"response"`
-	EvalMode   bool                       `json:"evalMode"`
-	IDMappings []IDMapping                `json:"idMappings"`
+	TraceID   string                     `json:"traceId"`
+	StartTime time.Time                  `json:"startTime"`
+	EndTime   time.Time                  `json:"endTime"`
+	Request   *v1alpha1.GenerateRequest  `json:"request"`
+	Response  *v1alpha1.GenerateResponse `json:"response"`
+	EvalMode  bool                       `json:"evalMode"`
 }
 
 func (g *GenerateTrace) ID() string {
@@ -150,12 +149,6 @@ func (g *GenerateTrace) ID() string {
 
 func (g *GenerateTrace) Type() TraceType {
 	return GenerateTraceType
-}
-
-type IDMapping struct {
-	// BlockID is the id of the block this will be a UUID.
-	BlockID string `json:"blockId"`
-	// RunmeID is the id of the doc
 }
 
 // ExecuteTrace is the trace of an execution request.
