@@ -34,13 +34,18 @@ func BlockToCell(block *v1alpha1.Block) (*parserv1.Cell, error) {
 		}
 		cellOutputs = append(cellOutputs, cOutput)
 	}
+
 	cellKind := BlockKindToCellKind(block.Kind)
-	return &parserv1.Cell{
+	cell := &parserv1.Cell{
 		LanguageId: block.Language,
 		Value:      block.Contents,
 		Kind:       cellKind,
 		Outputs:    cellOutputs,
-	}, nil
+		Metadata: map[string]string{
+			IdField: block.Id,
+		},
+	}
+	return cell, nil
 }
 
 func BlockKindToCellKind(kind v1alpha1.BlockKind) parserv1.CellKind {

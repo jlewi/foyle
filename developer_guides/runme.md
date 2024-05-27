@@ -57,3 +57,9 @@ Lets try installing and reinstalling it
 ```bash {"id":"01HY75KYKE3SFAM5EXMDAVJDTQ"}
 echo "hello world"
 ```
+
+## Debugging the Runme Extension in vscode
+
+* It seems like you may need to run `yarn build` for changes to get picked up; running `F5` doesn't always seem to work
+* Console logs will show up in the `debug console` in the development workspace; not the instance of vscode that gets launched to run
+  your extension

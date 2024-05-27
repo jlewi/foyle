@@ -7,7 +7,6 @@ import (
 
 	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/logs"
-	"github.com/jlewi/foyle/app/pkg/runme/ulid"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	aiv1alpha1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/ai/v1alpha1"
 	"go.opentelemetry.io/otel/trace"
@@ -64,18 +63,6 @@ func (p *Proxy) GenerateCells(ctx context.Context, req *aiv1alpha1.GenerateCells
 	}
 	resp := &aiv1alpha1.GenerateCellsResponse{
 		Cells: cells,
-	}
-
-	// TODO(jeremy): Set the cell ids.
-	for i, cell := range resp.Cells {
-		if cell.Metadata == nil {
-			cell.Metadata = make(map[string]string)
-		}
-		id := ulid.GenerateID()
-		cell.Metadata[IdField] = id
-
-		// We need a log message so we can link the ulid and the block id.
-		log.Info("Generate ulid", "id", id, "blockId", agentResp.Blocks[i].Id)
 	}
 	return resp, nil
 }

@@ -45,7 +45,16 @@ func CellToBlock(cell *parserv1.Cell) (*v1alpha1.Block, error) {
 		blockOutputs = append(blockOutputs, bOutput)
 	}
 	blockKind := CellKindToBlockKind(cell.Kind)
+
+	id := ""
+	if cell.Metadata != nil {
+		if newId, ok := cell.Metadata[IdField]; ok {
+			id = newId
+		}
+	}
+
 	return &v1alpha1.Block{
+		Id:       id,
 		Language: cell.LanguageId,
 		Contents: cell.Value,
 		Kind:     blockKind,
