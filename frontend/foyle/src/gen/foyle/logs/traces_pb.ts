@@ -44,6 +44,13 @@ export class Trace extends Message<Trace> {
     case: "execute";
   } | { case: undefined; value?: undefined } = { case: undefined };
 
+  /**
+   * Eval mode is true if the trace was generated in eval mode.
+   *
+   * @generated from field: bool eval_mode = 6;
+   */
+  evalMode = false;
+
   constructor(data?: PartialMessage<Trace>) {
     super();
     proto3.util.initPartial(data, this);
@@ -57,6 +64,7 @@ export class Trace extends Message<Trace> {
     { no: 3, name: "end_time", kind: "message", T: Timestamp },
     { no: 4, name: "generate", kind: "message", T: GenerateTrace, oneof: "data" },
     { no: 5, name: "execute", kind: "message", T: ExecuteTrace, oneof: "data" },
+    { no: 6, name: "eval_mode", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): Trace {

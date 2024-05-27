@@ -8,7 +8,7 @@ import "google/protobuf/timestamp.proto";
 
 package foyle.logs;
 
-option go_package = "github.com/jlewi/foyle/protos/go/foyle/logs";
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/logs;logspb";
 
 message Trace {
   string id = 1;
@@ -19,6 +19,9 @@ message Trace {
     GenerateTrace generate = 4;
     ExecuteTrace execute = 5;
   }
+
+  // Eval mode is true if the trace was generated in eval mode.
+  bool eval_mode = 6;
 }
 
 message GenerateTrace {

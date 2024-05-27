@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"os"
 	"path/filepath"
@@ -350,7 +352,7 @@ func buildBlockLog(ctx context.Context, block *api.BlockLog, traces map[string]a
 	return nil
 }
 
-func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (api.Trace, error) {
+func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (logspb.Trace, error) {
 	// First sort the entries by timestamp.
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Time().Before(entries[j].Time())
@@ -371,12 +373,17 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (api.T
 	return nil, errors.New("Failed to identify trace type")
 }
 
-func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*api.GenerateTrace, error) {
-	trace := &api.GenerateTrace{}
+func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
+	gTrace := &logspb.GenerateTrace{}
+	trace := &logspb.Trace{
+		Data: &logspb.Trace_Generate{
+			Generate: gTrace,
+		},
+	}
 	evalMode := false
 	for _, e := range entries {
-		if trace.TraceID == "" {
-			trace.TraceID = e.TraceID()
+		if trace.Id == "" {
+			trace.Id = e.TraceID()
 		}
 		if mode, present := e.EvalMode(); present {
 			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
@@ -388,7 +395,7 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*api.Ge
 			}
 		}
 
-		if trace.Request == nil {
+		if gTrace.Request == nil {
 			raw := e.Request()
 			if raw != nil {
 				request := &v1alpha1.GenerateRequest{}
@@ -396,19 +403,19 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*api.Ge
 					return nil, err
 				}
 
-				trace.Request = request
-				trace.StartTime = e.Time()
+				gTrace.Request = request
+				trace.StartTime = timestamppb.New(e.Time())
 			}
 		}
-		if trace.Response == nil {
+		if gTrace.Response == nil {
 			raw := e.Response()
 			if raw != nil {
 				v := &v1alpha1.GenerateResponse{}
 				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
 					return nil, err
 				}
-				trace.Response = v
-				trace.EndTime = e.Time()
+				gTrace.Response = v
+				trace.EndTime = timestamppb.New(e.Time())
 			}
 		}
 	}
@@ -416,12 +423,17 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*api.Ge
 	return trace, nil
 }
 
-func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*api.ExecuteTrace, error) {
-	trace := &api.ExecuteTrace{}
+func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
+	eTrace := &logspb.ExecuteTrace{}
+	trace := &logspb.Trace{
+		Data: &logspb.Trace_Execute{
+			Execute: eTrace,
+		},
+	}
 	evalMode := false
 	for _, e := range entries {
-		if trace.TraceID == "" {
-			trace.TraceID = e.TraceID()
+		if trace.Id == "" {
+			trace.Id = e.TraceID()
 		}
 		if mode, present := e.EvalMode(); present {
 			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
@@ -433,7 +445,7 @@ func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*api.Exe
 			}
 		}
 
-		if trace.Request == nil {
+		if eTrace.Request == nil {
 			raw := e.Request()
 			if raw != nil {
 				request := &v1alpha1.ExecuteRequest{}
@@ -441,19 +453,19 @@ func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*api.Exe
 					return nil, err
 				}
 
-				trace.Request = request
-				trace.StartTime = e.Time()
+				eTrace.Request = request
+				trace.StartTime = timestamppb.New(e.Time())
 			}
 		}
-		if trace.Response == nil {
+		if eTrace.Response == nil {
 			raw := e.Response()
 			if raw != nil {
 				v := &v1alpha1.ExecuteResponse{}
 				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
 					return nil, err
 				}
-				trace.Response = v
-				trace.EndTime = e.Time()
+				eTrace.Response = v
+				trace.EndTime = timestamppb.New(e.Time())
 			}
 		}
 	}
