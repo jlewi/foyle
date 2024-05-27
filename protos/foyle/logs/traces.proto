@@ -1,9 +1,12 @@
 syntax = "proto3";
 
 import "foyle/v1alpha1/agent.proto";
+import "runme/runner/v1/runner.proto";
 
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+
+package foyle.logs;
 
 option go_package = "github.com/jlewi/foyle/protos/go/foyle/logs";
 
@@ -26,4 +29,8 @@ message GenerateTrace {
 message ExecuteTrace {
   ExecuteRequest request = 1;
   ExecuteResponse response = 2;
+}
+
+message RunMeTrace {
+  runme.runner.v1.ExecuteRequest request = 1;
 }
