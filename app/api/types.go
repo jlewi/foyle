@@ -6,7 +6,16 @@ import (
 
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	"go.uber.org/zap"
+)
+
+const (
+	// TraceIDField is the field name for the trace ID used in Foyle logs
+	TraceIDField = "traceID"
+
+	// RunMeIDField is the field name for the ID used in RunMe Logs
+	RunMeIDField = "runMeID"
 )
 
 // LogEntry represents a log entry.
@@ -23,18 +32,22 @@ func (L *LogEntry) Get(field string) (interface{}, bool) {
 }
 
 func (L *LogEntry) Request() []byte {
-	v, ok := (*L)["request"]
-	if !ok {
-		return nil
-	}
-	if v, ok := v.(map[string]interface{}); ok {
-		b, err := json.Marshal(v)
-		if err != nil {
-			log := zapr.NewLogger(zap.L())
-			log.Error(err, "Failed to marshal request")
-			return nil
+	// Different field names can be quest for the request.
+	// Foyle uses "request" and RunMe uses "req"
+	for _, field := range []string{"request", "req"} {
+		v, ok := (*L)[field]
+		if !ok {
+			continue
 		}
-		return b
+		if v, ok := v.(map[string]interface{}); ok {
+			b, err := json.Marshal(v)
+			if err != nil {
+				log := zapr.NewLogger(zap.L())
+				log.Error(err, "Failed to marshal request")
+				return nil
+			}
+			return b
+		}
 	}
 	return nil
 }
@@ -92,9 +105,13 @@ func (L *LogEntry) Message() string {
 }
 
 func (L *LogEntry) TraceID() string {
-	v, ok := (*L)["traceId"]
+	// Check if its a Foyle Log
+	v, ok := (*L)[TraceIDField]
 	if !ok {
-		return ""
+		v, ok = (*L)[RunMeIDField]
+		if !ok {
+			return ""
+		}
 	}
 	if v, ok := v.(string); ok {
 		return v
@@ -124,6 +141,7 @@ type TraceType string
 const (
 	GenerateTraceType TraceType = "Generate"
 	ExecuteTraceType  TraceType = "Execute"
+	RunMeTraceType    TraceType = "RunMe"
 )
 
 type Trace interface {
@@ -168,6 +186,25 @@ func (e *ExecuteTrace) ID() string {
 
 func (e *ExecuteTrace) Type() TraceType {
 	return ExecuteTraceType
+}
+
+// RunMeTrace is the trace of a RunMe execution request.
+type RunMeTrace struct {
+	// ID is the id of this trace
+	TraceID   string                    `json:"traceId"`
+	StartTime time.Time                 `json:"startTime"`
+	EndTime   time.Time                 `json:"endTime"`
+	Request   *runnerv1.ExecuteRequest  `json:"request"`
+	Response  *runnerv1.ExecuteResponse `json:"response"`
+	EvalMode  bool                      `json:"evalMode"`
+}
+
+func (e *RunMeTrace) ID() string {
+	return e.TraceID
+}
+
+func (e *RunMeTrace) Type() TraceType {
+	return RunMeTraceType
 }
 
 // BlockLog is the log of what happened to a block. It includes information about how a block was generated (if it

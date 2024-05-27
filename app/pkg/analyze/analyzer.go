@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	"io"
 	"os"
 	"path/filepath"
@@ -366,6 +367,10 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (api.T
 		if strings.HasSuffix(function, "executor.(*Executor).Execute") {
 			return combineExecuteTrace(ctx, entries)
 		}
+
+		if strings.HasSuffix(function, "runner.(*runnerService).Execute") {
+			return combineRunMeTrace(ctx, entries)
+		}
 	}
 
 	return nil, errors.New("Failed to identify trace type")
@@ -449,6 +454,51 @@ func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*api.Exe
 			raw := e.Response()
 			if raw != nil {
 				v := &v1alpha1.ExecuteResponse{}
+				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
+					return nil, err
+				}
+				trace.Response = v
+				trace.EndTime = e.Time()
+			}
+		}
+	}
+	trace.EvalMode = evalMode
+	return trace, nil
+}
+
+func combineRunMeTrace(ctx context.Context, entries []*api.LogEntry) (*api.RunMeTrace, error) {
+	trace := &api.RunMeTrace{}
+	evalMode := false
+	for _, e := range entries {
+		if trace.TraceID == "" {
+			trace.TraceID = e.TraceID()
+		}
+		if mode, present := e.EvalMode(); present {
+			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
+			// We don't want to assume that the evalMode will be set on all log entries in the trace.
+			// So the logic is to assume its not eval mode by default and then set it to eval mode if we find
+			// One entry that is marked as eval mode.
+			if mode {
+				evalMode = mode
+			}
+		}
+
+		if trace.Request == nil {
+			raw := e.Request()
+			if raw != nil {
+				request := &runnerv1.ExecuteRequest{}
+				if err := protojson.Unmarshal([]byte(raw), request); err != nil {
+					return nil, err
+				}
+
+				trace.Request = request
+				trace.StartTime = e.Time()
+			}
+		}
+		if trace.Response == nil {
+			raw := e.Response()
+			if raw != nil {
+				v := &runnerv1.ExecuteResponse{}
 				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
 					return nil, err
 				}

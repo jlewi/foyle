@@ -501,3 +501,65 @@ func Test_CombineExecuteEntries(t *testing.T) {
 		})
 	}
 }
+
+func Test_CombineRunmeEntries(t *testing.T) {
+	type testCase struct {
+		name             string
+		linesFile        string
+		expectedEvalMode bool
+	}
+
+	cases := []testCase{
+		{
+			name:             "basic",
+			linesFile:        "runme_traces_lines.jsonl",
+			expectedEvalMode: false,
+		},
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current working directory: %v", err)
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			entries := make([]*api.LogEntry, 0, 10)
+			testFile, err := os.Open(filepath.Join(cwd, "test_data", c.linesFile))
+			if err != nil {
+				t.Fatalf("Failed to open test file: %v", err)
+			}
+			d := json.NewDecoder(testFile)
+			for {
+				e := &api.LogEntry{}
+				err := d.Decode(e)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					t.Fatalf("Failed to unmarshal log entry: %v", err)
+				}
+				entries = append(entries, e)
+			}
+			trace, err := combineRunMeTrace(context.Background(), entries)
+			if err != nil {
+				t.Fatalf("combineRunMeTrace failed: %+v", err)
+			}
+			if trace == nil {
+				t.Fatalf("combineRunMeTrace should have returned non nil response")
+			}
+
+			// Assert the trace has a request and no response
+			if trace.Request == nil {
+				t.Errorf("Expected trace to have a request")
+			}
+			// TODO(jeremy): We don't currently log the response with RunMe
+			// https://github.com/stateful/runme/blob/6e56cfae38c5a72193a86677356927e14ce87b27/internal/runner/service.go#L461
+			if trace.Response != nil {
+				t.Errorf("Expected trace not to have a response")
+			}
+			if trace.EvalMode != c.expectedEvalMode {
+				t.Errorf("Expected EvalMode to be %v but got %v", c.expectedEvalMode, trace.EvalMode)
+			}
+		})
+	}
+}
