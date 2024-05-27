@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+import "foyle/v1alpha1/agent.proto";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/logs";
+
+message Trace {
+  string id = 1;
+  google.protobuf.Timestamp  start_time = 2;
+  google.protobuf.Timestamp    end_time = 3;
+
+  oneof data {
+    GenerateTrace generate = 4;
+    ExecuteTrace execute = 5;
+  }
+}
+
+message GenerateTrace {
+  GenerateRequest request = 1;
+  GenerateResponse response = 2;
+}
+
+message ExecuteTrace {
+  ExecuteRequest request = 1;
+  ExecuteResponse response = 2;
+}
