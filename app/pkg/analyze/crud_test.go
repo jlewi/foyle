@@ -2,17 +2,18 @@ package analyze
 
 import (
 	"encoding/json"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-cmp/cmp"
-	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/config"
 )
 
 func TestGetBlockLog(t *testing.T) {
+	t.Errorf("Test needs to be updated after we switched to using pebble to stor the block logs")
 	// Create a new CrudHandler with a mock configuration
 	handler, err := NewCrudHandler(config.Config{})
 	if err != nil {
@@ -20,9 +21,9 @@ func TestGetBlockLog(t *testing.T) {
 	}
 
 	// Add a block log to the handler's cache for testing
-	handler.blockLogs = map[string]api.BlockLog{
+	handler.blockLogs = map[string]logspb.BlockLog{
 		"test-id": {
-			ID:       "test-id",
+			Id:       "test-id",
 			ExitCode: 7,
 		},
 	}
@@ -52,7 +53,7 @@ func TestGetBlockLog(t *testing.T) {
 
 	// Check the response body
 	actualBody := w.Body.String()
-	actual := api.BlockLog{}
+	actual := &logspb.BlockLog{}
 	if err := json.Unmarshal([]byte(actualBody), &actual); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}

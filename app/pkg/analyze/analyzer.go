@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cockroachdb/pebble"
+	"github.com/jlewi/foyle/app/api"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
-
-	"github.com/jlewi/foyle/app/api"
 
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -38,44 +38,50 @@ func NewAnalyzer() (*Analyzer, error) {
 }
 
 type ResultFiles struct {
-	BlockLogs      []string
-	GenerateTraces []string
-	ExecuteTraces  []string
+	BlockDB  string
+	TracesDB string
 }
 
 // Analyze analyzes the logs.
-func (a *Analyzer) Analyze(ctx context.Context, logsDir string, outDir string) (ResultFiles, error) {
+// logsDir - Is the directory containing the logs
+// tracesDBDir - Is the directory containing the traces pebble database
+// blocksDBDir - Is the directory containing the blocks pebble database
+func (a *Analyzer) Analyze(ctx context.Context, logsDir string, tracesDBDir string, blocksDBDir string) error {
 	log := logs.FromContext(ctx)
-	log.Info("Analyzing logs", "logsDir", logsDir, "outDir", outDir)
+	log.Info("Analyzing logs", "logsDir", logsDir, "tracesDBDir", tracesDBDir, "blocksDBDir", blocksDBDir)
 
-	results := initResultFiles(outDir)
-
-	if _, err := os.Stat(logsDir); os.IsNotExist(err) {
-		// Logger won't be setup yet so we can't use it.
-		log.Info("Creating output directory", "dir", outDir)
-		err := os.MkdirAll(outDir, 0755)
-		if err != nil {
-			return results, errors.Wrapf(err, "could not create log directory %s", outDir)
-		}
+	log.Info("Opening traces database", "database", tracesDBDir)
+	tracesDB, err := pebble.Open(tracesDBDir, &pebble.Options{})
+	if err != nil {
+		return errors.Wrapf(err, "could not open traces database %s", tracesDBDir)
 	}
+
+	defer helpers.DeferIgnoreError(tracesDB.Close)
+
+	log.Info("Opening blocks database", "database", blocksDBDir)
+	blocksDB, err := pebble.Open(blocksDBDir, &pebble.Options{})
+	if err != nil {
+		return errors.Wrapf(err, "could not open blocks database %s", blocksDBDir)
+	}
+
+	defer helpers.DeferIgnoreError(blocksDB.Close)
 
 	jsonFiles, err := findLogFiles(ctx, logsDir)
 	if err != nil {
-		return results, err
+		return err
 	}
 
-	traces, blocks, err := buildTraces(ctx, jsonFiles, results)
-	if err != nil {
-		return results, err
+	if err := buildTraces(ctx, jsonFiles, tracesDB, blocksDB); err != nil {
+		return err
 	}
 
-	err = buildBlockLogs(ctx, traces, blocks, results.BlockLogs[0])
+	err = buildBlockLogs(ctx, tracesDB, blocksDB)
 
-	return results, err
+	return err
 }
 
 // buildTraces creates a map of all the traces and initializes the blocks.
-func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFiles) (map[string]api.Trace, map[string]*api.BlockLog, error) {
+func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, blocksDB *pebble.DB) error {
 	log := logs.FromContext(ctx)
 	// Entries is a mapping from a traceId to a list of logEntries associated with that entry.
 	traceEntries := make(map[string][]*api.LogEntry)
@@ -115,28 +121,6 @@ func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFile
 		}
 	}
 
-	// Store a map of all traces
-	traces := make(map[string]api.Trace)
-
-	// Build a map of the blocks
-	blocks := make(map[string]*api.BlockLog)
-
-	// Create encoders to write the traces
-	genFile, err := os.Create(resultFiles.GenerateTraces[0])
-	if err != nil {
-		return nil, nil, err
-	}
-	defer helpers.DeferIgnoreError(genFile.Close)
-
-	execFile, err := os.Create(resultFiles.ExecuteTraces[0])
-	if err != nil {
-		return nil, nil, err
-	}
-	defer helpers.DeferIgnoreError(execFile.Close)
-
-	genEnc := json.NewEncoder(genFile)
-	execEnc := json.NewEncoder(execFile)
-
 	// Now combine all the entries for each trace
 	for tid, items := range traceEntries {
 		log.Info("Combining entries for trace", "traceId", tid, "numEntries", len(items))
@@ -145,57 +129,47 @@ func buildTraces(ctx context.Context, jsonFiles []string, resultFiles ResultFile
 			log.Error(err, "Error combining entries for trace", "traceId", tid)
 			continue
 		}
-		traces[tid] = trace
 
-		var enc *json.Encoder
+		if err := writeProto(tracesDB, tid, trace); err != nil {
+			return err
+		}
 
 		// Update the blocks associated with this trace
-		switch t := trace.(type) {
-		case *api.GenerateTrace:
-			for _, oBlock := range t.Response.GetBlocks() {
+		switch t := trace.Data.(type) {
+		case *logspb.Trace_Generate:
+			for _, oBlock := range t.Generate.Response.GetBlocks() {
 				bid := oBlock.GetId()
 				if bid == "" {
 					continue
 				}
-				block, ok := blocks[bid]
-				if !ok {
-					block = &api.BlockLog{
-						ID: bid,
-					}
-					blocks[bid] = block
+				if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+					block.GenTraceId = tid
+					return nil
+				}); err != nil {
+					return errors.Wrapf(err, "Failed to set generate trace on block %s", bid)
 				}
-				block.GenTraceID = tid
 			}
-			enc = genEnc
-		case *api.ExecuteTrace:
-			bid := t.Request.GetBlock().GetId()
+		case *logspb.Trace_Execute:
+			bid := t.Execute.Request.GetBlock().GetId()
 			if bid == "" {
 				continue
 			}
-			block, ok := blocks[bid]
-			if !ok {
-				block = &api.BlockLog{
-					ID: bid,
+
+			if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+				if block.ExecTraceIds == nil {
+					block.ExecTraceIds = make([]string, 0, 10)
 				}
-				blocks[bid] = block
+				block.ExecTraceIds = append(block.ExecTraceIds, tid)
+				return nil
+			}); err != nil {
+				return errors.Wrapf(err, "Failed to set execute trace on block %s", bid)
 			}
-			if block.ExecTraceIDs == nil {
-				block.ExecTraceIDs = make([]string, 0, 10)
-			}
-			block.ExecTraceIDs = append(block.ExecTraceIDs, tid)
-			enc = execEnc
 		default:
 			log.Error(fmt.Errorf("Unknown trace type"), "Unknown trace type", "trace", t)
 		}
-
-		if enc != nil {
-			if err := enc.Encode(trace); err != nil {
-				log.Error(err, "Error writing trace to output file")
-			}
-		}
 	}
 
-	return traces, blocks, nil
+	return nil
 }
 
 func findLogFiles(ctx context.Context, logsDir string) ([]string, error) {
@@ -238,121 +212,138 @@ func findLogFiles(ctx context.Context, logsDir string) ([]string, error) {
 	return jsonFiles, nil
 }
 
-func initResultFiles(outDir string) ResultFiles {
-	stamp := time.Now().Format("2006-01-02T15:04:05")
-	return ResultFiles{
-		BlockLogs:      []string{filepath.Join(outDir, fmt.Sprintf("blocks.logs.%s.jsonl", stamp))},
-		GenerateTraces: []string{filepath.Join(outDir, fmt.Sprintf("traces.generate.%s.jsonl", stamp))},
-		ExecuteTraces:  []string{filepath.Join(outDir, fmt.Sprintf("traces.execute.%s.jsonl", stamp))},
-	}
-}
-
-func buildBlockLogs(ctx context.Context, traces map[string]api.Trace, blocks map[string]*api.BlockLog, outFile string) error {
+func buildBlockLogs(ctx context.Context, tracesDB *pebble.DB, blocksDB *pebble.DB) error {
 	log := logs.FromContext(ctx)
 
-	oDir := filepath.Dir(outFile)
-	if _, err := os.Stat(oDir); os.IsNotExist(err) {
-		log.Info("Creating directory for block logs", "dir", oDir)
-		err := os.MkdirAll(oDir, 0755)
-		if err != nil {
-			return errors.Wrapf(err, "could not log directory %s", oDir)
-		}
-	}
-
-	// Now we can process each block and write the combined entries to the output file.
-	oFile, err := os.Create(outFile)
+	iter, err := blocksDB.NewIterWithContext(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer helpers.DeferIgnoreError(oFile.Close)
+	defer iter.Close()
 
-	enc := json.NewEncoder(oFile)
-	for bid, blockLog := range blocks {
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if key == nil {
+			break
+		}
+		bid := string(key)
+		value, err := iter.ValueAndErr()
+		if err != nil {
+			return errors.Wrapf(err, "Failed to read block for key %s", string(key))
+		}
+
 		log.Info("Combining entries for block", "blockId", bid)
 
-		if err := buildBlockLog(ctx, blockLog, traces); err != nil {
+		blockLog := &logspb.BlockLog{}
+		if err := proto.Unmarshal(value, blockLog); err != nil {
+			return errors.Wrapf(err, "Failed to unmarshal block for id %s", bid)
+		}
+		if err := buildBlockLog(ctx, blockLog, tracesDB); err != nil {
 			log.Error(err, "Error combining entries for block", "blockId", bid)
 			continue
 		}
-		if err := enc.Encode(blockLog); err != nil {
-			log.Error(err, "Error writing example to output file")
+		bytes, err := proto.Marshal(blockLog)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to marshal block for id %s", bid)
+		}
+		if err := blocksDB.Set([]byte(bid), bytes, pebble.Sync); err != nil {
+			log.Error(err, "Error writing block", "blockId", bid)
 		}
 	}
 	return nil
 }
 
-func buildBlockLog(ctx context.Context, block *api.BlockLog, traces map[string]api.Trace) error {
+func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble.DB) error {
 	log := logs.FromContext(ctx)
-	log = log.WithValues("blockId", block.ID)
+	log = log.WithValues("blockId", block.Id)
 	log.Info("Building block log", "block", block)
 
-	if block.ID == "" {
+	if block.Id == "" {
 		return errors.New("Block ID is required")
 	}
 
-	if block.GenTraceID != "" {
-		genTrace, ok := traces[block.GenTraceID].(*api.GenerateTrace)
-		if !ok {
-			log.Error(errors.New("Missing GenerateTrace for traceId"), "Error getting generate trace", "genTraceId", block.GenTraceID)
-		} else {
-			block.Doc = genTrace.Request.GetDoc()
-		}
-
-		// If the block was generated as part of evaluation mode then consider it to be in evaluation mode.
-		if genTrace.EvalMode {
-			block.EvalMode = true
-		}
-
-		// Find the actual block
-		for _, b := range genTrace.Response.GetBlocks() {
-			if b.GetId() == block.ID {
-				block.GeneratedBlock = b
-				break
+	if block.GenTraceId != "" {
+		func() {
+			trace := &logspb.Trace{}
+			if err := GetProto(tracesDB, block.GenTraceId, trace); err != nil {
+				log.Error(err, "Error getting generate trace", "genTraceId", block.GenTraceId)
+				return
 			}
-		}
-		if block.GeneratedBlock == nil {
-			log.Error(errors.New("Failed to find generated block"), "Error finding generated block", "blockId", block.ID)
-		}
+			genTrace, ok := trace.Data.(*logspb.Trace_Generate)
+			if !ok {
+				log.Error(errors.New("Invalid GenerateTrace for traceId"), "Error getting generate trace", "genTraceId", block.GenTraceId)
+				return
+			}
+
+			block.Doc = genTrace.Generate.Request.GetDoc()
+			// If the block was generated as part of evaluation mode then consider it to be in evaluation mode.
+			if trace.EvalMode {
+				block.EvalMode = true
+			}
+
+			// Find the actual block
+			for _, b := range genTrace.Generate.Response.GetBlocks() {
+				if b.GetId() == block.GetId() {
+					block.GeneratedBlock = b
+					return
+				}
+			}
+			if block.GeneratedBlock == nil {
+				log.Error(errors.New("Failed to find generated block"), "Error finding generated block", "blockId", block.GetId())
+			}
+		}()
 	}
 
-	var lastTrace *api.ExecuteTrace
+	var lastTrace *logspb.Trace
 	// Get the last execution trace
-	for _, tid := range block.ExecTraceIDs {
-		trace, ok := traces[tid].(*api.ExecuteTrace)
-		if !ok {
-			log.Error(errors.New("Missing ExecuteTrace for traceId"), "Error getting execute trace", "execTraceId", tid)
-			continue
-		}
+	for _, tid := range block.GetExecTraceIds() {
+		func() {
+			trace := &logspb.Trace{}
+			if err := GetProto(tracesDB, tid, trace); err != nil {
+				log.Error(err, "Error getting execute trace", "execTraceId", tid)
+				return
+			}
 
-		if lastTrace == nil {
-			lastTrace = trace
-			continue
-		}
+			if _, ok := trace.Data.(*logspb.Trace_Execute); !ok {
+				log.Error(errors.New("Invalid ExecuteTrace for traceId"), "Error getting execute trace", "execTraceId", tid)
+				return
+			}
+			if lastTrace == nil {
+				lastTrace = trace
+				return
+			}
 
-		if lastTrace.StartTime.Before(trace.StartTime) {
-			lastTrace = trace
-		}
+			if lastTrace.StartTime.AsTime().Before(trace.StartTime.AsTime()) {
+				lastTrace = trace
+			}
+		}()
 	}
 	if lastTrace != nil {
-		// If the block was executed as part of evaluation mode then consider it to be in evaluation mode.
-		if lastTrace.EvalMode {
-			block.EvalMode = true
-		}
-		block.ExecutedBlock = lastTrace.Request.GetBlock()
-		block.ExitCode = unsetExitCode
-		for _, o := range lastTrace.Response.GetOutputs() {
-			exitCode, ok := docs.GetExitCode(o)
-			if ok {
-				block.ExitCode = exitCode
-				break
+		func() {
+			execTrace, ok := lastTrace.Data.(*logspb.Trace_Execute)
+			if !ok {
+				log.Error(errors.New("Invalid ExecuteTrace for traceId"), "Error getting execute trace; trace is not an execute trace", "execTraceId", lastTrace.Id)
 			}
-		}
+			// If the block was executed as part of evaluation mode then consider it to be in evaluation mode.
+			if lastTrace.EvalMode {
+				block.EvalMode = true
+			}
+			block.ExecutedBlock = execTrace.Execute.Request.GetBlock()
+			block.ExitCode = unsetExitCode
+			for _, o := range execTrace.Execute.Response.GetOutputs() {
+				exitCode, ok := docs.GetExitCode(o)
+				if ok {
+					block.ExitCode = int32(exitCode)
+					break
+				}
+			}
+		}()
 	}
 
 	return nil
 }
 
-func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (logspb.Trace, error) {
+func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
 	// First sort the entries by timestamp.
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Time().Before(entries[j].Time())
@@ -471,4 +462,36 @@ func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.
 	}
 	trace.EvalMode = evalMode
 	return trace, nil
+}
+
+func writeProto(db *pebble.DB, key string, pb proto.Message) error {
+	b, err := proto.Marshal(pb)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to marshal proto with key %s", key)
+	}
+	return db.Set([]byte(key), b, pebble.Sync)
+}
+
+// readModifyWriteBlock reads a block from the database, modifies it and writes it back.
+func readModifyWriteBlock(db *pebble.DB, key string, modify func(*logspb.BlockLog) error) error {
+	b, closer, err := db.Get([]byte(key))
+	if err != nil && !errors.Is(err, pebble.ErrNotFound) {
+		return errors.Wrapf(err, "Failed to read block with key %s", key)
+	}
+	defer closer.Close()
+
+	block := &logspb.BlockLog{}
+
+	if err != pebble.ErrNotFound {
+
+		if err := proto.Unmarshal(b, block); err != nil {
+			return errors.Wrapf(err, "Failed to unmarshal block with key %s", key)
+		}
+	}
+
+	if err := modify(block); err != nil {
+		return errors.Wrapf(err, "Failed to modify block with key %s", key)
+	}
+
+	return writeProto(db, key, block)
 }
