@@ -36,9 +36,11 @@ Now we can install the extension using the vscode binary
 * If you search for the extension in the extensions view, you can click on the arrow next to the update button and uncheck auto-update
    if you don't do that it may continue to auto update
 * The exact file will be named `runme-X.Y.Z.vsix` so it will change as the version changes
-* You can bump the version in `package.json` and then do the build and install
-  * The advantage of this is that then you can tell which version of the extension you have installed
-  * It also seemed like when I didn't bump the version I might have actually been using an old version of the extension
+* You can bump the version in `package.json` to something like `"version": "3.5.7-dev.0",` and then do the build and install
+   * **Note**: Your version number should be higher than whats in the vscode marketplace otherwise vscode
+      does some odd version magic
+   * The advantage of this is that then you can tell which version of the extension you have installed
+   * It also seemed like when I didn't bump the version I might have actually been using an old version of the extension
 
 ```bash {"id":"01HYZVG8KZKYSTFS4R1RJZDS7P"}
 /Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --force --install-extension ~/git_vscode-runme/runme-3.5.9.vsix

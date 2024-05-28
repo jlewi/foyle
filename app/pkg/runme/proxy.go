@@ -65,13 +65,5 @@ func (p *Proxy) GenerateCells(ctx context.Context, req *aiv1alpha1.GenerateCells
 		Cells: cells,
 	}
 
-	// DO NOT COMMIT
-	for _, cell := range resp.Cells {
-		cell.LanguageId = "sh"
-		log.Info("Runme.Generate cell", "cell", cell)
-	}
-
-	// N.B. resp won't be logged in protojson format because we don't generate a zap marshal function for that proto.
-	log.Info("Runme.Generate completed", "response", resp)
 	return resp, nil
 }
