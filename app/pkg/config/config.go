@@ -177,8 +177,12 @@ func (c *Config) GetRawLogDir() string {
 	return filepath.Join(c.GetLogDir(), "raw")
 }
 
-func (c *Config) GetProcessedLogDir() string {
-	return filepath.Join(c.GetLogDir(), "processed")
+func (c *Config) GetBlocksDBDir() string {
+	return filepath.Join(c.GetLogDir(), "blocks")
+}
+
+func (c *Config) GetTracesDBDir() string {
+	return filepath.Join(c.GetLogDir(), "traces")
 }
 
 func (c *Config) GetTrainingDir() string {

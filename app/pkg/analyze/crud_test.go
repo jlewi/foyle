@@ -2,30 +2,56 @@ package analyze
 
 import (
 	"encoding/json"
+	"github.com/cockroachdb/pebble"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/go-cmp/cmp"
 	"github.com/jlewi/foyle/app/pkg/config"
 )
 
-func TestGetBlockLog(t *testing.T) {
-	t.Errorf("Test needs to be updated after we switched to using pebble to stor the block logs")
-	// Create a new CrudHandler with a mock configuration
-	handler, err := NewCrudHandler(config.Config{})
+func populateDB(blocksDB string) error {
+	db, err := pebble.Open(blocksDB, &pebble.Options{})
 	if err != nil {
-		t.Fatalf("Failed to create handler: %v", err)
+		return err
+	}
+	defer db.Close()
+
+	bLog := &logspb.BlockLog{
+		Id:         "test-id",
+		GenTraceId: "sometrace",
 	}
 
-	// Add a block log to the handler's cache for testing
-	handler.blockLogs = map[string]logspb.BlockLog{
-		"test-id": {
-			Id:       "test-id",
-			ExitCode: 7,
+	data, err := proto.Marshal(bLog)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to marshal block log")
+	}
+	return db.Set([]byte("test-id"), data, pebble.Sync)
+}
+
+func TestGetBlockLog(t *testing.T) {
+	logsDir, err := os.MkdirTemp("", "crudTest")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	cfg := config.Config{
+		Logging: config.Logging{
+			LogDir: logsDir,
 		},
+	}
+	if err := populateDB(cfg.GetBlocksDBDir()); err != nil {
+		t.Fatalf("Failed to populate DB: %v", err)
+	}
+
+	// Create a new CrudHandler with a mock configuration
+	handler, err := NewCrudHandler(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create handler: %v", err)
 	}
 
 	// Create a new Gin engine
@@ -56,8 +82,5 @@ func TestGetBlockLog(t *testing.T) {
 	actual := &logspb.BlockLog{}
 	if err := json.Unmarshal([]byte(actualBody), &actual); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
-	}
-	if d := cmp.Diff(handler.blockLogs["test-id"], actual); d != "" {
-		t.Errorf("Unexpected diff body (-want +got):\n%s", d)
 	}
 }
