@@ -3,12 +3,12 @@ package learn
 import (
 	"context"
 	"fmt"
+	"github.com/cockroachdb/pebble"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/jlewi/foyle/app/api"
-	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -60,14 +60,18 @@ func (l *Learner) Reconcile(ctx context.Context) error {
 
 	allErrors := &helpers.ListOfErrors{}
 
-	// Load the blocklogs
-	blocks, err := analyze.LoadLatestBlockLogs(ctx, l.Config.GetProcessedLogDir())
+	// Load the blocksdb
+	blocksDB, err := pebble.Open(l.Config.GetBlocksDBDir(), &pebble.Options{})
+	if err != nil {
+		return errors.Wrapf(err, "could not open blocks database %s", l.Config.GetBlocksDBDir())
+	}
+
 	if err != nil {
 		log.Error(err, "There was a problem loading the latest block logs")
 		allErrors.AddCause(errors.New("The latest block locks could not be loaded; check logs for more information"))
 	}
 
-	if err := l.reconcileExamples(ctx, blocks); err != nil {
+	if err := l.reconcileExamples(ctx, blocksDB); err != nil {
 		log.Error(err, "There were problems reconciling examples")
 		allErrors.AddCause(errors.New("Not all example were reconciled successfully; check logs for more information"))
 	}
@@ -80,12 +84,34 @@ func (l *Learner) Reconcile(ctx context.Context) error {
 }
 
 // reconcileExamples ensures that an example file exists for mistakes
-func (l *Learner) reconcileExamples(ctx context.Context, blocks map[string]api.BlockLog) error {
+func (l *Learner) reconcileExamples(ctx context.Context, blocksDB *pebble.DB) error {
 	log := logs.FromContext(ctx)
 
 	allErrors := &helpers.ListOfErrors{}
 
-	for _, b := range blocks {
+	iter, err := blocksDB.NewIterWithContext(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if key == nil {
+			break
+		}
+
+		value, err := iter.ValueAndErr()
+		if err != nil {
+			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
+		}
+
+		b := &logspb.BlockLog{}
+		if err := proto.Unmarshal(value, b); err != nil {
+			allErrors.AddCause(errors.Wrapf(err, "Failed to read block %s", string(key)))
+			continue
+		}
+
 		if b.ExecutedBlock == nil {
 			// Skip unexecuted block
 			continue
@@ -97,22 +123,21 @@ func (l *Learner) reconcileExamples(ctx context.Context, blocks map[string]api.B
 		}
 
 		if b.EvalMode {
-			log.V(logs.Debug).Info("Skipping block which was created as part of an eval", "id", b.ID)
+			log.V(logs.Debug).Info("Skipping block which was created as part of an eval", "id", b.GetId())
 			continue
 		}
 
 		// TODO(jeremy): Should we use some sort of distance metric? e.g. edit distance? We could potentially
 		// Use the metric used for eval.
 		if strings.TrimSpace(b.ExecutedBlock.GetContents()) == strings.TrimSpace(b.GeneratedBlock.GetContents()) {
-			log.V(logs.Debug).Info("Skipping executed block which matches generated block", "id", b.ID)
+			log.V(logs.Debug).Info("Skipping executed block which matches generated block", "id", b.GetId())
 			continue
 		}
 
-		expectedFile := l.getExampleFile(b.ID)
+		expectedFile := l.getExampleFile(b.GetId())
 
-		_, err := os.Stat(expectedFile)
-		if err == nil {
-			log.V(logs.Debug).Info("File for block exists", "id", b.ID)
+		if _, err := os.Stat(expectedFile); err == nil {
+			log.V(logs.Debug).Info("File for block exists", "id", b.GetId())
 			continue
 		}
 
@@ -124,20 +149,20 @@ func (l *Learner) reconcileExamples(ctx context.Context, blocks map[string]api.B
 		answer := []*v1alpha1.Block{newBlock}
 
 		example := &v1alpha1.Example{
-			Id:     b.ID,
+			Id:     b.GetId(),
 			Query:  newDoc,
 			Answer: answer,
 		}
 
 		encoded, err := proto.Marshal(example)
 		if err != nil {
-			log.Error(err, "Failed to serialize doc", "id", b.ID)
+			log.Error(err, "Failed to serialize doc", "id", b.GetId())
 			allErrors.AddCause(err)
 			continue
 		}
 
 		if err := os.WriteFile(expectedFile, encoded, 0777); err != nil {
-			log.Error(err, "Failed to serialize doc", "id", b.ID)
+			log.Error(err, "Failed to serialize doc", "id", b.GetId())
 			allErrors.AddCause(err)
 			continue
 		}

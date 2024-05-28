@@ -2,13 +2,13 @@ package logsviewer
 
 import (
 	"context"
-	"encoding/json"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	"google.golang.org/protobuf/encoding/protojson"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/go-logr/zapr"
-	"github.com/jlewi/foyle/app/api"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -24,7 +24,7 @@ type LogsClient struct {
 	Endpoint string
 }
 
-func (c *LogsClient) GetBlockLog(ctx context.Context, blockID string) (*api.BlockLog, error) {
+func (c *LogsClient) GetBlockLog(ctx context.Context, blockID string) (*logspb.BlockLog, error) {
 	// For now don't use the cache always dynamically generate the trace.
 	r, err := http.Get(c.Endpoint + "api/blocklogs/" + blockID)
 	if err != nil {
@@ -35,8 +35,8 @@ func (c *LogsClient) GetBlockLog(ctx context.Context, blockID string) (*api.Bloc
 	if err != nil {
 		return nil, err
 	}
-	block := &api.BlockLog{}
-	if err := json.Unmarshal(b, block); err != nil {
+	block := &logspb.BlockLog{}
+	if err := protojson.Unmarshal(b, block); err != nil {
 		return nil, err
 	}
 	return block, nil

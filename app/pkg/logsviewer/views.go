@@ -2,19 +2,19 @@ package logsviewer
 
 import (
 	"bytes"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 
 	"github.com/go-logr/zapr"
-	"github.com/jlewi/foyle/app/api"
 	"github.com/pkg/errors"
 	"github.com/yuin/goldmark"
 	"go.uber.org/zap"
 )
 
 // renderGeneratedBlock returns the generated block as HTML if there is one
-func renderGeneratedBlock(block *api.BlockLog) (string, error) {
+func renderGeneratedBlock(block *logspb.BlockLog) (string, error) {
 	if block == nil {
 		return "", errors.New("block is nil")
 	}
@@ -34,7 +34,7 @@ func renderGeneratedBlock(block *api.BlockLog) (string, error) {
 }
 
 // renderExecutedBlock returns the executed block as HTML if there is one
-func renderExecutedBlock(block *api.BlockLog) (string, error) {
+func renderExecutedBlock(block *logspb.BlockLog) (string, error) {
 	if block == nil {
 		return "", errors.New("block is nil")
 	}
