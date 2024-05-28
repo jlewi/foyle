@@ -34,10 +34,14 @@ Now we can install the extension using the vscode binary
 
 * I had to uninstall the RunMe extension first before installing the new one
 * If you search for the extension in the extensions view, you can click on the arrow next to the update button and uncheck auto-update
-  if you don't do that it may continue to auto update
+   if you don't do that it may continue to auto update
+* The exact file will be named `runme-X.Y.Z.vsix` so it will change as the version changes
+* You can bump the version in `package.json` and then do the build and install
+  * The advantage of this is that then you can tell which version of the extension you have installed
+  * It also seemed like when I didn't bump the version I might have actually been using an old version of the extension
 
-```sh {"id":"01HY25NW7H5RRC50HJBJJ0XYDM"}
-/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --force --install-extension ~/git_vscode-runme/runme-3.5.3.vsix
+```bash {"id":"01HYZVG8KZKYSTFS4R1RJZDS7P"}
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --force --install-extension ~/git_vscode-runme/runme-3.5.9.vsix
 ```
 
 ```sh {"id":"01HY264KZTS4J9NHJASJT1GYJ7"}
@@ -62,4 +66,4 @@ echo "hello world"
 
 * It seems like you may need to run `yarn build` for changes to get picked up; running `F5` doesn't always seem to work
 * Console logs will show up in the `debug console` in the development workspace; not the instance of vscode that gets launched to run
-  your extension
+   your extension
