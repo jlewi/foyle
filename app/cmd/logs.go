@@ -46,21 +46,18 @@ func NewLogsProcessCmd() *cobra.Command {
 					logsDir = app.Config.GetRawLogDir()
 				}
 
-				if outDir == "" {
-					outDir = app.Config.GetProcessedLogDir()
-				}
 				a, err := analyze.NewAnalyzer()
 				if err != nil {
 					return err
 				}
 
 				log := zapr.NewLogger(zap.L())
-				log.Info("Processing logs", "logs", logsDir, "out", outDir)
-				resultFiles, err := a.Analyze(context.Background(), logsDir, outDir)
-				if err != nil {
+				log.Info("Processing logs", "logs", logsDir)
+
+				if err := a.Analyze(context.Background(), logsDir, app.Config.GetTracesDBDir(), app.Config.GetBlocksDBDir()); err != nil {
 					return err
 				}
-				log.Info("Processed logs", "resultFiles", resultFiles)
+				log.Info("Processed logs", "logs", logsDir, "traces", app.Config.GetTracesDBDir(), "blocks", app.Config.GetBlocksDBDir())
 				return nil
 			}()
 
