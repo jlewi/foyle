@@ -11,6 +11,8 @@ import (
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/monogo/helpers"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"math/rand"
@@ -257,7 +259,7 @@ func Test_BuildBlockLog(t *testing.T) {
 			if err := buildBlockLog(context.Background(), c.block, tracesDB); err != nil {
 				t.Fatalf("buildBlockLog failed: %v", err)
 			}
- 
+
 			if d := cmp.Diff(c.expected, c.block, cmpopts.IgnoreUnexported(logspb.BlockLog{}), testutil.BlockComparer, cmpopts.IgnoreUnexported(v1alpha1.Doc{})); d != "" {
 				t.Errorf("Unexpected diff:\n%s", d)
 			}
@@ -265,146 +267,107 @@ func Test_BuildBlockLog(t *testing.T) {
 	}
 }
 
-//func Test_Analyzer(t *testing.T) {
-//	cwd, err := os.Getwd()
-//	if err != nil {
-//		t.Fatalf("Failed to get current working directory: %v", err)
-//	}
-//
-//	c := zap.NewDevelopmentConfig()
-//	log, err := c.Build()
-//	if err != nil {
-//		t.Fatalf("Failed to create logger: %v", err)
-//	}
-//	zap.ReplaceGlobals(log)
-//
-//	testDir := filepath.Join(cwd, "test_data", "logs")
-//
-//	a, err := NewAnalyzer()
-//	if err != nil {
-//		t.Fatalf("Failed to create analyzer: %v", err)
-//	}
-//
-//	oDir, err := os.MkdirTemp("", "processedLogs")
-//	if err != nil {
-//		t.Fatalf("Failed to create temp dir: %v", err)
-//	}
-//
-//	resultFiles, err := a.Analyze(context.Background(), testDir, oDir)
-//	if err != nil {
-//		t.Fatalf("Analyze failed: %v", err)
-//	}
-//	t.Logf("Output written to: %s", oDir)
-//
-//	// Check the blocks
-//	f, err := os.Open(resultFiles.BlockLogs[0])
-//	if err != nil {
-//		t.Fatalf("Failed to open output file: %v", err)
-//	}
-//	d := json.NewDecoder(f)
-//
-//	actual := map[string]*api.BlockLog{}
-//	for {
-//		var b api.BlockLog
-//		if err := d.Decode(&b); err != nil {
-//			if err == io.EOF {
-//				break
-//			}
-//			t.Errorf("Failed to decode block log: %v", err)
-//		}
-//		actual[b.ID] = &b
-//	}
-//
-//	expectedBlocks := map[string]bool{
-//		"9557680b-e08c-4d1d-b098-6dcd03e0e108": true,
-//		"23706965-8e3b-440d-ba1a-1e1cc035fbd4": true,
-//		"48d530be-254a-493f-8cf4-20627078f830": true,
-//	}
-//
-//	for id := range expectedBlocks {
-//		if _, ok := actual[id]; !ok {
-//			t.Errorf("Missing block log for id ID: %v", id)
-//		}
-//	}
-//
-//	for id := range actual {
-//		if _, ok := expectedBlocks[id]; !ok {
-//			t.Errorf("Unexpected block log for id ID: %v", id)
-//		}
-//	}
-//
-//	// This is a block that was generated via the AI and then executed so run some additional checks
-//	block := actual["23706965-8e3b-440d-ba1a-1e1cc035fbd4"]
-//	if block.GenTraceID == "" {
-//		t.Errorf("Expected GenTraceID to be set")
-//	}
-//	if len(block.ExecTraceIDs) == 0 {
-//		t.Errorf("Expected ExecTraceIDs to be set")
-//	}
-//	if block.Doc == nil {
-//		t.Errorf("Expected Doc to be set")
-//	}
-//	if block.GeneratedBlock == nil {
-//		t.Errorf("Expected GeneratedBlock to be set")
-//	}
-//	if block.ExecutedBlock == nil {
-//		t.Errorf("Expected ExecutedBlock to be set")
-//	}
-//
-//	// Check the traces
-//	checkGenTracesFiles(t, resultFiles.GenerateTraces[0])
-//	checkExecuteTracesFiles(t, resultFiles.ExecuteTraces[0])
-//}
+func Test_Analyzer(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current working directory: %v", err)
+	}
 
-//func checkGenTracesFiles(t *testing.T, path string) {
-//	// Check the generate traces
-//	genFile, err := os.Open(path)
-//	if err != nil {
-//		t.Errorf("Failed to open output file: %v", err)
-//		return
-//	}
-//	traces := make([]*api.GenerateTrace, 0, 10)
-//	d := json.NewDecoder(genFile)
-//	for {
-//		trace := &api.GenerateTrace{}
-//		if err := d.Decode(trace); err != nil {
-//			if err == io.EOF {
-//				break
-//			}
-//			t.Errorf("Failed to decode generate trace: %v", err)
-//		}
-//		traces = append(traces, trace)
-//	}
-//
-//	if len(traces) == 0 {
-//		t.Errorf("Expected to find some generate traces")
-//	}
-//}
-//
-//func checkExecuteTracesFiles(t *testing.T, path string) {
-//	// Check the generate traces
-//	genFile, err := os.Open(path)
-//	if err != nil {
-//		t.Errorf("Failed to open output file: %v", err)
-//		return
-//	}
-//	traces := make([]*api.ExecuteTrace, 0, 10)
-//	d := json.NewDecoder(genFile)
-//	for {
-//		trace := &api.ExecuteTrace{}
-//		if err := d.Decode(trace); err != nil {
-//			if err == io.EOF {
-//				break
-//			}
-//			t.Errorf("Failed to decode execute trace: %v", err)
-//		}
-//		traces = append(traces, trace)
-//	}
-//
-//	if len(traces) == 0 {
-//		t.Errorf("Expected to find some execute traces")
-//	}
-//}
+	c := zap.NewDevelopmentConfig()
+	log, err := c.Build()
+	if err != nil {
+		t.Fatalf("Failed to create logger: %v", err)
+	}
+	zap.ReplaceGlobals(log)
+
+	testDir := filepath.Join(cwd, "test_data", "logs")
+
+	a, err := NewAnalyzer()
+	if err != nil {
+		t.Fatalf("Failed to create analyzer: %v", err)
+	}
+
+	oDir, err := os.MkdirTemp("", "analyzeTestDBs")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	tracesDBDir := filepath.Join(oDir, "traces")
+	blocksDBDir := filepath.Join(oDir, "blocks")
+
+	if err := a.Analyze(context.Background(), testDir, tracesDBDir, blocksDBDir); err != nil {
+		t.Fatalf("Analyze failed: %v", err)
+	}
+	t.Logf("Output written to: %s", oDir)
+
+	blocksDB, err := pebble.Open(blocksDBDir, &pebble.Options{})
+	if err != nil {
+		t.Fatalf("could not open blocks database %s", blocksDBDir)
+	}
+	defer helpers.DeferIgnoreError(blocksDB.Close)
+
+	actual := map[string]*logspb.BlockLog{}
+
+	iter, err := blocksDB.NewIterWithContext(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Failed to create iterator: %v", err)
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if key == nil {
+			break
+		}
+
+		value, err := iter.ValueAndErr()
+		if err != nil {
+			t.Fatalf("Failed to read block for key %s; error: %+v", string(key), err)
+		}
+
+		b := &logspb.BlockLog{}
+		if err := proto.Unmarshal(value, b); err != nil {
+			t.Fatalf("Failed to unmarshal block log: %v", err)
+		}
+		actual[b.Id] = b
+	}
+
+	expectedBlocks := map[string]bool{
+		"9557680b-e08c-4d1d-b098-6dcd03e0e108": true,
+		"23706965-8e3b-440d-ba1a-1e1cc035fbd4": true,
+		"48d530be-254a-493f-8cf4-20627078f830": true,
+	}
+
+	for id := range expectedBlocks {
+		if _, ok := actual[id]; !ok {
+			t.Errorf("Missing block log for id ID: %v", id)
+		}
+	}
+
+	for id := range actual {
+		if _, ok := expectedBlocks[id]; !ok {
+			t.Errorf("Unexpected block log for id ID: %v", id)
+		}
+	}
+
+	// This is a block that was generated via the AI and then executed so run some additional checks
+	block := actual["23706965-8e3b-440d-ba1a-1e1cc035fbd4"]
+	if block.GenTraceId == "" {
+		t.Errorf("Expected GenTraceID to be set")
+	}
+	if len(block.ExecTraceIds) == 0 {
+		t.Errorf("Expected ExecTraceIDs to be set")
+	}
+	if block.Doc == nil {
+		t.Errorf("Expected Doc to be set")
+	}
+	if block.GeneratedBlock == nil {
+		t.Errorf("Expected GeneratedBlock to be set")
+	}
+	if block.ExecutedBlock == nil {
+		t.Errorf("Expected ExecutedBlock to be set")
+	}
+}
 
 func Test_CombineGenerateEntries(t *testing.T) {
 	type testCase struct {

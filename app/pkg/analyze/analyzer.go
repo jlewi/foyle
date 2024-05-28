@@ -144,6 +144,7 @@ func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, b
 					continue
 				}
 				if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+					block.Id = bid
 					block.GenTraceId = tid
 					return nil
 				}); err != nil {
@@ -157,6 +158,7 @@ func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, b
 			}
 
 			if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+				block.Id = bid
 				if block.ExecTraceIds == nil {
 					block.ExecTraceIds = make([]string, 0, 10)
 				}
@@ -260,7 +262,7 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 	log.Info("Building block log", "block", block)
 
 	if block.Id == "" {
-		return errors.New("Block ID is required")
+		return errors.WithStack(errors.New("Block ID is required"))
 	}
 
 	if block.GenTraceId != "" {
@@ -474,12 +476,16 @@ func writeProto(db *pebble.DB, key string, pb proto.Message) error {
 }
 
 // readModifyWriteBlock reads a block from the database, modifies it and writes it back.
+// If the block doesn't exist an empty BlockLog will be passed to the function.
 func readModifyWriteBlock(db *pebble.DB, key string, modify func(*logspb.BlockLog) error) error {
 	b, closer, err := db.Get([]byte(key))
 	if err != nil && !errors.Is(err, pebble.ErrNotFound) {
 		return errors.Wrapf(err, "Failed to read block with key %s", key)
 	}
-	defer closer.Close()
+	// Closer is nil on not found
+	if closer != nil {
+		defer closer.Close()
+	}
 
 	block := &logspb.BlockLog{}
 
