@@ -354,7 +354,10 @@ func Test_Analyzer(t *testing.T) {
 	}
 
 	// This is a block that was generated via the AI and then executed so run some additional checks
-	block := actual["23706965-8e3b-440d-ba1a-1e1cc035fbd4"]
+	block, ok := actual["23706965-8e3b-440d-ba1a-1e1cc035fbd4"]
+	if !ok {
+		t.Fatalf("Failed to find block with ID: 23706965-8e3b-440d-ba1a-1e1cc035fbd4")
+	}
 	if block.GenTraceId == "" {
 		t.Errorf("Expected GenTraceID to be set")
 	}

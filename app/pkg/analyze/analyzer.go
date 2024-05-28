@@ -268,6 +268,7 @@ func buildBlockLogs(ctx context.Context, tracesDB *pebble.DB, blocksDB *pebble.D
 		if err != nil {
 			return errors.Wrapf(err, "Failed to marshal block for id %s", bid)
 		}
+		log.Info("Writing block", "blockId", bid, "block", blockLog)
 		if err := blocksDB.Set([]byte(bid), bytes, pebble.Sync); err != nil {
 			log.Error(err, "Error writing block", "blockId", bid)
 		}

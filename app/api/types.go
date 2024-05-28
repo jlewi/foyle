@@ -10,10 +10,10 @@ import (
 
 const (
 	// TraceIDField is the field name for the trace ID used in Foyle logs
-	TraceIDField = "traceID"
+	TraceIDField = "traceId"
 
-	// RunMeIDField is the field name for the ID used in RunMe Logs
-	RunMeIDField = "runMeID"
+	// RunMeIDField is the field name for the trace id used in RunMe Logs
+	RunMeIDField = "_id"
 )
 
 // LogEntry represents a log entry.
@@ -103,16 +103,13 @@ func (L *LogEntry) Message() string {
 }
 
 func (L *LogEntry) TraceID() string {
-	// Check if its a Foyle Log
-	v, ok := (*L)[TraceIDField]
-	if !ok {
-		v, ok = (*L)[RunMeIDField]
-		if !ok {
-			return ""
+	for _, field := range []string{TraceIDField, RunMeIDField} {
+		v, ok := (*L)[field]
+		if ok {
+			if v, ok := v.(string); ok {
+				return v
+			}
 		}
-	}
-	if v, ok := v.(string); ok {
-		return v
 	}
 	return ""
 }
