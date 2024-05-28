@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+
 	"github.com/go-logr/zapr"
-	"github.com/jlewi/foyle/app/api"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -104,7 +105,7 @@ func (m *blockLogView) handleGetAction(ctx app.Context, action app.Action) {
 
 		m.HTMLContent = "<p>Error getting blocklog:</p><br> " + errState
 	case generatedBlockView:
-		block := &api.BlockLog{}
+		block := &logspb.BlockLog{}
 		ctx.GetState(blockLogState, block)
 		value, err := renderGeneratedBlock(block)
 		if err == nil {
@@ -114,7 +115,7 @@ func (m *blockLogView) handleGetAction(ctx app.Context, action app.Action) {
 			m.HTMLContent = fmt.Sprintf("Failed to convert generated block to html : error %+v", err)
 		}
 	case executedBlockView:
-		block := &api.BlockLog{}
+		block := &logspb.BlockLog{}
 		ctx.GetState(blockLogState, block)
 		value, err := renderExecutedBlock(block)
 		if err == nil {
@@ -124,7 +125,7 @@ func (m *blockLogView) handleGetAction(ctx app.Context, action app.Action) {
 			m.HTMLContent = fmt.Sprintf("Failed to convert executed block to html: error %+v", err)
 		}
 	case rawView:
-		block := &api.BlockLog{}
+		block := &logspb.BlockLog{}
 		ctx.GetState(blockLogState, block)
 		blockJson, err := json.MarshalIndent(block, "", " ")
 		if err != nil {

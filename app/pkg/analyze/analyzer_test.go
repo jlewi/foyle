@@ -10,21 +10,27 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jlewi/foyle/app/api"
-
+	"github.com/cockroachdb/pebble"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/jlewi/foyle/app/pkg/dbutil"
 	"github.com/jlewi/foyle/app/pkg/testutil"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"github.com/jlewi/monogo/helpers"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/jlewi/foyle/app/api"
 )
 
-func timeMustParse(layoutString, value string) time.Time {
+func timeMustParse(layoutString, value string) *timestamppb.Timestamp {
 	t, err := time.Parse(layoutString, value)
 	if err != nil {
 		panic(err)
 	}
-	return t
+	return timestamppb.New(t)
 }
 
 func shuffle(in []string) []string {
@@ -35,53 +41,34 @@ func shuffle(in []string) []string {
 func Test_BuildBlockLog(t *testing.T) {
 	type testCase struct {
 		name     string
-		block    *api.BlockLog
-		traces   map[string]api.Trace
-		expected *api.BlockLog
+		block    *logspb.BlockLog
+		traces   map[string]*logspb.Trace
+		expected *logspb.BlockLog
 	}
 
-	traces := make(map[string]api.Trace)
+	traces := make(map[string]*logspb.Trace)
 
 	const bid1 = "g123output1"
-	genTrace := &api.GenerateTrace{
-		TraceID:   "g123",
+	genTrace := &logspb.Trace{
+		Id:        "g123",
 		StartTime: timeMustParse(time.RFC3339, "2021-01-01T00:00:00Z"),
 		EndTime:   timeMustParse(time.RFC3339, "2021-01-01T00:01:00Z"),
-		Request: &v1alpha1.GenerateRequest{
-			Doc: &v1alpha1.Doc{
-				Blocks: []*v1alpha1.Block{
-					{
-						Contents: "echo hello",
+		Data: &logspb.Trace_Generate{
+			Generate: &logspb.GenerateTrace{
+				Request: &v1alpha1.GenerateRequest{
+					Doc: &v1alpha1.Doc{
+						Blocks: []*v1alpha1.Block{
+							{
+								Contents: "echo hello",
+							},
+						},
 					},
 				},
-			},
-		},
-		Response: &v1alpha1.GenerateResponse{
-			Blocks: []*v1alpha1.Block{
-				{
-					Id:       bid1,
-					Contents: "outcell",
-				},
-			},
-		},
-	}
-
-	execTrace1 := &api.ExecuteTrace{
-		TraceID:   "e456",
-		StartTime: timeMustParse(time.RFC3339, "2021-01-02T00:00:00Z"),
-		EndTime:   timeMustParse(time.RFC3339, "2021-01-02T00:01:00Z"),
-		Request: &v1alpha1.ExecuteRequest{
-			Block: &v1alpha1.Block{
-				Contents: "echo hello",
-				Id:       bid1,
-			},
-		},
-		Response: &v1alpha1.ExecuteResponse{
-			Outputs: []*v1alpha1.BlockOutput{
-				{
-					Items: []*v1alpha1.BlockOutputItem{
+				Response: &v1alpha1.GenerateResponse{
+					Blocks: []*v1alpha1.Block{
 						{
-							TextData: "exitCode: 4",
+							Id:       bid1,
+							Contents: "outcell",
 						},
 					},
 				},
@@ -89,22 +76,53 @@ func Test_BuildBlockLog(t *testing.T) {
 		},
 	}
 
-	execTrace2 := &api.ExecuteTrace{
-		TraceID:   "e789",
-		StartTime: timeMustParse(time.RFC3339, "2021-01-03T00:00:00Z"),
-		EndTime:   timeMustParse(time.RFC3339, "2021-01-03T00:01:00Z"),
-		Request: &v1alpha1.ExecuteRequest{
-			Block: &v1alpha1.Block{
-				Contents: "echo hello",
-				Id:       bid1,
+	execTrace1 := &logspb.Trace{
+		Id:        "e456",
+		StartTime: timeMustParse(time.RFC3339, "2021-01-02T00:00:00Z"),
+		EndTime:   timeMustParse(time.RFC3339, "2021-01-02T00:01:00Z"),
+		Data: &logspb.Trace_Execute{
+			Execute: &logspb.ExecuteTrace{
+				Request: &v1alpha1.ExecuteRequest{
+					Block: &v1alpha1.Block{
+						Contents: "echo hello",
+						Id:       bid1,
+					},
+				},
+				Response: &v1alpha1.ExecuteResponse{
+					Outputs: []*v1alpha1.BlockOutput{
+						{
+							Items: []*v1alpha1.BlockOutputItem{
+								{
+									TextData: "exitCode: 4",
+								},
+							},
+						},
+					},
+				},
 			},
 		},
-		Response: &v1alpha1.ExecuteResponse{
-			Outputs: []*v1alpha1.BlockOutput{
-				{
-					Items: []*v1alpha1.BlockOutputItem{
+	}
+
+	execTrace2 := &logspb.Trace{
+		Id:        "e789",
+		StartTime: timeMustParse(time.RFC3339, "2021-01-03T00:00:00Z"),
+		EndTime:   timeMustParse(time.RFC3339, "2021-01-03T00:01:00Z"),
+		Data: &logspb.Trace_Execute{
+			Execute: &logspb.ExecuteTrace{
+				Request: &v1alpha1.ExecuteRequest{
+					Block: &v1alpha1.Block{
+						Contents: "echo hello",
+						Id:       bid1,
+					},
+				},
+				Response: &v1alpha1.ExecuteResponse{
+					Outputs: []*v1alpha1.BlockOutput{
 						{
-							TextData: "exitCode: 7",
+							Items: []*v1alpha1.BlockOutputItem{
+								{
+									TextData: "exitCode: 7",
+								},
+							},
 						},
 					},
 				},
@@ -114,46 +132,54 @@ func Test_BuildBlockLog(t *testing.T) {
 
 	// Create a block in evaluation mode
 	const bid2 = "g456output1"
-	genTrace2 := &api.GenerateTrace{
-		TraceID:   "g456",
+	genTrace2 := &logspb.Trace{
+		Id:        "g456",
 		StartTime: timeMustParse(time.RFC3339, "2021-01-01T00:00:00Z"),
 		EndTime:   timeMustParse(time.RFC3339, "2021-01-01T00:01:00Z"),
-		Request: &v1alpha1.GenerateRequest{
-			Doc: &v1alpha1.Doc{
-				Blocks: []*v1alpha1.Block{
-					{
-						Contents: "echo hello",
+		Data: &logspb.Trace_Generate{
+			Generate: &logspb.GenerateTrace{
+				Request: &v1alpha1.GenerateRequest{
+					Doc: &v1alpha1.Doc{
+						Blocks: []*v1alpha1.Block{
+							{
+								Contents: "echo hello",
+							},
+						},
 					},
 				},
-			},
-		},
-		Response: &v1alpha1.GenerateResponse{
-			Blocks: []*v1alpha1.Block{
-				{
-					Id:       bid2,
-					Contents: "outcell",
+				Response: &v1alpha1.GenerateResponse{
+					Blocks: []*v1alpha1.Block{
+						{
+							Id:       bid2,
+							Contents: "outcell",
+						},
+					},
 				},
 			},
 		},
 		EvalMode: true,
 	}
 
-	execTrace3 := &api.ExecuteTrace{
-		TraceID:   "e912",
+	execTrace3 := &logspb.Trace{
+		Id:        "e912",
 		StartTime: timeMustParse(time.RFC3339, "2021-01-03T00:00:00Z"),
 		EndTime:   timeMustParse(time.RFC3339, "2021-01-03T00:01:00Z"),
-		Request: &v1alpha1.ExecuteRequest{
-			Block: &v1alpha1.Block{
-				Contents: "echo hello",
-				Id:       bid2,
-			},
-		},
-		Response: &v1alpha1.ExecuteResponse{
-			Outputs: []*v1alpha1.BlockOutput{
-				{
-					Items: []*v1alpha1.BlockOutputItem{
+		Data: &logspb.Trace_Execute{
+			Execute: &logspb.ExecuteTrace{
+				Request: &v1alpha1.ExecuteRequest{
+					Block: &v1alpha1.Block{
+						Contents: "echo hello",
+						Id:       bid2,
+					},
+				},
+				Response: &v1alpha1.ExecuteResponse{
+					Outputs: []*v1alpha1.BlockOutput{
 						{
-							TextData: "exitCode: 7",
+							Items: []*v1alpha1.BlockOutputItem{
+								{
+									TextData: "exitCode: 7",
+								},
+							},
 						},
 					},
 				},
@@ -161,30 +187,30 @@ func Test_BuildBlockLog(t *testing.T) {
 		},
 	}
 
-	traces[genTrace.TraceID] = genTrace
-	traces[genTrace2.TraceID] = genTrace2
-	traces[execTrace1.TraceID] = execTrace1
-	traces[execTrace2.TraceID] = execTrace2
-	traces[execTrace3.TraceID] = execTrace3
+	traces[genTrace.Id] = genTrace
+	traces[genTrace2.Id] = genTrace2
+	traces[execTrace1.Id] = execTrace1
+	traces[execTrace2.Id] = execTrace2
+	traces[execTrace3.Id] = execTrace3
 
 	// We shuffle ExecTraceIds to make sure we properly set block log based on the later trace
-	execTraceIds := shuffle([]string{execTrace1.TraceID, execTrace2.TraceID})
+	execTraceIds := shuffle([]string{execTrace1.GetId(), execTrace2.GetId()})
 	cases := []testCase{
 		{
 			name: "basic",
-			block: &api.BlockLog{
-				ID:         bid1,
-				GenTraceID: genTrace.TraceID,
+			block: &logspb.BlockLog{
+				Id:         bid1,
+				GenTraceId: genTrace.Id,
 
-				ExecTraceIDs: execTraceIds,
+				ExecTraceIds: execTraceIds,
 			},
-			expected: &api.BlockLog{
-				ID:             bid1,
-				GenTraceID:     genTrace.TraceID,
-				ExecTraceIDs:   execTraceIds,
-				Doc:            genTrace.Request.Doc,
-				GeneratedBlock: genTrace.Response.Blocks[0],
-				ExecutedBlock:  execTrace2.Request.Block,
+			expected: &logspb.BlockLog{
+				Id:             bid1,
+				GenTraceId:     genTrace.Id,
+				ExecTraceIds:   execTraceIds,
+				Doc:            genTrace.GetGenerate().Request.Doc,
+				GeneratedBlock: genTrace.GetGenerate().Response.Blocks[0],
+				ExecutedBlock:  execTrace2.GetExecute().Request.Block,
 				ExitCode:       7,
 				EvalMode:       false,
 			},
@@ -192,19 +218,19 @@ func Test_BuildBlockLog(t *testing.T) {
 		},
 		{
 			name: "eval_mode",
-			block: &api.BlockLog{
-				ID:         bid2,
-				GenTraceID: genTrace2.TraceID,
+			block: &logspb.BlockLog{
+				Id:         bid2,
+				GenTraceId: genTrace2.Id,
 
-				ExecTraceIDs: []string{execTrace3.TraceID},
+				ExecTraceIds: []string{execTrace3.Id},
 			},
-			expected: &api.BlockLog{
-				ID:             bid2,
-				GenTraceID:     genTrace2.TraceID,
-				ExecTraceIDs:   []string{execTrace3.TraceID},
-				Doc:            genTrace2.Request.Doc,
-				GeneratedBlock: genTrace2.Response.Blocks[0],
-				ExecutedBlock:  execTrace3.Request.Block,
+			expected: &logspb.BlockLog{
+				Id:             bid2,
+				GenTraceId:     genTrace2.Id,
+				ExecTraceIds:   []string{execTrace3.Id},
+				Doc:            genTrace2.GetGenerate().Request.Doc,
+				GeneratedBlock: genTrace2.GetGenerate().Response.Blocks[0],
+				ExecutedBlock:  execTrace3.GetExecute().Request.Block,
 				ExitCode:       7,
 				EvalMode:       true,
 			},
@@ -212,13 +238,30 @@ func Test_BuildBlockLog(t *testing.T) {
 		},
 	}
 
+	tracesDBDir, err := os.MkdirTemp("", "tracesdb")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	tracesDB, err := pebble.Open(tracesDBDir, &pebble.Options{})
+	if err != nil {
+		t.Errorf("could not open traces database %s", tracesDBDir)
+	}
+	defer helpers.DeferIgnoreError(tracesDB.Close)
+
+	for _, trace := range traces {
+
+		if err := dbutil.SetProto(tracesDB, trace.Id, trace); err != nil {
+			t.Fatalf("Failed to set trace for key %s: %v", trace.Id, err)
+		}
+	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if err := buildBlockLog(context.Background(), c.block, c.traces); err != nil {
+			if err := buildBlockLog(context.Background(), c.block, tracesDB); err != nil {
 				t.Fatalf("buildBlockLog failed: %v", err)
 			}
 
-			if d := cmp.Diff(c.expected, c.block, testutil.BlockComparer, cmpopts.IgnoreUnexported(v1alpha1.Doc{})); d != "" {
+			if d := cmp.Diff(c.expected, c.block, cmpopts.IgnoreUnexported(logspb.BlockLog{}), testutil.BlockComparer, cmpopts.IgnoreUnexported(v1alpha1.Doc{})); d != "" {
 				t.Errorf("Unexpected diff:\n%s", d)
 			}
 		})
@@ -245,34 +288,49 @@ func Test_Analyzer(t *testing.T) {
 		t.Fatalf("Failed to create analyzer: %v", err)
 	}
 
-	oDir, err := os.MkdirTemp("", "processedLogs")
+	oDir, err := os.MkdirTemp("", "analyzeTestDBs")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
-	resultFiles, err := a.Analyze(context.Background(), testDir, oDir)
-	if err != nil {
+	tracesDBDir := filepath.Join(oDir, "traces")
+	blocksDBDir := filepath.Join(oDir, "blocks")
+
+	if err := a.Analyze(context.Background(), testDir, tracesDBDir, blocksDBDir); err != nil {
 		t.Fatalf("Analyze failed: %v", err)
 	}
 	t.Logf("Output written to: %s", oDir)
 
-	// Check the blocks
-	f, err := os.Open(resultFiles.BlockLogs[0])
+	blocksDB, err := pebble.Open(blocksDBDir, &pebble.Options{})
 	if err != nil {
-		t.Fatalf("Failed to open output file: %v", err)
+		t.Fatalf("could not open blocks database %s", blocksDBDir)
 	}
-	d := json.NewDecoder(f)
+	defer helpers.DeferIgnoreError(blocksDB.Close)
 
-	actual := map[string]*api.BlockLog{}
-	for {
-		var b api.BlockLog
-		if err := d.Decode(&b); err != nil {
-			if err == io.EOF {
-				break
-			}
-			t.Errorf("Failed to decode block log: %v", err)
+	actual := map[string]*logspb.BlockLog{}
+
+	iter, err := blocksDB.NewIterWithContext(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Failed to create iterator: %v", err)
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if key == nil {
+			break
 		}
-		actual[b.ID] = &b
+
+		value, err := iter.ValueAndErr()
+		if err != nil {
+			t.Fatalf("Failed to read block for key %s; error: %+v", string(key), err)
+		}
+
+		b := &logspb.BlockLog{}
+		if err := proto.Unmarshal(value, b); err != nil {
+			t.Fatalf("Failed to unmarshal block log: %v", err)
+		}
+		actual[b.Id] = b
 	}
 
 	expectedBlocks := map[string]bool{
@@ -295,10 +353,10 @@ func Test_Analyzer(t *testing.T) {
 
 	// This is a block that was generated via the AI and then executed so run some additional checks
 	block := actual["23706965-8e3b-440d-ba1a-1e1cc035fbd4"]
-	if block.GenTraceID == "" {
+	if block.GenTraceId == "" {
 		t.Errorf("Expected GenTraceID to be set")
 	}
-	if len(block.ExecTraceIDs) == 0 {
+	if len(block.ExecTraceIds) == 0 {
 		t.Errorf("Expected ExecTraceIDs to be set")
 	}
 	if block.Doc == nil {
@@ -309,60 +367,6 @@ func Test_Analyzer(t *testing.T) {
 	}
 	if block.ExecutedBlock == nil {
 		t.Errorf("Expected ExecutedBlock to be set")
-	}
-
-	// Check the traces
-	checkGenTracesFiles(t, resultFiles.GenerateTraces[0])
-	checkExecuteTracesFiles(t, resultFiles.ExecuteTraces[0])
-}
-
-func checkGenTracesFiles(t *testing.T, path string) {
-	// Check the generate traces
-	genFile, err := os.Open(path)
-	if err != nil {
-		t.Errorf("Failed to open output file: %v", err)
-		return
-	}
-	traces := make([]*api.GenerateTrace, 0, 10)
-	d := json.NewDecoder(genFile)
-	for {
-		trace := &api.GenerateTrace{}
-		if err := d.Decode(trace); err != nil {
-			if err == io.EOF {
-				break
-			}
-			t.Errorf("Failed to decode generate trace: %v", err)
-		}
-		traces = append(traces, trace)
-	}
-
-	if len(traces) == 0 {
-		t.Errorf("Expected to find some generate traces")
-	}
-}
-
-func checkExecuteTracesFiles(t *testing.T, path string) {
-	// Check the generate traces
-	genFile, err := os.Open(path)
-	if err != nil {
-		t.Errorf("Failed to open output file: %v", err)
-		return
-	}
-	traces := make([]*api.ExecuteTrace, 0, 10)
-	d := json.NewDecoder(genFile)
-	for {
-		trace := &api.ExecuteTrace{}
-		if err := d.Decode(trace); err != nil {
-			if err == io.EOF {
-				break
-			}
-			t.Errorf("Failed to decode execute trace: %v", err)
-		}
-		traces = append(traces, trace)
-	}
-
-	if len(traces) == 0 {
-		t.Errorf("Expected to find some execute traces")
 	}
 }
 
@@ -417,11 +421,15 @@ func Test_CombineGenerateEntries(t *testing.T) {
 				t.Fatalf("combineGenerateTrace should have returned non nil response")
 			}
 
+			genTrace := trace.GetGenerate()
+			if genTrace == nil {
+				t.Fatalf("Expected trace to have a generate trace")
+			}
 			// Assert the trace has a request and a response
-			if trace.Request == nil {
+			if genTrace.Request == nil {
 				t.Errorf("Expected trace to have a request")
 			}
-			if trace.Response == nil {
+			if genTrace.Response == nil {
 				t.Errorf("Expected trace to have a response")
 			}
 
@@ -488,11 +496,15 @@ func Test_CombineExecuteEntries(t *testing.T) {
 				t.Fatalf("combineExecuteTrace should have returned non nil response")
 			}
 
+			execTrace := trace.GetExecute()
+			if execTrace == nil {
+				t.Fatalf("Expected trace to have an execute trace")
+			}
 			// Assert the trace has a request and a response
-			if trace.Request == nil {
+			if execTrace.Request == nil {
 				t.Errorf("Expected trace to have a request")
 			}
-			if trace.Response == nil {
+			if execTrace.Response == nil {
 				t.Errorf("Expected trace to have a response")
 			}
 			if trace.EvalMode != c.expectedEvalMode {
