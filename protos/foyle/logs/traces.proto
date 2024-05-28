@@ -18,6 +18,7 @@ message Trace {
   oneof data {
     GenerateTrace generate = 4;
     ExecuteTrace execute = 5;
+    RunMeTrace run_me = 7;
   }
 
   // Eval mode is true if the trace was generated in eval mode.
@@ -36,4 +37,5 @@ message ExecuteTrace {
 
 message RunMeTrace {
   runme.runner.v1.ExecuteRequest request = 1;
+  runme.runner.v1.ExecuteResponse response = 2;
 }

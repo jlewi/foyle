@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -560,17 +562,96 @@ func Test_CombineRunmeEntries(t *testing.T) {
 				t.Fatalf("combineRunMeTrace should have returned non nil response")
 			}
 
+			rTrace := trace.GetRunMe()
+			if rTrace == nil {
+				t.Fatalf("Expected trace to have a runme trace")
+			}
 			// Assert the trace has a request and no response
-			if trace.Request == nil {
+			if rTrace.Request == nil {
 				t.Errorf("Expected trace to have a request")
 			}
 			// TODO(jeremy): We don't currently log the response with RunMe
 			// https://github.com/stateful/runme/blob/6e56cfae38c5a72193a86677356927e14ce87b27/internal/runner/service.go#L461
-			if trace.Response != nil {
+			if rTrace.Response != nil {
 				t.Errorf("Expected trace not to have a response")
 			}
 			if trace.EvalMode != c.expectedEvalMode {
 				t.Errorf("Expected EvalMode to be %v but got %v", c.expectedEvalMode, trace.EvalMode)
+			}
+		})
+	}
+}
+
+func Test_updateBlockForExecution(t *testing.T) {
+	type testCase struct {
+		name     string
+		block    *logspb.BlockLog
+		trace    *logspb.Trace
+		expected *logspb.BlockLog
+	}
+
+	cases := []testCase{
+		{
+			name:  "ExecuteTrace",
+			block: &logspb.BlockLog{},
+			trace: &logspb.Trace{
+				Data: &logspb.Trace_Execute{
+					Execute: &logspb.ExecuteTrace{
+						Request: &v1alpha1.ExecuteRequest{
+							Block: &v1alpha1.Block{
+								Contents: "echo hello",
+							},
+						},
+						Response: &v1alpha1.ExecuteResponse{
+							Outputs: []*v1alpha1.BlockOutput{
+								{
+									Items: []*v1alpha1.BlockOutputItem{
+										{
+											TextData: "exitCode: 4",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &logspb.BlockLog{
+				ExecutedBlock: &v1alpha1.Block{
+					Contents: "echo hello",
+				},
+				ExitCode: 4,
+			},
+		},
+		{
+			name:  "RunMeTrace",
+			block: &logspb.BlockLog{},
+			trace: &logspb.Trace{
+				Data: &logspb.Trace_RunMe{
+					RunMe: &logspb.RunMeTrace{
+						Request: &runnerv1.ExecuteRequest{
+							Commands: []string{"prog1", "arg1"},
+						},
+					},
+				},
+			},
+			expected: &logspb.BlockLog{
+				ExecutedBlock: &v1alpha1.Block{
+					Contents: "prog1 arg1",
+					Kind:     v1alpha1.BlockKind_CODE,
+				},
+				ExitCode: -2377,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if err := updateBlockForExecution(c.block, c.trace); err != nil {
+				t.Fatalf("updateBlockForExecution failed: %v", err)
+			}
+			if d := cmp.Diff(c.expected, c.block, cmpopts.IgnoreUnexported(logspb.BlockLog{}), testutil.BlockComparer); d != "" {
+				t.Errorf("Unexpected diff:\n%s", d)
 			}
 		})
 	}
