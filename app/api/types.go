@@ -8,6 +8,14 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	// TraceIDField is the field name for the trace ID used in Foyle logs
+	TraceIDField = "traceId"
+
+	// RunMeIDField is the field name for the trace id used in RunMe Logs
+	RunMeIDField = "_id"
+)
+
 // LogEntry represents a log entry.
 // We can't use a struct with well known types because when logging structured data we don't enforce a field
 // name to be of a certain type. e.g. we could have
@@ -22,18 +30,22 @@ func (L *LogEntry) Get(field string) (interface{}, bool) {
 }
 
 func (L *LogEntry) Request() []byte {
-	v, ok := (*L)["request"]
-	if !ok {
-		return nil
-	}
-	if v, ok := v.(map[string]interface{}); ok {
-		b, err := json.Marshal(v)
-		if err != nil {
-			log := zapr.NewLogger(zap.L())
-			log.Error(err, "Failed to marshal request")
-			return nil
+	// Different field names can be quest for the request.
+	// Foyle uses "request" and RunMe uses "req"
+	for _, field := range []string{"request", "req"} {
+		v, ok := (*L)[field]
+		if !ok {
+			continue
 		}
-		return b
+		if v, ok := v.(map[string]interface{}); ok {
+			b, err := json.Marshal(v)
+			if err != nil {
+				log := zapr.NewLogger(zap.L())
+				log.Error(err, "Failed to marshal request")
+				return nil
+			}
+			return b
+		}
 	}
 	return nil
 }
@@ -91,12 +103,13 @@ func (L *LogEntry) Message() string {
 }
 
 func (L *LogEntry) TraceID() string {
-	v, ok := (*L)["traceId"]
-	if !ok {
-		return ""
-	}
-	if v, ok := v.(string); ok {
-		return v
+	for _, field := range []string{TraceIDField, RunMeIDField} {
+		v, ok := (*L)[field]
+		if ok {
+			if v, ok := v.(string); ok {
+				return v
+			}
+		}
 	}
 	return ""
 }

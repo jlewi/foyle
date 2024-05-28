@@ -10,6 +10,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jlewi/foyle/app/pkg/docs"
+	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
@@ -17,7 +20,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/monogo/helpers"
@@ -168,6 +170,22 @@ func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, b
 			}); err != nil {
 				return errors.Wrapf(err, "Failed to set execute trace on block %s", bid)
 			}
+		case *logspb.Trace_RunMe:
+			bid := t.RunMe.Request.GetKnownId()
+			if bid == "" {
+				continue
+			}
+
+			if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+				block.Id = bid
+				if block.ExecTraceIds == nil {
+					block.ExecTraceIds = make([]string, 0, 10)
+				}
+				block.ExecTraceIds = append(block.ExecTraceIds, tid)
+				return nil
+			}); err != nil {
+				return errors.Wrapf(err, "Failed to set RunMe trace on block %s", bid)
+			}
 		default:
 			log.Error(fmt.Errorf("Unknown trace type"), "Unknown trace type", "trace", t)
 		}
@@ -250,6 +268,7 @@ func buildBlockLogs(ctx context.Context, tracesDB *pebble.DB, blocksDB *pebble.D
 		if err != nil {
 			return errors.Wrapf(err, "Failed to marshal block for id %s", bid)
 		}
+		log.Info("Writing block", "blockId", bid, "block", blockLog)
 		if err := blocksDB.Set([]byte(bid), bytes, pebble.Sync); err != nil {
 			log.Error(err, "Error writing block", "blockId", bid)
 		}
@@ -323,27 +342,46 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 		}()
 	}
 	if lastTrace != nil {
-		func() {
-			execTrace, ok := lastTrace.Data.(*logspb.Trace_Execute)
-			if !ok {
-				log.Error(errors.New("Invalid ExecuteTrace for traceId"), "Error getting execute trace; trace is not an execute trace", "execTraceId", lastTrace.Id)
-			}
-			// If the block was executed as part of evaluation mode then consider it to be in evaluation mode.
-			if lastTrace.EvalMode {
-				block.EvalMode = true
-			}
-			block.ExecutedBlock = execTrace.Execute.Request.GetBlock()
-			block.ExitCode = unsetExitCode
-			for _, o := range execTrace.Execute.Response.GetOutputs() {
-				exitCode, ok := docs.GetExitCode(o)
-				if ok {
-					block.ExitCode = int32(exitCode)
-					break
-				}
-			}
-		}()
+		if err := updateBlockForExecution(block, lastTrace); err != nil {
+			return err
+		}
 	}
 
+	return nil
+}
+
+// updateBlockForExecution updates fields in the block log based the last execution trace of that block
+func updateBlockForExecution(block *logspb.BlockLog, lastTrace *logspb.Trace) error {
+	// If the block was executed as part of evaluation mode then consider it to be in evaluation mode.
+	if lastTrace.EvalMode {
+		block.EvalMode = true
+	}
+	block.ExecutedBlock = nil
+	block.ExitCode = unsetExitCode
+
+	switch eTrace := lastTrace.Data.(type) {
+	case *logspb.Trace_Execute:
+		block.ExecutedBlock = eTrace.Execute.Request.GetBlock()
+
+		for _, o := range eTrace.Execute.Response.GetOutputs() {
+			exitCode, ok := docs.GetExitCode(o)
+			if ok {
+				block.ExitCode = int32(exitCode)
+				break
+			}
+		}
+	case *logspb.Trace_RunMe:
+		// TODO(jeremy): Is this the right way to turn the command into a string?
+		block.ExecutedBlock = &v1alpha1.Block{
+			Kind:     v1alpha1.BlockKind_CODE,
+			Contents: strings.Join(eTrace.RunMe.Request.GetCommands(), " "),
+			Outputs:  nil,
+			TraceIds: nil,
+		}
+
+	default:
+		return errors.WithStack(errors.Errorf("Can't update BlockLog with execution information. The last trace, id %s  is not an execution trace", lastTrace.Id))
+	}
 	return nil
 }
 
@@ -362,6 +400,10 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (*logs
 
 		if strings.HasSuffix(function, "executor.(*Executor).Execute") {
 			return combineExecuteTrace(ctx, entries)
+		}
+
+		if strings.HasSuffix(function, "runner.(*runnerService).Execute") {
+			return combineRunMeTrace(ctx, entries)
 		}
 	}
 
@@ -460,6 +502,56 @@ func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.
 					return nil, err
 				}
 				eTrace.Response = v
+				trace.EndTime = timestamppb.New(e.Time())
+			}
+		}
+	}
+	trace.EvalMode = evalMode
+	return trace, nil
+}
+
+func combineRunMeTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
+	rTrace := &logspb.RunMeTrace{}
+	trace := &logspb.Trace{
+		Data: &logspb.Trace_RunMe{
+			RunMe: rTrace,
+		},
+	}
+	evalMode := false
+	for _, e := range entries {
+		if trace.Id == "" {
+			trace.Id = e.TraceID()
+		}
+		if mode, present := e.EvalMode(); present {
+			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
+			// We don't want to assume that the evalMode will be set on all log entries in the trace.
+			// So the logic is to assume its not eval mode by default and then set it to eval mode if we find
+			// One entry that is marked as eval mode.
+			if mode {
+				evalMode = mode
+			}
+		}
+
+		if rTrace.Request == nil {
+			raw := e.Request()
+			if raw != nil {
+				request := &runnerv1.ExecuteRequest{}
+				if err := protojson.Unmarshal([]byte(raw), request); err != nil {
+					return nil, err
+				}
+
+				rTrace.Request = request
+				trace.StartTime = timestamppb.New(e.Time())
+			}
+		}
+		if rTrace.Response == nil {
+			raw := e.Response()
+			if raw != nil {
+				v := &runnerv1.ExecuteResponse{}
+				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
+					return nil, err
+				}
+				rTrace.Response = v
 				trace.EndTime = timestamppb.New(e.Time())
 			}
 		}

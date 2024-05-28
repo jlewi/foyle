@@ -6,7 +6,7 @@
 import type { BinaryReadOptions, FieldList, JsonReadOptions, JsonValue, PartialMessage, PlainMessage } from "@bufbuild/protobuf";
 import { Message, proto3, Timestamp } from "@bufbuild/protobuf";
 import { ExecuteRequest, ExecuteResponse, GenerateRequest, GenerateResponse } from "../v1alpha1/agent_pb";
-import { ExecuteRequest as ExecuteRequest$1 } from "../../runme/runner/v1/runner_pb";
+import { ExecuteRequest as ExecuteRequest$1, ExecuteResponse as ExecuteResponse$1 } from "../../runme/runner/v1/runner_pb";
 
 /**
  * @generated from message foyle.logs.Trace
@@ -42,6 +42,12 @@ export class Trace extends Message<Trace> {
      */
     value: ExecuteTrace;
     case: "execute";
+  } | {
+    /**
+     * @generated from field: foyle.logs.RunMeTrace run_me = 7;
+     */
+    value: RunMeTrace;
+    case: "runMe";
   } | { case: undefined; value?: undefined } = { case: undefined };
 
   /**
@@ -64,6 +70,7 @@ export class Trace extends Message<Trace> {
     { no: 3, name: "end_time", kind: "message", T: Timestamp },
     { no: 4, name: "generate", kind: "message", T: GenerateTrace, oneof: "data" },
     { no: 5, name: "execute", kind: "message", T: ExecuteTrace, oneof: "data" },
+    { no: 7, name: "run_me", kind: "message", T: RunMeTrace, oneof: "data" },
     { no: 6, name: "eval_mode", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
   ]);
 
@@ -179,6 +186,11 @@ export class RunMeTrace extends Message<RunMeTrace> {
    */
   request?: ExecuteRequest$1;
 
+  /**
+   * @generated from field: runme.runner.v1.ExecuteResponse response = 2;
+   */
+  response?: ExecuteResponse$1;
+
   constructor(data?: PartialMessage<RunMeTrace>) {
     super();
     proto3.util.initPartial(data, this);
@@ -188,6 +200,7 @@ export class RunMeTrace extends Message<RunMeTrace> {
   static readonly typeName = "foyle.logs.RunMeTrace";
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
     { no: 1, name: "request", kind: "message", T: ExecuteRequest$1 },
+    { no: 2, name: "response", kind: "message", T: ExecuteResponse$1 },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): RunMeTrace {
