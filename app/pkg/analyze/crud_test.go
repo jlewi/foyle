@@ -2,14 +2,15 @@ package analyze
 
 import (
 	"encoding/json"
-	"github.com/cockroachdb/pebble"
-	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
-	"github.com/pkg/errors"
-	"google.golang.org/protobuf/proto"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/cockroachdb/pebble"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jlewi/foyle/app/pkg/config"

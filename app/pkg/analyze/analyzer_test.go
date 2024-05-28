@@ -3,6 +3,13 @@ package analyze
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -14,12 +21,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"io"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
 
 	"github.com/jlewi/foyle/app/api"
 )

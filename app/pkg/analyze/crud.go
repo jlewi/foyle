@@ -2,6 +2,8 @@ package analyze
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/zapr"
@@ -11,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
-	"net/http"
 )
 
 // CrudHandler is a handler for CRUD operations on log entries
