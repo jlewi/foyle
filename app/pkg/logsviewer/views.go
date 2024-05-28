@@ -2,6 +2,7 @@ package logsviewer
 
 import (
 	"bytes"
+
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/jlewi/foyle/app/pkg/docs"

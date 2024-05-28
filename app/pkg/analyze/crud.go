@@ -61,5 +61,7 @@ func (h *CrudHandler) GetBlockLog(c *gin.Context) {
 
 	// Use the id to fetch or manipulate the resource
 	// For now, we'll just echo it back
-	c.Writer.Write(b)
+	if _, err := c.Writer.Write(b); err != nil {
+		log.Error(err, "Failed to write response", "id", id)
+	}
 }

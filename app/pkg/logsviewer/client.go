@@ -2,11 +2,12 @@ package logsviewer
 
 import (
 	"context"
-	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
-	"google.golang.org/protobuf/encoding/protojson"
 	"io"
 	"net/http"
 	"strings"
+
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/go-logr/zapr"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"

@@ -3,11 +3,12 @@ package learn
 import (
 	"context"
 	"fmt"
-	"github.com/cockroachdb/pebble"
-	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/cockroachdb/pebble"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
