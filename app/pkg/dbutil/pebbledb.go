@@ -1,4 +1,4 @@
-package analyze
+package dbutil
 
 import (
 	"github.com/cockroachdb/pebble"
@@ -19,4 +19,14 @@ func GetProto(db *pebble.DB, key string, value proto.Message) error {
 	}
 
 	return nil
+}
+
+// SetProto reads a proto message from a Pebble DB.
+func SetProto(db *pebble.DB, key string, value proto.Message) error {
+	b, err := proto.Marshal(value)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to marshal proto with key %s", key)
+	}
+
+	return db.Set([]byte(key), b, pebble.Sync)
 }

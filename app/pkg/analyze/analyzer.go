@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/api"
+	"github.com/jlewi/foyle/app/pkg/dbutil"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -265,7 +266,7 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 	if block.GenTraceId != "" {
 		func() {
 			trace := &logspb.Trace{}
-			if err := GetProto(tracesDB, block.GenTraceId, trace); err != nil {
+			if err := dbutil.GetProto(tracesDB, block.GenTraceId, trace); err != nil {
 				log.Error(err, "Error getting generate trace", "genTraceId", block.GenTraceId)
 				return
 			}
@@ -299,7 +300,7 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 	for _, tid := range block.GetExecTraceIds() {
 		func() {
 			trace := &logspb.Trace{}
-			if err := GetProto(tracesDB, tid, trace); err != nil {
+			if err := dbutil.GetProto(tracesDB, tid, trace); err != nil {
 				log.Error(err, "Error getting execute trace", "execTraceId", tid)
 				return
 			}
