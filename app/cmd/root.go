@@ -25,6 +25,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().BoolVarP(&jsonLog, "json-logs", "", false, "Enable json logging.")
 
 	rootCmd.AddCommand(NewAssetsCmd())
+	rootCmd.AddCommand(NewConvertCmd())
 	rootCmd.AddCommand(NewVersionCmd(appName, os.Stdout))
 	rootCmd.AddCommand(NewServeCmd())
 	rootCmd.AddCommand(NewLearnCmd())
