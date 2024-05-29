@@ -142,6 +142,8 @@ func (l *Learner) reconcileExamples(ctx context.Context, blocksDB *pebble.DB) er
 			continue
 		}
 
+		log.Info("Found new training example", "blockId", b.GetId())
+
 		// TODO(jeremy): Should we take into account execution status when looking for mistakes?
 
 		// Deep copy the original message

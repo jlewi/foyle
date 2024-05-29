@@ -25,7 +25,7 @@ func NewLogsCmd() *cobra.Command {
 
 // NewLogsProcessCmd returns a command to process the assets
 func NewLogsProcessCmd() *cobra.Command {
-	var logsDir string
+	logDirs := []string{}
 	var outDir string
 	cmd := &cobra.Command{
 		Use: "process",
@@ -42,8 +42,12 @@ func NewLogsProcessCmd() *cobra.Command {
 
 				logVersion()
 
-				if logsDir == "" {
-					logsDir = app.Config.GetRawLogDir()
+				if len(logDirs) == 0 {
+					logDirs = append(logDirs, app.Config.GetRawLogDir())
+
+					if app.Config.Learner != nil {
+						logDirs = append(logDirs, app.Config.Learner.LogDirs...)
+					}
 				}
 
 				a, err := analyze.NewAnalyzer()
@@ -52,12 +56,12 @@ func NewLogsProcessCmd() *cobra.Command {
 				}
 
 				log := zapr.NewLogger(zap.L())
-				log.Info("Processing logs", "logs", logsDir)
+				log.Info("Processing logs", "logDirs", logDirs)
 
-				if err := a.Analyze(context.Background(), logsDir, app.Config.GetTracesDBDir(), app.Config.GetBlocksDBDir()); err != nil {
+				if err := a.Analyze(context.Background(), logDirs, app.Config.GetTracesDBDir(), app.Config.GetBlocksDBDir()); err != nil {
 					return err
 				}
-				log.Info("Processed logs", "logs", logsDir, "traces", app.Config.GetTracesDBDir(), "blocks", app.Config.GetBlocksDBDir())
+				log.Info("Processed logs", "logs", logDirs, "traces", app.Config.GetTracesDBDir(), "blocks", app.Config.GetBlocksDBDir())
 				return nil
 			}()
 
@@ -68,7 +72,7 @@ func NewLogsProcessCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&logsDir, "logs", "", "", "(Optional) Directory containing logs to process")
+	cmd.Flags().StringArrayVarP(&logDirs, "logs", "", []string{}, "(Optional) Directories containing logs to process")
 	cmd.Flags().StringVarP(&outDir, "out", "", "", "(Optional) Directory to write the output to")
 	return cmd
 }
