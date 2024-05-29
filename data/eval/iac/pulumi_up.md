@@ -3,6 +3,6 @@ Sync the dev infra
 ```
 
 ```bash {"id":"01HZ2GTQAA8ECXR36P75EJBGK4"}
-pulumi up -C /Users/jlewi/git_foyle/iac/dev --non-interactive --yes
-
+pulumi -C /Users/jlewi/git_foyle/iac/dev refresh -y
+pulumi -C /Users/jlewi/git_foyle/iac/dev up --diff --skip-preview --non-interactive
 ```
