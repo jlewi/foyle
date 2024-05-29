@@ -28,12 +28,6 @@ then you need to configure RunMe to enable the AI logging experiment
 Now that logging is enabled. You can verify that the logs are being written and identify the location
 of the logs.
 
-By default, on MacOs RunMe will use
-
-```bash
-/Users/${USER}/Library/Application Support/runme/logs/
-```
-
 Inside VSCode open an output window and select the **RunMe** output channel. 
 Scroll to the top of the messages and look for a `Logger initialized` message like the one below
 
@@ -41,12 +35,18 @@ Scroll to the top of the messages and look for a `Logger initialized` message li
 [2024-05-28T22:12:20.681Z] INFO Runme(RunmeServer): {"level":"info","ts":1716934340.6789708,"caller":"cmd/common.go:190","msg":"Logger initialized","devMode":false,"aiLogs":true,"aiLogFile":"/Users/jlewi/Library/Application Support/runme/logs/logs.2024-05-28T15:12:20.json"}
 ```
 
-The field `aiLogs` will contain the directory where the JSON logs are written.
+The field `aiLogs` will contain the file that the current instance of RunMe is using for the JSON logs.
+
+By default, on MacOs RunMe will use the directory
+
+```bash
+/Users/${USER}/Library/Application Support/runme/logs/
+```
 
 ## Configuring Learning
 
 If you are using [RunMe.dev](https://runme.dev/) as the frontend for Foyle
-then you need to configure Foyle with the location of the logs.
+then you need to configure Foyle with the location of the **directory** of RunMe's logs.
 Refer to the previous section for instructions on how to locate the file
 where `RunMe` is writing the logs. Then remove the filename to get the directory
 where the logs are being written.
