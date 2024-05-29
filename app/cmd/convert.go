@@ -2,6 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/application"
 	"github.com/jlewi/foyle/app/pkg/docs"
@@ -10,10 +15,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 // NewConvertCmd create a convert command
@@ -67,7 +68,7 @@ func convertDir(dir string) error {
 		return errors.Wrapf(err, "Directory %s doesn't exist", dir)
 	}
 
-	return filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+	return filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
 		if entry.IsDir() {
 			return nil
 		}
