@@ -1,48 +1,5 @@
 List the most recent image builds
-```bash
-gcloud builds list --project=foyle-public
-```
-```output
-exitCode: 0
-```
-```output
-stdout:
-ID                                    CREATE_TIME                DURATION  SOURCE                                                                                                       IMAGES  STATUS
-124c5ddd-b040-4749-87ba-47b68cc5326e  2024-04-19T20:41:14+00:00  2M21S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.09fe389c90b80da08b773145a3e35b7032f4e0b5.tgz   -       SUCCESS
-fb836b86-2b3f-4e0c-aefd-4ec60a6abdb9  2024-04-19T20:07:16+00:00  2M7S      gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.0b15ea610db1d5c1bb566f06e69a502a5bcbca1d.tgz   -       SUCCESS
-75556df2-dc55-410c-b9b5-038b9937e74d  2024-04-17T22:29:21+00:00  2M37S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.da26d1b1d8b0fae2309ed90f72f9d9c609945d39.tgz   -       SUCCESS
-47a93531-99c0-4855-932e-4365db430fae  2024-04-17T01:52:28+00:00  2M43S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.ce6affc61ec2a93e463e5787a799e42199f42213.tgz   -       SUCCESS
-bcea8b7a-27a9-48fe-914f-2781ce222a82  2024-04-13T22:27:10+00:00  2M57S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.c6d2e14d309b57fac3eef004197db6f41b90786f.tgz   -       SUCCESS
-9b6cc343-29fe-4fa1-90cc-8cb5f7f6f049  2024-04-13T00:10:31+00:00  2M2S      gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.51a604f692eb0803c7d2dcc00fac7709df1fa822.tgz   -       SUCCESS
-47bcfc80-7a32-4d95-abc6-dd61c11ccb46  2024-04-12T22:44:14+00:00  2M34S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.8b27185ae391801b216274ce80946244dbf84fd6.tgz   -       SUCCESS
-c907682e-e477-4900-95fc-d73ec210902b  2024-04-12T22:39:28+00:00  4M30S     gs://builds-foyle-public/foyle-public/images/hydros/hydros.48988a89c2dbabe5fb7f4e6970fb8c403d8c8c83.tgz      -       FAILURE
-e9b641b4-ab8d-45ec-abae-c7d76ede19e0  2024-04-12T22:35:00+00:00  4M16S     gs://builds-foyle-public/foyle-public/images/hydros/hydros.61c688b161974544d94933e8160e56508a4ef67f.tgz      -       FAILURE
-a59a9932-37f6-42fd-afd4-4c727efb5e47  2024-04-12T21:57:29+00:00  3M21S     gs://builds-foyle-public/foyle-public/images/hydros/hydros.fd32250d8e277ab5d6f71b4efb1337bb0ff2e95b.tgz      -       FAILURE
-ec7d695f-f8a8-416c-b06c-7d9af2b974c9  2024-04-12T21:54:04+00:00  3M15S     gs://builds-foyle-public/foyle-public/images/hydros/hydros.fd32250d8e277ab5d6f71b4efb1337bb0ff2e95b.tgz      -       FAILURE
-c92cd6f9-fe6d-447e-80f0-de5280c37140  2024-04-11T20:04:48+00:00  2M33S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.e8901ec0fb1dd84a26b4d4976de16319fad10cb1.tgz   -       SUCCESS
-ba916139-8ba3-4b58-9f9d-f1b0a9617f79  2024-04-11T15:41:21+00:00  3M16S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.d2641e55fea10d79305aa25f6fa2fd19ae554b7f.tgz   -       SUCCESS
-afdac249-1290-4844-be41-3d2d6d8bccb2  2024-04-11T15:30:05+00:00  4M50S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.dd52c555034fe0e16efaed64cce276d5ebc0f2c2.tgz   -       SUCCESS
-a7889c13-7069-473b-9fa7-dba7940662a6  2024-04-11T15:16:34+00:00  2M21S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.d2415d1fc8c6647cc6f8ecb3191f31b0a0fd8c7f.tgz   -       SUCCESS
-cc398381-ea0b-40e5-a5c5-0afe4c311338  2024-04-09T01:08:05+00:00  4M25S     gs://builds-foyle-public/foyle-public/images/hydros/hydros.f97f18c5edb20de30bc3fa6ba25835d9afed06c9.tgz      -       SUCCESS
-323523fb-6503-4838-b92c-07659e634894  2024-04-08T23:01:46+00:00  2M        gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.6ba56ae46fc150d3a39a2d592183f83cc8c67d44.tgz   -       SUCCESS
-e792f9a1-5540-4c28-bc6a-d1330cf18e08  2024-04-04T14:42:43+00:00  3M31S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.7a82dd2768441944b620cf22561222e925fee624.tgz   -       SUCCESS
-b2952cf5-b814-4dc6-92cc-95c74c1f02a1  2024-04-04T01:54:18+00:00  8M7S      gs://builds-foyle-public/foyle-public/images/vscode-web-assets.107d350496ec50984207cdccdab73602dd32de11.tgz  -       SUCCESS
-98980d6f-ca20-404c-abcd-544098d5ab3e  2024-04-04T00:21:26+00:00  46M27S    gs://builds-foyle-public/foyle-public/images/vscode.0a44acc96351fd10d0373d487f5d558397f0ac39.tgz             -       SUCCESS
 
-ID                                    CREATE_TIME                DURATION  SOURCE                                                                                                       IMAGES  STATUS
-848d642f-f9d9-4920-90ab-9d7934f46206  2024-03-29T02:24:40+00:00  2M41S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.0f57f56d6fb1d73418d854b600591a571f2417ff.tgz   -       SUCCESS
-64b885c4-395b-4810-b42f-24a280a6d7e4  2024-03-27T15:37:49+00:00  1M31S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.9f4215579f9b3cbb411ce872b1297fe81ecf347a.tgz   -       SUCCESS
-031d2e4a-2219-46cb-97e0-7acae74dfb0d  2024-03-27T15:23:56+00:00  2M9S      gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.52123d6f90f72054a11667b56bc071d322612e89.tgz   -       FAILURE
-e891ebfc-973a-498a-85d5-9ccdc04a387b  2024-03-27T15:20:25+00:00  51S       gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.5a8e3e527ba56ff63423afa1cffd31395565a89a.tgz   -       FAILURE
-e5b89e3a-fa8d-4f24-b018-b837a1fbd539  2024-03-27T15:15:49+00:00  1M16S     gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.00ebe5dcfc930752cc8aca1383c8524ac9afa984.tgz   -       FAILURE
-538bb476-3754-4623-b12e-9afd9948815d  2024-03-27T15:10:58+00:00  12S       gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.9c0fead30a336e37e8436510165eff2ad8acb106.tgz   -       FAILURE
-4df9adb4-924d-43f6-84ef-1b68c9428baf  2024-03-27T15:05:37+00:00  13S       gs://builds-foyle-public/foyle-public/images/foyle-vscode-ext.9c0fead30a336e37e8436510165eff2ad8acb106.tgz   -       FAILURE
-4f528397-18a3-4aaf-b687-8551ec3fe33a  2024-03-26T21:10:40+00:00  8M49S     gs://builds-foyle-public/foyle-public/images/vscode-web-assets.897c800c918a1c869c80aa739b3b8c38b12afc86.tgz  -       SUCCESS
-739c7a30-7a70-4d84-b409-eee540a2e490  2024-03-26T21:05:24+00:00  8S        gs://builds-foyle-public/foyle-public/images/vscode-web-assets.82e00b39c4a3dd31c89d9732c59836ff2b658a8a.tgz  -       FAILURE
-53c35095-a9b2-424a-bccd-67005b055259  2024-03-26T18:35:34+00:00  46M26S    gs://builds-foyle-public/foyle-public/images/vscode.493523cf6e84f3eecbde1d3371116282568f65e6.tgz             -       SUCCESS
-03120030-08a1-486a-bb17-6259953a3caf  2024-03-26T14:16:26+00:00  4M11S     gs://builds-foyle-public/foyle-public/images/vscode.8c1bf4cb441a9c11d21c57fabc4493909a4ba79b.tgz             -       FAILURE
-d5b85047-9479-4956-adf7-0844c1903b97  2024-03-26T14:10:57+00:00  46S       gs://builds-foyle-public/foyle-public/images/vscode.9e59b6edf3a32a5df991477b7be92352bf487b5a.tgz             -       FAILURE
-7fb2ab0e-1107-4624-83b4-e1ea5d9e6264  2024-03-26T14:03:51+00:00  11S       gs://builds-foyle-public/foyle-public/images/vscode.34b4b67032d31b97f09b6f708e6a2b0fcd039d54.tgz             -       FAILURE
-2af6cb17-8c8a-4e21-b338-fd7e6a0857ae  2024-03-26T13:47:56+00:00  9S        gs://builds-foyle-public/foyle-public/images/vscode.2cef2e862e3ee3e7520e8b44b3a93b0b903faa54.tgz             -       FAILURE
-4bf0e191-b1e6-4d35-b31f-51f8fd2f8439  2024-03-26T03:14:24+00:00  7S        gs://builds-foyle-public/foyle-public/images/frontend.474aac87f6d426357ec353fd9724ea9092b9f7a9.tgz           -       FAILURE
+```bash {"id":"01HZ2GQWVPYWJD70GWFPBMT9ZF"}
+gcloud builds list --project=foyle-public
 ```
