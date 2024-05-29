@@ -298,7 +298,7 @@ func Test_Analyzer(t *testing.T) {
 	tracesDBDir := filepath.Join(oDir, "traces")
 	blocksDBDir := filepath.Join(oDir, "blocks")
 
-	if err := a.Analyze(context.Background(), testDir, tracesDBDir, blocksDBDir); err != nil {
+	if err := a.Analyze(context.Background(), []string{testDir}, tracesDBDir, blocksDBDir); err != nil {
 		t.Fatalf("Analyze failed: %v", err)
 	}
 	t.Logf("Output written to: %s", oDir)
