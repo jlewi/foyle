@@ -5,13 +5,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jlewi/foyle/app/pkg/dbutil"
+
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/google/uuid"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/executor"
@@ -23,7 +24,6 @@ import (
 	"google.golang.org/api/impersonate"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -88,7 +88,7 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	log.Info("Found unloaded files", "numFiles", len(unloadedFiles))
 
 	// We need to load the evaluation data into the database.
-	if err := e.loadFoyleFiles(ctx, db, unloadedFiles); err != nil {
+	if err := e.loadMarkdownFiles(ctx, db, unloadedFiles); err != nil {
 		return err
 	}
 
@@ -444,7 +444,7 @@ func (e *Evaluator) findUnloadedFiles(ctx context.Context, db *pebble.DB, files 
 	return toProcess, nil
 }
 
-// listEvalFiles returns a list of the all the Foyle files in the eval directory.
+// listEvalFiles returns a list of the all the markdown files in the eval directory.
 func (e *Evaluator) listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
 	examples := make([]string, 0, 100)
 	err := filepath.Walk(evalDir, func(path string, info os.FileInfo, err error) error {
@@ -452,7 +452,7 @@ func (e *Evaluator) listEvalFiles(ctx context.Context, evalDir string) ([]string
 			return nil
 		}
 
-		if filepath.Ext(path) != ".foyle" {
+		if filepath.Ext(path) != ".md" {
 			return nil
 		}
 
@@ -463,9 +463,9 @@ func (e *Evaluator) listEvalFiles(ctx context.Context, evalDir string) ([]string
 	return examples, err
 }
 
-// loadFoyleFiles loads a bunch of Foyle files representing evaluation data and converts them into example
+// loadMarkdownFiles loads a bunch of markdown files representing evaluation data and converts them into example
 // protos.
-func (e *Evaluator) loadFoyleFiles(ctx context.Context, db *pebble.DB, files []string) error {
+func (e *Evaluator) loadMarkdownFiles(ctx context.Context, db *pebble.DB, files []string) error {
 	oLog := logs.FromContext(ctx)
 
 	allErrors := &helpers.ListOfErrors{}
@@ -482,12 +482,16 @@ func (e *Evaluator) loadFoyleFiles(ctx context.Context, db *pebble.DB, files []s
 		}
 
 		doc := &v1alpha1.Doc{}
-		if err := protojson.Unmarshal(contents, doc); err != nil {
-			log.Error(err, "Failed to unmarshal example")
+
+		blocks, err := docs.MarkdownToBlocks(string(contents))
+		if err != nil {
+			log.Error(err, "Failed to convert markdown to blocks")
 			allErrors.AddCause(err)
 			// Keep going
 			continue
 		}
+
+		doc.Blocks = blocks
 
 		if len(doc.GetBlocks()) < 2 {
 			log.Info("Skipping doc; too few blocks; at least two are required")
@@ -501,14 +505,12 @@ func (e *Evaluator) loadFoyleFiles(ctx context.Context, db *pebble.DB, files []s
 			continue
 		}
 
-		// TODO(https://github.com/jlewi/foyle/issues/95): We should assign an ID to each example that is stable
-		// across experiments.
-		id := uuid.NewString()
+		// We generate a stable ID for the example by hashing the contents of the document.
 		example := &v1alpha1.Example{
-			Id:     id,
 			Query:  doc,
 			Answer: []*v1alpha1.Block{answer},
 		}
+		example.Id = HashExample(example)
 
 		result := &v1alpha1.EvalResult{
 			Example:     example,
@@ -517,14 +519,7 @@ func (e *Evaluator) loadFoyleFiles(ctx context.Context, db *pebble.DB, files []s
 			Distance: -1,
 		}
 
-		b, err := proto.Marshal(result)
-		if err != nil {
-			log.Error(err, "Failed to marshal result")
-			allErrors.AddCause(err)
-			// Keep going
-			continue
-		}
-		if err := db.Set([]byte(id), b, nil); err != nil {
+		if err := dbutil.SetProto(db, example.GetId(), result); err != nil {
 			log.Error(err, "Failed to write result to DB")
 			allErrors.AddCause(err)
 			// Keep going
