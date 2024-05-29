@@ -335,8 +335,8 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 				return
 			}
 
-			if _, ok := trace.Data.(*logspb.Trace_Execute); !ok {
-				log.Error(errors.New("Invalid ExecuteTrace for traceId"), "Error getting execute trace", "execTraceId", tid)
+			if trace.GetExecute() == nil && trace.GetRunMe() == nil {
+				log.Error(errors.New("Invalid execution trace for traceId"), "Error getting execute trace", "execTraceId", tid)
 				return
 			}
 			if lastTrace == nil {
