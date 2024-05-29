@@ -4,8 +4,6 @@ title: Getting Started
 weight: 2
 ---
 
-
-
 ## Installation
 
 ### Prerequisites: VSCode & RunMe 
@@ -20,37 +18,37 @@ to provide the frontend.
 
 1. Download the latest release from the [releases page](https://github.com/jlewi/foyle/releases)
 
-2. On Mac you may need to remove the quarantine attribute from the binary
+1. On Mac you may need to remove the quarantine attribute from the binary
 
-```bash {"id":"01HZ0YPESFNSEV4EJG4GH2VH1X"}
-xattr -d com.apple.quarantine /path/to/foyle
-```
+   ```bash
+   xattr -d com.apple.quarantine /path/to/foyle
+   ```
 
 ## Setup
 
 1. Configure your OpenAPI key
 
-```sh {"id":"01HZ0YPESFNSEV4EJG4KS032CF"}
-foyle config set openai.apiKeyFile=/path/to/openai/apikey
-```
+   ```sh
+   foyle config set openai.apiKeyFile=/path/to/openai/apikey
+   ```
 
-* If you don't have a key, go to [OpenAI](https://openai.com/) to
-   obtain one
+   * If you don't have a key, go to [OpenAI](https://openai.com/) to
+      obtain one
 
 1. Start the server
 
-```bash {"id":"01HZ0YPESFNSEV4EJG4PGPXBS9"}
-foyle serve
-```
+   ```bash
+   foyle serve
+   ```
 
-* By default foyle uses port 8080 for the http server and port 9080 for gRPC
+   * By default foyle uses port 8080 for the http server and port 9080 for gRPC
 
-* If you need to use different ports you can configure this as follows
+   * If you need to use different ports you can configure this as follows
 
-```sh {"id":"01HZ0YPESFNSEV4EJG4Q15T9QA"}
-foyle config set server.httpPort=<YOUR HTTP PORT>
-foyle config set server.grpcPort=<YOUR GRPC PORT> 
-```
+   ```sh
+   foyle config set server.httpPort=<YOUR HTTP PORT>
+   foyle config set server.grpcPort=<YOUR GRPC PORT> 
+   ```
 
 1. Inside VSCode configure RunMe to use Foyle
    1. Open the VSCode setting palette
