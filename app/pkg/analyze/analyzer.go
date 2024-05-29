@@ -50,9 +50,12 @@ type ResultFiles struct {
 // logsDir - Is the directory containing the logs
 // tracesDBDir - Is the directory containing the traces pebble database
 // blocksDBDir - Is the directory containing the blocks pebble database
-func (a *Analyzer) Analyze(ctx context.Context, logsDir string, tracesDBDir string, blocksDBDir string) error {
+//
+// TODO(https://github.com/jlewi/foyle/issues/126): I think we need to pass the DBs in because we can't
+// have them be multi process; so we probably want to have a single DB per process.
+func (a *Analyzer) Analyze(ctx context.Context, logDirs []string, tracesDBDir string, blocksDBDir string) error {
 	log := logs.FromContext(ctx)
-	log.Info("Analyzing logs", "logsDir", logsDir, "tracesDBDir", tracesDBDir, "blocksDBDir", blocksDBDir)
+	log.Info("Analyzing logs", "logDirs", logDirs, "tracesDBDir", tracesDBDir, "blocksDBDir", blocksDBDir)
 
 	log.Info("Opening traces database", "database", tracesDBDir)
 	tracesDB, err := pebble.Open(tracesDBDir, &pebble.Options{})
@@ -70,9 +73,14 @@ func (a *Analyzer) Analyze(ctx context.Context, logsDir string, tracesDBDir stri
 
 	defer helpers.DeferIgnoreError(blocksDB.Close)
 
-	jsonFiles, err := findLogFiles(ctx, logsDir)
-	if err != nil {
-		return err
+	jsonFiles := make([]string, 0, 100)
+	for _, logsDir := range logDirs {
+		newFiles, err := findLogFiles(ctx, logsDir)
+		if err != nil {
+			return err
+		}
+		log.Info("Found logs", "numFiles", len(newFiles), "logsDir", logsDir)
+		jsonFiles = append(jsonFiles, newFiles...)
 	}
 
 	if err := buildTraces(ctx, jsonFiles, tracesDB, blocksDB); err != nil {
@@ -327,8 +335,8 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 				return
 			}
 
-			if _, ok := trace.Data.(*logspb.Trace_Execute); !ok {
-				log.Error(errors.New("Invalid ExecuteTrace for traceId"), "Error getting execute trace", "execTraceId", tid)
+			if trace.GetExecute() == nil && trace.GetRunMe() == nil {
+				log.Error(errors.New("Invalid execution trace for traceId"), "Error getting execute trace", "execTraceId", tid)
 				return
 			}
 			if lastTrace == nil {

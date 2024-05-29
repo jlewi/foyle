@@ -1,8 +1,17 @@
+---
+runme:
+  document:
+    relativePath: runme.md
+  session:
+    id: 01HYZVHZ41CAN75B22CRC9D9J6
+    updated: 2024-05-28 14:57:56-07:00
+---
+
 # Developing the Runme Extension
 
-* The Runme extension is in the [vscode-runme](https://github.com/stateful/vscode-runme) repository
-* The service is defined in [runme/pkg/api/proto/runme/ai](https://github.com/stateful/runme/tree/main/pkg/api/proto/runme/ai)
-* Follow [RunMe's vscode contributing.md](https://github.com/stateful/vscode-runme/blob/main/CONTRIBUTING.md)
+* The Runme extension is in the [vscode-runme](ht************************************me) repository
+* The service is defined in [runme/pkg/api/proto/runme/ai](ht**************************************************************ai)
+* Follow [RunMe's vscode contributing.md](ht**************************************************************md)
 * If you need nvm you can brew install it
 
 ```sh {"id":"01HY2569DM0SR533BT4ZJTD2WV"}
@@ -18,7 +27,7 @@ jq -r ".recommendations[]" .vscode/extensions.json | xargs -n 1 /Applications/Vi
 
 ## Building and installing the extension from source
 
-* [VSCode Extension Packaging & Publishing](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
+* [VSCode Extension Packaging & Publishing](ht**************************************************************************on)
 * It looks like the package has a `bundle` command that will build the extension and package it into a `.vsix` file
 
 ```sh {"id":"01HY25HEG7CR7QCGJSERF3BB4K"}
@@ -36,14 +45,14 @@ Now we can install the extension using the vscode binary
 * If you search for the extension in the extensions view, you can click on the arrow next to the update button and uncheck auto-update
    if you don't do that it may continue to auto update
 * The exact file will be named `runme-X.Y.Z.vsix` so it will change as the version changes
-* You can bump the version in `package.json` to something like `"version": "3.5.7-dev.0",` and then do the build and install
+* You can bump the version in `package.json` to something like `"version": "3.*******.0",` and then do the build and install
    * **Note**: Your version number should be higher than whats in the vscode marketplace otherwise vscode
       does some odd version magic
    * The advantage of this is that then you can tell which version of the extension you have installed
    * It also seemed like when I didn't bump the version I might have actually been using an old version of the extension
 
 ```bash {"id":"01HYZVG8KZKYSTFS4R1RJZDS7P"}
-/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --force --install-extension ~/git_vscode-runme/runme-3.5.9.vsix
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --force --install-extension ~/gi************me/ru************ix
 ```
 
 ```sh {"id":"01HY264KZTS4J9NHJASJT1GYJ7"}

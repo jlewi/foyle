@@ -55,6 +55,13 @@ type Config struct {
 
 	// TODO(jeremy): Should we move this into the experiment?
 	Eval *EvalConfig `json:"eval,omitempty" yaml:"eval,omitempty"`
+
+	Learner *LearnerConfig `json:"learner,omitempty" yaml:"learner,omitempty"`
+}
+
+type LearnerConfig struct {
+	// LogDirs is an additional list of directories to search for logs.
+	LogDirs []string `json:"logDirs" yaml:"logDirs"`
 }
 
 type EvalConfig struct {

@@ -64,5 +64,6 @@ func (p *Proxy) GenerateCells(ctx context.Context, req *aiv1alpha1.GenerateCells
 	resp := &aiv1alpha1.GenerateCellsResponse{
 		Cells: cells,
 	}
+
 	return resp, nil
 }
