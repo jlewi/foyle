@@ -1,10 +1,20 @@
 ---
-title: Getting Started
 description: Getting started with Foyle
+title: Getting Started
 weight: 2
 ---
 
 ## Installation
+
+### Prerequisites: VSCode & RunMe 
+
+Foyle relies on [VSCode](https://code.visualstudio.com/) and [RunMe.dev](https://runme.dev/)
+to provide the frontend.
+
+1. If you don't have VSCode visit the [downloads page](https://code.visualstudio.com/) and install it
+1. Follow [RunMe.dev](https://docs.runme.dev/installation/installrunme#installing-runme-on-vs-code) instructions to install the RunMe.dev extension in vscode
+
+### Install Foyle
 
 1. Download the latest release from the [releases page](https://github.com/jlewi/foyle/releases)
 
@@ -16,88 +26,72 @@ weight: 2
 
 ## Setup
 
-1. Download the static assets for foyle
-
-   ```bash
-   foyle assets download
-   ```
-
-   * This downloads the static assets for foyle. 
-   * The assets are stored in `${HOME}/.foyle/assets`.
-
 1. Configure your OpenAPI key
 
-   ```
+   ```sh
    foyle config set openai.apiKeyFile=/path/to/openai/apikey
    ```
- 
+
    * If you don't have a key, go to [OpenAI](https://openai.com/) to
-   obtain one
+      obtain one
 
 1. Start the server
 
-    ```bash
-    foyle serve
-    ```
-    
-    * By default foyle uses port 8080 for the http server and port 9080 for gRPC
-    * If you need to use different ports you can configure this as follows
+   ```bash
+   foyle serve
+   ```
 
-      ```
-      foyle config set server.httpPort=<YOUR HTTP PORT>
-      foyle config set server.grpcPort=<YOUR GRPC PORT> 
-      ```
+   * By default foyle uses port 8080 for the http server and port 9080 for gRPC
+
+   * If you need to use different ports you can configure this as follows
+
+   ```sh
+   foyle config set server.httpPort=<YOUR HTTP PORT>
+   foyle config set server.grpcPort=<YOUR GRPC PORT> 
+   ```
+
+1. Inside VSCode configure RunMe to use Foyle
+   1. Open the VSCode setting palette
+   1. Search for `Runme: Foyle Address`
+   1. Set the address to `localhost:${GRPC_PORT}`
+      * The default port is 9080
+      * If you set a non default value then it will be the value of `server.grpcPort`
+
 ## Try it out!
 
-Now that foyle is running you can open up VSCode in your web browser and start interacting with foyle.
+Now that foyle is running you can open markdown documents in VSCode and start interacting with foyle.
 
-1. Open up your browser and go to [http://localhost:8080/workbench](http://localhost:8080/workbench)
-1. The first time you open the workbench you will be prompted to choose a theme as shown below.
-
-   * Choose your theme and then click `mark done` 
-   ![Choose Theme](choose_theme.png)
-1. Open the explorer tab by clicking the icon in the left hand side navigation bar
-1. Inside the explorer tab click the link to `add a folder`
-
-   * Unfortunately **Open Folder** doesn't work reliably. [jlewi/foyle#21](https://github.com/jlewi/foyle/issues/21)
-     is tracking this.
-1. This should open a file explorer and you should select the folder where you want your foyle notebooks to be
-   saved
-   * Your browser will likely prompt you to allow the site to access the file system; you need to allow this
-1. You should now see the folder you selected in the explorer tab
-1. Start a new notebook by clicking the `+` icon in the explorer tab
-1. Give your notebook the ".foyle" extension
-   * Your notebook must have the ".foyle" extension so that vscode knows to open it using foyle
-1. Click on your new notebook to open it inside VSCode's notebook editor
+1. Inside VSCode Open a markdown file or create a notebook; this will open the notebook inside RunMe
+   * Refer to [RunMe's documentation](https://docs.runme.dev/installation/installrunme#full-display-of-runmes-action-on-a-markdown-file-in-vs-code) for a walk through
+     of RunMe's UI
+   * If the notebook doesn't open in RunMe
+      1. right click on the file and select "Open With"
+      1. Select the option "Run your markdown" to open it with RunMe
 1. You can now add code and notebook cells like you normally would in vscode
 1. To ask Foyle for help do one of the following
 
    * Open the command pallet and search for `Foyle generate a completion`
    * Use the shortcut key:
-     * "win;" - on windows
-     * "cmd;" - on mac
+      * "win;" - on windows
+      * "cmd;" - on mac
 
 ## Customizing Foyle VSCode Extension Settings
 
-### Customizing the server endpoints
-
-If you are running the Foyle server on a different port or address then you will need to change Foyle's VSCode settings.
+### Customizing the Foyle Server Address
 
 1. Open the settings panel; you can click the gear icon in the lower left window and then select settings
-1. Search for `Foyle`
-1. Set `Foyle-notebook: Agent-address` to the address of the Foyle server to use as the Agent
+2. Search for `Foyle`
+3. Set `Runme: Foyle Address` to the address of the Foyle server to use as the Agent
    * The Agent handles requests to generate completions
-1. Set `Foyle-notebook: Executor-address` to the address of the Foyle server to use as the Executor
-   * The Executor handles requests to execute commands
 
 ### Customizing the keybindings
 
 If you are unhappy with the default key binding to generate a completion you can change it as follows
 
 1. Click the gear icon in the lower left window and then select "Keyboard shortcuts"
-1. Search for "Foyle"
-1. Change the keybinding for `Foyle: generate a completion` to the keybinding you want to use
+2. Search for "Foyle"
+3. Change the keybinding for `Foyle: generate a completion` to the keybinding you want to use
 
 ## Where to go next
 
-* [Using Markdown Files](/docs/markdown/)
+* [Learning from feedback](/docs/learning/) - How to improve the AI with human feedback.

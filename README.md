@@ -86,32 +86,3 @@ issue/slack channel/Google Doc to create a record of what happened.
 
 More importantly, the documents produced by literate environments contain essential information for training agents to
 operate our infrastructure.
-
-<!-- ## How you can help 
-
-TODO(jeremy): We should ask people try it out but first we need it to be working enough 
-for people to try out.
-
-## Cutting a release
-
-Foyle use's [hydros](https://github.com/jlewi/hydros).
-
-```bash {"id":"01HWC3HJZE75PN5S3A6TK4ZQZ3"}
-hydros apply releasing.yaml
-```
-
-## References
-
-1. [VSCode Notebook API](https://code.visualstudio.com/api/extension-guides/notebook)
-2. [Simplify Devops With Executable Notebooks](https://docs.google.com/presentation/d/1AmztNiX0K17RXwoidamC8BcjmgSp6CFZd26zZEIwN-8/edit#slide=id.p)
-
-## Related Projects
-
-[cleric.io](https://cleric.io/) Company building a fully autonomous SRE teammate.
-[k8sgpt.ai](https://k8sgpt.ai/) Tool to scan your K8s clusters and explain issues and potential fixes.
-[Honeycomb Query Assitant](https://www.honeycomb.io/blog/introducing-query-assistant)
-[Fiberplane](https://docs.fiberplane.com/docs/notebooks) Offer collaborative notebooks for incidement management and post-mortems
-
-```bash {"id":"01HWC3KR7A6NKR89YQ7Z7XVGFG"}
-gcloud container --project=foyle-dev clusters list
-```
