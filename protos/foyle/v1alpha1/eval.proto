@@ -31,6 +31,9 @@ message EvalResult {
 
   // Status of the evaluation
   EvalResultStatus status = 6;
+
+  // The ID of the generate trace
+  string gen_trace_id = 8;
 }
 
 message EvalResultListRequest {

@@ -61,6 +61,9 @@ func (m *EvalResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 	keyName = "status" // field status = 6
 	enc.AddString(keyName, m.Status.String())
 
+	keyName = "gen_trace_id" // field gen_trace_id = 8
+	enc.AddString(keyName, m.GenTraceId)
+
 	return nil
 }
 

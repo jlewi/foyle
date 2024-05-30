@@ -58,6 +58,9 @@ func (m *GenerateResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEn
 		return nil
 	}))
 
+	keyName = "trace_id" // field trace_id = 2
+	enc.AddString(keyName, m.TraceId)
+
 	return nil
 }
 
