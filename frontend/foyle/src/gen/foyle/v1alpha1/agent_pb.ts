@@ -53,6 +53,11 @@ export class GenerateResponse extends Message<GenerateResponse> {
    */
   blocks: Block[] = [];
 
+  /**
+   * @generated from field: string trace_id = 2;
+   */
+  traceId = "";
+
   constructor(data?: PartialMessage<GenerateResponse>) {
     super();
     proto3.util.initPartial(data, this);
@@ -62,6 +67,7 @@ export class GenerateResponse extends Message<GenerateResponse> {
   static readonly typeName = "GenerateResponse";
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
     { no: 1, name: "blocks", kind: "message", T: Block, repeated: true },
+    { no: 2, name: "trace_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GenerateResponse {

@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jlewi/foyle/app/pkg/executor"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+
 	"github.com/jlewi/foyle/app/api"
 	"github.com/pkg/errors"
 
@@ -107,4 +110,59 @@ func experimentForTesting() (*api.Experiment, error) {
 			},
 		},
 	}, nil
+}
+
+func Test_updateEvalResultDistance(t *testing.T) {
+	type testCase struct {
+		name               string
+		result             *v1alpha1.EvalResult
+		expectedDistance   int32
+		expectedNormalized float32
+	}
+
+	cases := []testCase{
+		{
+			// Test the case where the actual answer contains no codeblocks
+			name: "nocodeblocks",
+			result: &v1alpha1.EvalResult{
+				Example: &v1alpha1.Example{
+					Id: "1234",
+					Answer: []*v1alpha1.Block{
+						{
+							Kind:     v1alpha1.BlockKind_CODE,
+							Contents: "gcloud builds list",
+						},
+					},
+				},
+				ExampleFile: "",
+				Actual: []*v1alpha1.Block{
+					{
+						Kind:     v1alpha1.BlockKind_MARKUP,
+						Contents: "Not a code cell",
+					},
+				},
+			},
+			expectedDistance:   3,
+			expectedNormalized: 1.0,
+		},
+	}
+	parser, err := executor.NewBashishParser()
+	if err != nil {
+		t.Fatalf("Error creating parser; %v", err)
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			updateEvalResultDistance(context.Background(), parser, c.result)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if c.result.Distance != c.expectedDistance {
+				t.Errorf("Expected distance %d but got %d", c.expectedDistance, c.result.Distance)
+			}
+			if c.result.NormalizedDistance != c.expectedNormalized {
+				t.Errorf("Expected normalized distance %f but got %f", c.expectedNormalized, c.result.NormalizedDistance)
+			}
+		})
+	}
 }

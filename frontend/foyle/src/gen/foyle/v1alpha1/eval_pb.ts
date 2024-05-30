@@ -85,6 +85,13 @@ export class EvalResult extends Message<EvalResult> {
    */
   status = EvalResultStatus.UNKNOWN_EVAL_RESULT_STATUS;
 
+  /**
+   * The ID of the generate trace
+   *
+   * @generated from field: string gen_trace_id = 8;
+   */
+  genTraceId = "";
+
   constructor(data?: PartialMessage<EvalResult>) {
     super();
     proto3.util.initPartial(data, this);
@@ -100,6 +107,7 @@ export class EvalResult extends Message<EvalResult> {
     { no: 7, name: "normalized_distance", kind: "scalar", T: 2 /* ScalarType.FLOAT */ },
     { no: 5, name: "error", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 6, name: "status", kind: "enum", T: proto3.getEnumType(EvalResultStatus) },
+    { no: 8, name: "gen_trace_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): EvalResult {

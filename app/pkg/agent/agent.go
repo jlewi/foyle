@@ -72,7 +72,8 @@ func NewAgent(cfg config.Config, client *openai.Client) (*Agent, error) {
 func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v1alpha1.GenerateResponse, error) {
 	span := trace.SpanFromContext(ctx)
 	log := logs.FromContext(ctx)
-	log = log.WithValues("traceId", span.SpanContext().TraceID(), "evalMode", a.config.EvalMode())
+	traceId := span.SpanContext().TraceID()
+	log = log.WithValues("traceId", traceId, "evalMode", a.config.EvalMode())
 	ctx = logr.NewContext(ctx, log)
 
 	var examples []*v1alpha1.Example
@@ -106,7 +107,8 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 	}
 
 	resp := &v1alpha1.GenerateResponse{
-		Blocks: blocks,
+		Blocks:  blocks,
+		TraceId: traceId.String(),
 	}
 
 	log.Info("Agent.Generate returning response", zap.Object("response", resp))

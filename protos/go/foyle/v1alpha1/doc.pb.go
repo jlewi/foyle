@@ -141,6 +141,7 @@ type Block struct {
 	// outputs are the output of a block if any.
 	Outputs []*BlockOutput `protobuf:"bytes,4,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	// IDs of any traces associated with this block.
+	// TODO(jeremy): Can we deprecate this field? The trace is a property of the request not the individual block.
 	TraceIds []string `protobuf:"bytes,6,rep,name=trace_ids,json=traceIds,proto3" json:"trace_ids,omitempty"`
 	// ID of the block.
 	Id string `protobuf:"bytes,7,opt,name=id,proto3" json:"id,omitempty"`

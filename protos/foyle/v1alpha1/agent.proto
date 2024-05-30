@@ -20,6 +20,7 @@ message GenerateRequest {
 
 message GenerateResponse {
   repeated Block blocks = 1;
+  string trace_id = 2;
 }
 
 // Generate completions using AI

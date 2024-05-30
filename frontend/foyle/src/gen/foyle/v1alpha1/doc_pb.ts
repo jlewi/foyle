@@ -115,6 +115,7 @@ export class Block extends Message<Block> {
 
   /**
    * IDs of any traces associated with this block.
+   * TODO(jeremy): Can we deprecate this field? The trace is a property of the request not the individual block.
    *
    * @generated from field: repeated string trace_ids = 6;
    */

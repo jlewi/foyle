@@ -48,6 +48,16 @@ func Test_Distance(t *testing.T) {
 				Normalized: 1.0,
 			},
 		},
+		{
+			name:  "empty-array",
+			left:  []string{""},
+			right: []string{"gcloud", "-p", "acme", "baz"},
+			expected: DistanceResult{
+				Distance:   4,
+				Max:        4,
+				Normalized: 1.0,
+			},
+		},
 	}
 
 	for _, c := range cases {

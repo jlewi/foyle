@@ -23,5 +23,6 @@ func HashExample(e *v1alpha1.Example) string {
 	}
 	hash := hasher.Sum(nil)
 
-	return base64.StdEncoding.EncodeToString(hash)
+	// We use URL encoding because if the ID starts with a + Google Sheets has problems with it
+	return base64.URLEncoding.EncodeToString(hash)
 }
