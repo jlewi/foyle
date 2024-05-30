@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"github.com/jlewi/foyle/app/pkg/analyze"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"os"
 	"path/filepath"
@@ -35,11 +36,12 @@ const (
 )
 
 type Evaluator struct {
-	config config.Config
-	parser *executor.BashishParser
+	config   config.Config
+	parser   *executor.BashishParser
+	analyzer *analyze.Analyzer
 }
 
-func NewEvaluator(cfg config.Config) (*Evaluator, error) {
+func NewEvaluator(cfg config.Config, analyzer *analyze.Analyzer) (*Evaluator, error) {
 	parser, err := executor.NewBashishParser()
 
 	if err != nil {
@@ -47,8 +49,9 @@ func NewEvaluator(cfg config.Config) (*Evaluator, error) {
 	}
 
 	return &Evaluator{
-		config: cfg,
-		parser: parser,
+		config:   cfg,
+		parser:   parser,
+		analyzer: analyzer,
 	}, nil
 }
 
@@ -101,6 +104,24 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 
 	// Now generate predictions for any results that are missing them.
 	if err := e.reconcilePredictions(ctx, db, agent); err != nil {
+		return err
+	}
+
+	// We need to process all the logs because we need the traces.
+	// TODO(https://github.com/jlewi/foyle/issues/84): We should do this in real time.
+	// We only need to process the logs for the Agent (raw logs) because we generate predictions but we don't try
+	// to execute them
+	if err := e.analyzer.Analyze(ctx, []string{e.config.GetRawLogDir()}, e.config.GetTracesDBDir(), e.config.GetBlocksDBDir()); err != nil {
+		return err
+	}
+
+	tracesDB, err := pebble.Open(e.config.GetTracesDBDir(), &pebble.Options{})
+	if err != nil {
+		return err
+	}
+	defer helpers.DeferIgnoreError(tracesDB.Close)
+
+	if err := e.reconcileBestRAGResult(ctx, db, tracesDB); err != nil {
 		return err
 	}
 
@@ -169,10 +190,16 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, age
 		}
 
 		if len(result.Actual) == 0 {
-			// We need to generate the answer.
-			resp, err := agent.Generate(ctx, &v1alpha1.GenerateRequest{
-				Doc: result.Example.Query,
-			})
+			// Initialize a trace
+			resp, err := func() (*v1alpha1.GenerateResponse, error) {
+				newCtx, span := tracer().Start(ctx, "(*Evaluator).reconcilePredictions")
+				defer span.End()
+
+				// We need to generate the answer.
+				return agent.Generate(newCtx, &v1alpha1.GenerateRequest{
+					Doc: result.Example.Query,
+				})
+			}()
 			if err != nil {
 				result.Error = err.Error()
 				result.Status = v1alpha1.EvalResultStatus_ERROR

@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"github.com/jlewi/foyle/app/pkg/analyze"
 	"io"
 	"net/http"
 	"os"
@@ -189,7 +190,13 @@ func (a *App) SetupRegistry() error {
 	a.Registry = &controllers.Registry{}
 
 	// Register controllers
-	eval, err := eval.NewEvaluator(*a.Config)
+
+	analyzer, err := analyze.NewAnalyzer()
+	if err != nil {
+		return err
+	}
+
+	eval, err := eval.NewEvaluator(*a.Config, analyzer)
 	if err != nil {
 		return err
 	}

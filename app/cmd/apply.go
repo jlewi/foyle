@@ -34,6 +34,10 @@ func NewApplyCmd() *cobra.Command {
 				if err := app.SetupLogging(false); err != nil {
 					return err
 				}
+				// We need to setup OTEL because we rely on the trace provider.
+				if err := app.SetupOTEL(); err != nil {
+					return err
+				}
 
 				if err := app.SetupRegistry(); err != nil {
 					return err
