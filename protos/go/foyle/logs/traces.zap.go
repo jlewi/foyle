@@ -77,6 +77,95 @@ func (m *Trace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) erro
 	keyName = "eval_mode" // field eval_mode = 6
 	enc.AddBool(keyName, m.EvalMode)
 
+	keyName = "spans" // field spans = 8
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Spans {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	return nil
+}
+
+func (m *Span) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "id" // field id = 1
+	enc.AddString(keyName, m.Id)
+
+	keyName = "rag" // field rag = 2
+	if ov, ok := m.GetData().(*Span_Rag); ok {
+		_ = ov
+		if ov.Rag != nil {
+			var vv interface{} = ov.Rag
+			if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+				enc.AddObject(keyName, marshaler)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (m *RAGSpan) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "query" // field query = 1
+	enc.AddString(keyName, m.Query)
+
+	keyName = "results" // field results = 2
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Results {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	return nil
+}
+
+func (m *RAGResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "example" // field example = 1
+	if m.Example != nil {
+		var vv interface{} = m.Example
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
+
+	keyName = "score" // field score = 2
+	enc.AddFloat64(keyName, m.Score)
+
 	return nil
 }
 

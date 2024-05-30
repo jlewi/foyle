@@ -423,6 +423,7 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb
 		Data: &logspb.Trace_Generate{
 			Generate: gTrace,
 		},
+		Spans: make([]*logspb.Span, 0, 10),
 	}
 	evalMode := false
 	for _, e := range entries {
@@ -462,8 +463,15 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb
 				trace.EndTime = timestamppb.New(e.Time())
 			}
 		}
+
+		span := logEntryToSpan(ctx, e)
+		if span != nil {
+			trace.Spans = append(trace.Spans, span)
+		}
 	}
 	trace.EvalMode = evalMode
+
+	combineSpans(trace)
 	return trace, nil
 }
 

@@ -2,6 +2,8 @@ package api
 
 import (
 	"encoding/json"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 	"time"
 
 	"github.com/go-logr/zapr"
@@ -27,6 +29,41 @@ type LogEntry map[string]interface{}
 func (L *LogEntry) Get(field string) (interface{}, bool) {
 	v, ok := (*L)[field]
 	return v, ok
+}
+
+func (L *LogEntry) GetFloat64(field string) (float64, bool) {
+	v, ok := (*L)[field]
+
+	f, ok := v.(float64)
+	return f, ok
+}
+
+// GetProto gets the field as the specified proto message.
+// Returns false if the field was not present or the field was not the supplied proto message.
+func (L *LogEntry) GetProto(field string, msg proto.Message) bool {
+	v, ok := (*L)[field]
+	if !ok {
+		return ok
+	}
+	obj, ok := v.(map[string]interface{})
+
+	if !ok {
+		return false
+	}
+
+	b, err := json.Marshal(obj)
+	if err != nil {
+		log := zapr.NewLogger(zap.L())
+		log.Error(err, "Failed to marshal request")
+		return false
+	}
+	if err := protojson.Unmarshal(b, msg); err != nil {
+		log := zapr.NewLogger(zap.L())
+		log.Error(err, "Failed to unmarshal request")
+		return false
+
+	}
+	return true
 }
 
 func (L *LogEntry) Request() []byte {
