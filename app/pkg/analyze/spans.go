@@ -17,7 +17,7 @@ func logEntryToSpan(ctx context.Context, e *api.LogEntry) *logspb.Span {
 
 func logEntryToRAGSpan(ctx context.Context, e *api.LogEntry) *logspb.Span {
 	rag := &logspb.RAGSpan{
-		Results: make([]*logspb.RAGResult, 0),
+		Results: make([]*v1alpha1.RAGResult, 0),
 	}
 	if v, ok := e.Get("query"); ok {
 		if q, ok := v.(string); ok {
@@ -34,7 +34,7 @@ func logEntryToRAGSpan(ctx context.Context, e *api.LogEntry) *logspb.Span {
 			score = newScore
 		}
 
-		rag.Results = append(rag.Results, &logspb.RAGResult{
+		rag.Results = append(rag.Results, &v1alpha1.RAGResult{
 			Example: example,
 			Score:   score,
 		})
@@ -78,7 +78,7 @@ func combineSpans(trace *logspb.Trace) {
 func combineRAGSpans(a, b *logspb.RAGSpan) *logspb.RAGSpan {
 	span := &logspb.RAGSpan{
 		Query:   a.Query,
-		Results: make([]*logspb.RAGResult, 0, len(a.Results)+len(b.Results)),
+		Results: make([]*v1alpha1.RAGResult, 0, len(a.Results)+len(b.Results)),
 	}
 
 	if span.Query == "" && b.Query != "" {

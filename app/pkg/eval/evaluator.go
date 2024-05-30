@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"os"
 	"path/filepath"
 
@@ -240,6 +241,77 @@ func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error 
 	return nil
 }
 
+func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, db *pebble.DB, traces *pebble.DB) error {
+	olog := logs.FromContext(ctx)
+	iter, err := db.NewIterWithContext(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if key == nil {
+			break
+		}
+
+		log := olog.WithValues("id", string(key))
+		value, err := iter.ValueAndErr()
+		if err != nil {
+			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
+		}
+
+		result := &v1alpha1.EvalResult{}
+		if err := proto.Unmarshal(value, result); err != nil {
+			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
+		}
+
+		// TODO(jeremy): How do we skip this step in the case where the experiment didn't involve RAG
+		if result.BestRagResult != nil {
+			log.Info("Skipping; best RAG result already computed")
+			continue
+		}
+
+		genTrace := &logspb.Trace{}
+		if err := dbutil.GetProto(traces, result.GenTraceId, genTrace); err != nil {
+			log.Error(err, "Failed to read gen trace", "id", result.GenTraceId)
+			continue
+		}
+
+		for _, span := range genTrace.Spans {
+			if span.GetRag() == nil {
+				continue
+			}
+			rag := span.GetRag()
+			if rag.Results == nil {
+				continue
+			}
+
+			for _, ragResult := range rag.Results {
+				if ragResult.Example == nil {
+					continue
+				}
+				if result.BestRagResult == nil {
+					result.BestRagResult = ragResult
+					continue
+				}
+
+				if result.BestRagResult.Score < ragResult.Score {
+					result.BestRagResult = ragResult
+				}
+			}
+		}
+
+		if result.BestRagResult == nil {
+			continue
+		}
+		if err := e.updateResult(ctx, string(key), result, db); err != nil {
+			log.Error(err, "Failed to update result")
+		}
+	}
+	return nil
+}
+
 func updateEvalResultDistance(ctx context.Context, parser *executor.BashishParser, result *v1alpha1.EvalResult) {
 	log := logs.FromContext(ctx).WithValues("id", result.GetExample().GetId())
 	var actualBlock *v1alpha1.Block
@@ -367,7 +439,7 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 
 	// Prepare the value range to write
 	writeRange := sheetName
-	values := [][]interface{}{{"id", "file", "prompt", "actual", "expected", "distance", "normalized_distance"}}
+	values := [][]interface{}{{"id", "file", "prompt", "actual", "expected", "distance", "normalized_distance", "best_rag"}}
 
 	iter, err := db.NewIterWithContext(ctx, nil)
 	if err != nil {
@@ -393,6 +465,14 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 
 		prompt := docs.DocToMarkdown(result.Example.Query)
 		row := []interface{}{result.Example.Id, result.ExampleFile, prompt, docs.BlocksToMarkdown(result.Actual), docs.BlocksToMarkdown(result.Example.Answer), result.Distance, result.NormalizedDistance}
+
+		bestRAG := ""
+		if result.BestRagResult != nil {
+			if result.BestRagResult.Example.Query != nil {
+				bestRAG = docs.DocToMarkdown(result.BestRagResult.Example.Query)
+			}
+		}
+		row = append(row, bestRAG)
 		values = append(values, row)
 	}
 	valueRange := &sheets.ValueRange{

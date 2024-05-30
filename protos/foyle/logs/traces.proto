@@ -42,11 +42,6 @@ message RAGSpan {
   repeated RAGResult results = 2;
 }
 
-message RAGResult {
-  Example example = 1;
-  double score = 2;
-}
-
 message GenerateTrace {
   GenerateRequest request = 1;
   GenerateResponse response = 2;

@@ -64,3 +64,46 @@ export class Example extends Message<Example> {
   }
 }
 
+/**
+ * @generated from message RAGResult
+ */
+export class RAGResult extends Message<RAGResult> {
+  /**
+   * @generated from field: Example example = 1;
+   */
+  example?: Example;
+
+  /**
+   * @generated from field: double score = 2;
+   */
+  score = 0;
+
+  constructor(data?: PartialMessage<RAGResult>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "RAGResult";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "example", kind: "message", T: Example },
+    { no: 2, name: "score", kind: "scalar", T: 1 /* ScalarType.DOUBLE */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): RAGResult {
+    return new RAGResult().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): RAGResult {
+    return new RAGResult().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): RAGResult {
+    return new RAGResult().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: RAGResult | PlainMessage<RAGResult> | undefined, b: RAGResult | PlainMessage<RAGResult> | undefined): boolean {
+    return proto3.util.equals(RAGResult, a, b);
+  }
+}
+

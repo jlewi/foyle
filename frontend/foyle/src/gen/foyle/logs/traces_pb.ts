@@ -5,7 +5,7 @@
 
 import type { BinaryReadOptions, FieldList, JsonReadOptions, JsonValue, PartialMessage, PlainMessage } from "@bufbuild/protobuf";
 import { Message, proto3, Timestamp } from "@bufbuild/protobuf";
-import { Example } from "../v1alpha1/trainer_pb";
+import { RAGResult } from "../v1alpha1/trainer_pb";
 import { ExecuteRequest, ExecuteResponse, GenerateRequest, GenerateResponse } from "../v1alpha1/agent_pb";
 import { ExecuteRequest as ExecuteRequest$1, ExecuteResponse as ExecuteResponse$1 } from "../../runme/runner/v1/runner_pb";
 
@@ -159,7 +159,7 @@ export class RAGSpan extends Message<RAGSpan> {
   query = "";
 
   /**
-   * @generated from field: repeated foyle.logs.RAGResult results = 2;
+   * @generated from field: repeated RAGResult results = 2;
    */
   results: RAGResult[] = [];
 
@@ -189,49 +189,6 @@ export class RAGSpan extends Message<RAGSpan> {
 
   static equals(a: RAGSpan | PlainMessage<RAGSpan> | undefined, b: RAGSpan | PlainMessage<RAGSpan> | undefined): boolean {
     return proto3.util.equals(RAGSpan, a, b);
-  }
-}
-
-/**
- * @generated from message foyle.logs.RAGResult
- */
-export class RAGResult extends Message<RAGResult> {
-  /**
-   * @generated from field: Example example = 1;
-   */
-  example?: Example;
-
-  /**
-   * @generated from field: double score = 2;
-   */
-  score = 0;
-
-  constructor(data?: PartialMessage<RAGResult>) {
-    super();
-    proto3.util.initPartial(data, this);
-  }
-
-  static readonly runtime: typeof proto3 = proto3;
-  static readonly typeName = "foyle.logs.RAGResult";
-  static readonly fields: FieldList = proto3.util.newFieldList(() => [
-    { no: 1, name: "example", kind: "message", T: Example },
-    { no: 2, name: "score", kind: "scalar", T: 1 /* ScalarType.DOUBLE */ },
-  ]);
-
-  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): RAGResult {
-    return new RAGResult().fromBinary(bytes, options);
-  }
-
-  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): RAGResult {
-    return new RAGResult().fromJson(jsonValue, options);
-  }
-
-  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): RAGResult {
-    return new RAGResult().fromJsonString(jsonString, options);
-  }
-
-  static equals(a: RAGResult | PlainMessage<RAGResult> | undefined, b: RAGResult | PlainMessage<RAGResult> | undefined): boolean {
-    return proto3.util.equals(RAGResult, a, b);
   }
 }
 

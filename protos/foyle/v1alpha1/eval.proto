@@ -34,6 +34,9 @@ message EvalResult {
 
   // The ID of the generate trace
   string gen_trace_id = 8;
+
+  // Best matching RAG result
+  RAGResult best_rag_result = 9;
 }
 
 message EvalResultListRequest {
