@@ -72,9 +72,9 @@ func (m *Block) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) erro
 		return nil
 	}))
 
-	keyName = "deprecated_trace_ids" // field deprecated_trace_ids = 6
+	keyName = "trace_ids" // field trace_ids = 6
 	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
-		for _, rv := range m.DeprecatedTraceIds {
+		for _, rv := range m.TraceIds {
 			_ = rv
 			aenc.AppendString(rv)
 		}

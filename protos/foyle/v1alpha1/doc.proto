@@ -32,8 +32,8 @@ message Block {
   repeated BlockOutput outputs = 4;
 
   // IDs of any traces associated with this block.
-  // trace_ids is no longer used. The trace is a property of the request not the individual block.
-  repeated string deprecated_trace_ids = 6;
+  // TODO(jeremy): Can we deprecate this field? The trace is a property of the request not the individual block.
+  repeated string trace_ids = 6;
 
   // ID of the block.
   string id = 7;

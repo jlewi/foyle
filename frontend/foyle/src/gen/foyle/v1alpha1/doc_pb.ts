@@ -115,11 +115,11 @@ export class Block extends Message<Block> {
 
   /**
    * IDs of any traces associated with this block.
-   * trace_ids is no longer used. The trace is a property of the request not the individual block.
+   * TODO(jeremy): Can we deprecate this field? The trace is a property of the request not the individual block.
    *
-   * @generated from field: repeated string deprecated_trace_ids = 6;
+   * @generated from field: repeated string trace_ids = 6;
    */
-  deprecatedTraceIds: string[] = [];
+  traceIds: string[] = [];
 
   /**
    * ID of the block.
@@ -140,7 +140,7 @@ export class Block extends Message<Block> {
     { no: 2, name: "language", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "contents", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 4, name: "outputs", kind: "message", T: BlockOutput, repeated: true },
-    { no: 6, name: "deprecated_trace_ids", kind: "scalar", T: 9 /* ScalarType.STRING */, repeated: true },
+    { no: 6, name: "trace_ids", kind: "scalar", T: 9 /* ScalarType.STRING */, repeated: true },
     { no: 7, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ]);
 
