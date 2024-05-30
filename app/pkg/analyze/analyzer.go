@@ -384,7 +384,6 @@ func updateBlockForExecution(block *logspb.BlockLog, lastTrace *logspb.Trace) er
 			Kind:     v1alpha1.BlockKind_CODE,
 			Contents: strings.Join(eTrace.RunMe.Request.GetCommands(), " "),
 			Outputs:  nil,
-			TraceIds: nil,
 		}
 
 	default:

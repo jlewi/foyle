@@ -33,9 +33,9 @@ func Distance(left executor.Instruction, right executor.Instruction) (DistanceRe
 	rightArgs := splitInstruction(right)
 
 	result := DistanceResult{
-		Distance:   -1,
-		Max:        -1,
-		Normalized: -1,
+		Distance:   uninitializedDistance,
+		Max:        uninitializedDistance,
+		Normalized: uninitializedDistance,
 	}
 
 	// Compute the distance of the unnamed arguments

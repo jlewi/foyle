@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/go-cmd/cmd"
+
 	"github.com/jlewi/foyle/app/pkg/dbutil"
 
 	"github.com/jlewi/foyle/app/api"
@@ -25,6 +27,10 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 	"google.golang.org/protobuf/proto"
+)
+
+const (
+	uninitializedDistance = -1
 )
 
 type Evaluator struct {
@@ -173,6 +179,7 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, age
 			}
 
 			result.Actual = resp.GetBlocks()
+			result.GenTraceId = resp.GetTraceId()
 
 			log.Info("Writing result to DB")
 			if err := e.updateResult(ctx, string(key), result, db); err != nil {
@@ -224,70 +231,74 @@ func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error 
 			continue
 		}
 
-		var actualBlock *v1alpha1.Block
-
-		for _, b := range result.Actual {
-			if b.Kind == v1alpha1.BlockKind_CODE {
-				actualBlock = b
-				break
-			}
-		}
-		if actualBlock == nil {
-			log.Info("Skipping; no code blocks found in the answer")
-			continue
-		}
-
-		if len(result.Example.GetAnswer()) > 1 {
-			log.Info("Warning; expected answer more than one answer block. Only the first is used")
-		}
-
-		expected, err := e.parser.Parse(result.Example.Answer[0].GetContents())
-		if err != nil {
-			log.Error(err, "Failed to parse expected answer to command")
-			result.Error = err.Error()
-			result.Status = v1alpha1.EvalResultStatus_ERROR
-			if err := e.updateResult(ctx, string(key), result, db); err != nil {
-				log.Error(err, "Failed to update result")
-			}
-			continue
-		}
-
-		actual, err := e.parser.Parse(actualBlock.GetContents())
-		if err != nil {
-			log.Error(err, "Failed to parse actual answer to command")
-			result.Error = err.Error()
-			result.Status = v1alpha1.EvalResultStatus_ERROR
-			if err := e.updateResult(ctx, string(key), result, db); err != nil {
-				log.Error(err, "Failed to update result")
-			}
-			continue
-		}
-
-		distance, err := Distance(expected[0], actual[0])
-
-		if err != nil {
-			log.Error(err, "Failed to compute distance")
-			result.Error = err.Error()
-			result.Status = v1alpha1.EvalResultStatus_ERROR
-			if err := e.updateResult(ctx, string(key), result, db); err != nil {
-				log.Error(err, "Failed to update result")
-			}
-			continue
-		}
-
-		if distance.Max < distance.Distance {
-			log.Error(errors.New("Distance is greater than max distance"), "Distance is greater than max distance", "distance", distance.Distance, "max", distance.Max)
-		}
-
-		result.Distance = int32(distance.Distance)
-		result.NormalizedDistance = distance.Normalized
-		result.Status = v1alpha1.EvalResultStatus_DONE
+		updateEvalResultDistance(ctx, e.parser, result)
 		log.Info("Updating distance", "distance", result.Distance)
 		if err := e.updateResult(ctx, string(key), result, db); err != nil {
 			log.Error(err, "Failed to update result")
 		}
 	}
 	return nil
+}
+
+func updateEvalResultDistance(ctx context.Context, parser *executor.BashishParser, result *v1alpha1.EvalResult) {
+	log := logs.FromContext(ctx).WithValues("id", result.GetExample().GetId())
+	var actualBlock *v1alpha1.Block
+
+	for _, b := range result.Actual {
+		if b.Kind == v1alpha1.BlockKind_CODE {
+			actualBlock = b
+			break
+		}
+	}
+
+	if len(result.Example.GetAnswer()) > 1 {
+		log.Info("Warning; expected answer more than one answer block. Only the first is used")
+	}
+
+	expected, err := parser.Parse(result.Example.Answer[0].GetContents())
+	if err != nil {
+		log.Error(err, "Failed to parse expected answer to command")
+		result.Error = err.Error()
+		result.Status = v1alpha1.EvalResultStatus_ERROR
+		return
+	}
+
+	var actual []executor.Instruction
+	if actualBlock != nil {
+		parsed, err := parser.Parse(actualBlock.GetContents())
+		if err != nil {
+			log.Error(err, "Failed to parse actual answer to command")
+			result.Error = err.Error()
+			result.Status = v1alpha1.EvalResultStatus_ERROR
+			return
+		}
+		actual = parsed
+	} else {
+		// Since there is no code block. Initialize actual to an empty command.
+		// This will cause the distance computed to be the maximum possible distance which is what we want
+		actual = []executor.Instruction{
+			{
+				Command: cmd.NewCmd(""),
+			},
+		}
+	}
+
+	distance, err := Distance(expected[0], actual[0])
+
+	if err != nil {
+		log.Error(err, "Failed to compute distance")
+		result.Error = err.Error()
+		result.Status = v1alpha1.EvalResultStatus_ERROR
+		return
+	}
+
+	if distance.Max < distance.Distance {
+		log.Error(errors.New("Distance is greater than max distance"), "Distance is greater than max distance", "distance", distance.Distance, "max", distance.Max)
+	}
+
+	result.Distance = int32(distance.Distance)
+	result.NormalizedDistance = distance.Normalized
+	result.Status = v1alpha1.EvalResultStatus_DONE
 }
 
 func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experiment, db *pebble.DB) error {
@@ -516,7 +527,7 @@ func (e *Evaluator) loadMarkdownFiles(ctx context.Context, db *pebble.DB, files 
 			Example:     example,
 			ExampleFile: path,
 			// initialize distance to a negative value so we can tell when it hasn't been computed
-			Distance: -1,
+			Distance: uninitializedDistance,
 		}
 
 		if err := dbutil.SetProto(db, example.GetId(), result); err != nil {
