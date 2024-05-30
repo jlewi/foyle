@@ -5,7 +5,7 @@ To fetch the hydros logs for the build of the image `vscode-ext`, you can follow
 1. Use `gcloud` to fetch the hydros logs for the image `vscode-ext`:
 
 ```sh {"id":"01HZ3BDKKQK01SE8K772C2D23B"}
-gcloud logging read 'logName="projects/foyle-dev/logs/hydros" jsonPayload.image="vscode-ext"' --freshness=14d --project=foyle-dev
+gcloud logging read 'logName="projects/foyle-dev/logs/hydros" jsonPayload.image="vscode"' --freshness=14d --project=foyle-dev
 ```
 
 2. Check the RunMe logs to ensure the command was logged:
