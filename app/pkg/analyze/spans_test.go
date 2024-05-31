@@ -3,13 +3,14 @@ package analyze
 import (
 	"context"
 	"encoding/json"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/testutil"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"testing"
 )
 
 func Test_logEntryToSpan(t *testing.T) {
@@ -26,7 +27,7 @@ func Test_logEntryToSpan(t *testing.T) {
 			expected: &logspb.Span{
 				Data: &logspb.Span_Rag{
 					Rag: &logspb.RAGSpan{
-						Results: []*logspb.RAGResult{
+						Results: []*v1alpha1.RAGResult{
 							{
 								Example: &v1alpha1.Example{
 									Id: "01HZ3K97HMF590J823F10RJZ4T",
@@ -63,7 +64,7 @@ func Test_logEntryToSpan(t *testing.T) {
 				t.Fatalf("Failed to unmarshal log line: %v", err)
 			}
 			span := logEntryToSpan(context.Background(), e)
-			if d := cmp.Diff(tc.expected, span, cmpopts.IgnoreUnexported(logspb.Span{}, logspb.RAGSpan{}, logspb.RAGResult{}, v1alpha1.Example{}), testutil.DocComparer); d != "" {
+			if d := cmp.Diff(tc.expected, span, cmpopts.IgnoreUnexported(logspb.Span{}, logspb.RAGSpan{}, v1alpha1.RAGResult{}, v1alpha1.Example{}), testutil.DocComparer); d != "" {
 				t.Fatalf("Unexpected diff:\n%v", d)
 			}
 		})
@@ -92,7 +93,7 @@ func Test_CombineSpans(t *testing.T) {
 					{
 						Data: &logspb.Span_Rag{
 							Rag: &logspb.RAGSpan{
-								Results: []*logspb.RAGResult{
+								Results: []*v1alpha1.RAGResult{
 									{
 										Example: &v1alpha1.Example{
 											Id: "012",
@@ -105,7 +106,7 @@ func Test_CombineSpans(t *testing.T) {
 					{
 						Data: &logspb.Span_Rag{
 							Rag: &logspb.RAGSpan{
-								Results: []*logspb.RAGResult{
+								Results: []*v1alpha1.RAGResult{
 									{
 										Example: &v1alpha1.Example{
 											Id: "abc",
@@ -123,7 +124,7 @@ func Test_CombineSpans(t *testing.T) {
 						Data: &logspb.Span_Rag{
 							Rag: &logspb.RAGSpan{
 								Query: "query",
-								Results: []*logspb.RAGResult{
+								Results: []*v1alpha1.RAGResult{
 									{
 										Example: &v1alpha1.Example{
 											Id: "012",
@@ -146,7 +147,7 @@ func Test_CombineSpans(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			combineSpans(tc.trace)
-			if d := cmp.Diff(tc.expected, tc.trace, cmpopts.IgnoreUnexported(logspb.Trace{}, logspb.Span{}, logspb.RAGSpan{}, logspb.RAGResult{}, v1alpha1.Example{}), testutil.DocComparer); d != "" {
+			if d := cmp.Diff(tc.expected, tc.trace, cmpopts.IgnoreUnexported(logspb.Trace{}, logspb.Span{}, logspb.RAGSpan{}, v1alpha1.RAGResult{}, v1alpha1.Example{}), testutil.DocComparer); d != "" {
 				t.Fatalf("Unexpected diff:\n%v", d)
 			}
 		})

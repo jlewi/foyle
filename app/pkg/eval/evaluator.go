@@ -2,10 +2,11 @@ package eval
 
 import (
 	"context"
-	"github.com/jlewi/foyle/app/pkg/analyze"
-	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"os"
 	"path/filepath"
+
+	"github.com/jlewi/foyle/app/pkg/analyze"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/go-cmd/cmd"
 

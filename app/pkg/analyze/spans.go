@@ -2,10 +2,11 @@ package analyze
 
 import (
 	"context"
+	"strings"
+
 	"github.com/jlewi/foyle/app/api"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"strings"
 )
 
 func logEntryToSpan(ctx context.Context, e *api.LogEntry) *logspb.Span {

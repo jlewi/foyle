@@ -2,9 +2,10 @@ package api
 
 import (
 	"encoding/json"
+	"time"
+
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"time"
 
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
@@ -33,6 +34,9 @@ func (L *LogEntry) Get(field string) (interface{}, bool) {
 
 func (L *LogEntry) GetFloat64(field string) (float64, bool) {
 	v, ok := (*L)[field]
+	if !ok {
+		return 0, false
+	}
 
 	f, ok := v.(float64)
 	return f, ok

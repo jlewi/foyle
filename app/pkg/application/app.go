@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"github.com/jlewi/foyle/app/pkg/analyze"
 	"io"
 	"net/http"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/jlewi/foyle/app/pkg/analyze"
 
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/eval"
