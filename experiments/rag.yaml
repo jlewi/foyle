@@ -5,7 +5,7 @@ metadata:
   name: "learning"
 spec:
   evalDir: /Users/jlewi/git_foyle/data/eval
-  dbDir: /Users/jlewi/foyle_experiments/20250530-1536/learning
+  dbDir: /Users/jlewi/foyle_experiments/20250530-1612/learning
   sheetID: "1iJbkdUSxEkEX24xMH2NYpxqYcM_7-0koSRuANccDAb8"
   sheetName: "WithRAG"
   agent:

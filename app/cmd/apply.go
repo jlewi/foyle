@@ -31,7 +31,8 @@ func NewApplyCmd() *cobra.Command {
 				if err := app.LoadConfig(cmd); err != nil {
 					return err
 				}
-				if err := app.SetupLogging(false); err != nil {
+				// We need to log to a file because in the case of Eval we want to capture traces.
+				if err := app.SetupLogging(true); err != nil {
 					return err
 				}
 				// We need to setup OTEL because we rely on the trace provider.
