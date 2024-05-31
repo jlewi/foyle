@@ -5,6 +5,7 @@
 
 import type { BinaryReadOptions, FieldList, JsonReadOptions, JsonValue, PartialMessage, PlainMessage } from "@bufbuild/protobuf";
 import { Message, proto3, Timestamp } from "@bufbuild/protobuf";
+import { RAGResult } from "../v1alpha1/trainer_pb";
 import { ExecuteRequest, ExecuteResponse, GenerateRequest, GenerateResponse } from "../v1alpha1/agent_pb";
 import { ExecuteRequest as ExecuteRequest$1, ExecuteResponse as ExecuteResponse$1 } from "../../runme/runner/v1/runner_pb";
 
@@ -28,6 +29,8 @@ export class Trace extends Message<Trace> {
   endTime?: Timestamp;
 
   /**
+   * TODO(jeremy): Should these really be spans?
+   *
    * @generated from oneof foyle.logs.Trace.data
    */
   data: {
@@ -57,6 +60,11 @@ export class Trace extends Message<Trace> {
    */
   evalMode = false;
 
+  /**
+   * @generated from field: repeated foyle.logs.Span spans = 8;
+   */
+  spans: Span[] = [];
+
   constructor(data?: PartialMessage<Trace>) {
     super();
     proto3.util.initPartial(data, this);
@@ -72,6 +80,7 @@ export class Trace extends Message<Trace> {
     { no: 5, name: "execute", kind: "message", T: ExecuteTrace, oneof: "data" },
     { no: 7, name: "run_me", kind: "message", T: RunMeTrace, oneof: "data" },
     { no: 6, name: "eval_mode", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 8, name: "spans", kind: "message", T: Span, repeated: true },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): Trace {
@@ -88,6 +97,98 @@ export class Trace extends Message<Trace> {
 
   static equals(a: Trace | PlainMessage<Trace> | undefined, b: Trace | PlainMessage<Trace> | undefined): boolean {
     return proto3.util.equals(Trace, a, b);
+  }
+}
+
+/**
+ * @generated from message foyle.logs.Span
+ */
+export class Span extends Message<Span> {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id = "";
+
+  /**
+   * @generated from oneof foyle.logs.Span.data
+   */
+  data: {
+    /**
+     * @generated from field: foyle.logs.RAGSpan rag = 2;
+     */
+    value: RAGSpan;
+    case: "rag";
+  } | { case: undefined; value?: undefined } = { case: undefined };
+
+  constructor(data?: PartialMessage<Span>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "foyle.logs.Span";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "rag", kind: "message", T: RAGSpan, oneof: "data" },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): Span {
+    return new Span().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): Span {
+    return new Span().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): Span {
+    return new Span().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: Span | PlainMessage<Span> | undefined, b: Span | PlainMessage<Span> | undefined): boolean {
+    return proto3.util.equals(Span, a, b);
+  }
+}
+
+/**
+ * @generated from message foyle.logs.RAGSpan
+ */
+export class RAGSpan extends Message<RAGSpan> {
+  /**
+   * @generated from field: string query = 1;
+   */
+  query = "";
+
+  /**
+   * @generated from field: repeated RAGResult results = 2;
+   */
+  results: RAGResult[] = [];
+
+  constructor(data?: PartialMessage<RAGSpan>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "foyle.logs.RAGSpan";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "query", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "results", kind: "message", T: RAGResult, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): RAGSpan {
+    return new RAGSpan().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): RAGSpan {
+    return new RAGSpan().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): RAGSpan {
+    return new RAGSpan().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: RAGSpan | PlainMessage<RAGSpan> | undefined, b: RAGSpan | PlainMessage<RAGSpan> | undefined): boolean {
+    return proto3.util.equals(RAGSpan, a, b);
   }
 }
 

@@ -60,3 +60,25 @@ func (m *Example) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) er
 
 	return nil
 }
+
+func (m *RAGResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "example" // field example = 1
+	if m.Example != nil {
+		var vv interface{} = m.Example
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
+
+	keyName = "score" // field score = 2
+	enc.AddFloat64(keyName, m.Score)
+
+	return nil
+}

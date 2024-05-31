@@ -13,3 +13,8 @@ message Example {
   Doc query = 3;
   repeated Block answer = 4;
 }
+
+message RAGResult {
+  Example example = 1;
+  double score = 2;
+}

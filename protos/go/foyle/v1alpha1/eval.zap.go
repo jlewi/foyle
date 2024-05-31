@@ -64,6 +64,14 @@ func (m *EvalResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 	keyName = "gen_trace_id" // field gen_trace_id = 8
 	enc.AddString(keyName, m.GenTraceId)
 
+	keyName = "best_rag_result" // field best_rag_result = 9
+	if m.BestRagResult != nil {
+		var vv interface{} = m.BestRagResult
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
+
 	return nil
 }
 

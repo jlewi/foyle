@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jlewi/foyle/app/pkg/analyze"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+
 	"github.com/go-cmd/cmd"
 
 	"github.com/jlewi/foyle/app/pkg/dbutil"
@@ -34,11 +37,12 @@ const (
 )
 
 type Evaluator struct {
-	config config.Config
-	parser *executor.BashishParser
+	config   config.Config
+	parser   *executor.BashishParser
+	analyzer *analyze.Analyzer
 }
 
-func NewEvaluator(cfg config.Config) (*Evaluator, error) {
+func NewEvaluator(cfg config.Config, analyzer *analyze.Analyzer) (*Evaluator, error) {
 	parser, err := executor.NewBashishParser()
 
 	if err != nil {
@@ -46,8 +50,9 @@ func NewEvaluator(cfg config.Config) (*Evaluator, error) {
 	}
 
 	return &Evaluator{
-		config: cfg,
-		parser: parser,
+		config:   cfg,
+		parser:   parser,
+		analyzer: analyzer,
 	}, nil
 }
 
@@ -100,6 +105,24 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 
 	// Now generate predictions for any results that are missing them.
 	if err := e.reconcilePredictions(ctx, db, agent); err != nil {
+		return err
+	}
+
+	// We need to process all the logs because we need the traces.
+	// TODO(https://github.com/jlewi/foyle/issues/84): We should do this in real time.
+	// We only need to process the logs for the Agent (raw logs) because we generate predictions but we don't try
+	// to execute them
+	if err := e.analyzer.Analyze(ctx, []string{e.config.GetRawLogDir()}, e.config.GetTracesDBDir(), e.config.GetBlocksDBDir()); err != nil {
+		return err
+	}
+
+	tracesDB, err := pebble.Open(e.config.GetTracesDBDir(), &pebble.Options{})
+	if err != nil {
+		return err
+	}
+	defer helpers.DeferIgnoreError(tracesDB.Close)
+
+	if err := e.reconcileBestRAGResult(ctx, db, tracesDB); err != nil {
 		return err
 	}
 
@@ -168,10 +191,16 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, age
 		}
 
 		if len(result.Actual) == 0 {
-			// We need to generate the answer.
-			resp, err := agent.Generate(ctx, &v1alpha1.GenerateRequest{
-				Doc: result.Example.Query,
-			})
+			// Initialize a trace
+			resp, err := func() (*v1alpha1.GenerateResponse, error) {
+				newCtx, span := tracer().Start(ctx, "(*Evaluator).reconcilePredictions")
+				defer span.End()
+
+				// We need to generate the answer.
+				return agent.Generate(newCtx, &v1alpha1.GenerateRequest{
+					Doc: result.Example.Query,
+				})
+			}()
 			if err != nil {
 				result.Error = err.Error()
 				result.Status = v1alpha1.EvalResultStatus_ERROR
@@ -233,6 +262,77 @@ func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error 
 
 		updateEvalResultDistance(ctx, e.parser, result)
 		log.Info("Updating distance", "distance", result.Distance)
+		if err := e.updateResult(ctx, string(key), result, db); err != nil {
+			log.Error(err, "Failed to update result")
+		}
+	}
+	return nil
+}
+
+func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, db *pebble.DB, traces *pebble.DB) error {
+	olog := logs.FromContext(ctx)
+	iter, err := db.NewIterWithContext(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if key == nil {
+			break
+		}
+
+		log := olog.WithValues("id", string(key))
+		value, err := iter.ValueAndErr()
+		if err != nil {
+			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
+		}
+
+		result := &v1alpha1.EvalResult{}
+		if err := proto.Unmarshal(value, result); err != nil {
+			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
+		}
+
+		// TODO(jeremy): How do we skip this step in the case where the experiment didn't involve RAG
+		if result.BestRagResult != nil {
+			log.Info("Skipping; best RAG result already computed")
+			continue
+		}
+
+		genTrace := &logspb.Trace{}
+		if err := dbutil.GetProto(traces, result.GenTraceId, genTrace); err != nil {
+			log.Error(err, "Failed to read gen trace", "id", result.GenTraceId)
+			continue
+		}
+
+		for _, span := range genTrace.Spans {
+			if span.GetRag() == nil {
+				continue
+			}
+			rag := span.GetRag()
+			if rag.Results == nil {
+				continue
+			}
+
+			for _, ragResult := range rag.Results {
+				if ragResult.Example == nil {
+					continue
+				}
+				if result.BestRagResult == nil {
+					result.BestRagResult = ragResult
+					continue
+				}
+
+				if result.BestRagResult.Score < ragResult.Score {
+					result.BestRagResult = ragResult
+				}
+			}
+		}
+
+		if result.BestRagResult == nil {
+			continue
+		}
 		if err := e.updateResult(ctx, string(key), result, db); err != nil {
 			log.Error(err, "Failed to update result")
 		}
@@ -367,7 +467,7 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 
 	// Prepare the value range to write
 	writeRange := sheetName
-	values := [][]interface{}{{"id", "file", "prompt", "actual", "expected", "distance", "normalized_distance"}}
+	values := [][]interface{}{{"id", "file", "prompt", "actual", "expected", "distance", "normalized_distance", "best_rag"}}
 
 	iter, err := db.NewIterWithContext(ctx, nil)
 	if err != nil {
@@ -393,6 +493,14 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 
 		prompt := docs.DocToMarkdown(result.Example.Query)
 		row := []interface{}{result.Example.Id, result.ExampleFile, prompt, docs.BlocksToMarkdown(result.Actual), docs.BlocksToMarkdown(result.Example.Answer), result.Distance, result.NormalizedDistance}
+
+		bestRAG := ""
+		if result.BestRagResult != nil {
+			if result.BestRagResult.Example.Query != nil {
+				bestRAG = docs.DocToMarkdown(result.BestRagResult.Example.Query)
+			}
+		}
+		row = append(row, bestRAG)
 		values = append(values, row)
 	}
 	valueRange := &sheets.ValueRange{

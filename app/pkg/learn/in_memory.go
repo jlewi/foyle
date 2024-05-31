@@ -58,6 +58,7 @@ func (db *InMemoryExampleDB) GetExamples(ctx context.Context, doc *v1alpha1.Doc,
 		return nil, errors.New("No examples available")
 	}
 
+	log.Info("RAG Query", "query", query)
 	request := openai.EmbeddingRequestStrings{
 		Input:          []string{query},
 		Model:          openai.SmallEmbedding3,

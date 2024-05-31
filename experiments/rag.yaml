@@ -5,9 +5,9 @@ metadata:
   name: "learning"
 spec:
   evalDir: /Users/jlewi/git_foyle/data/eval
-  dbDir: /Users/jlewi/foyle_experiments/20250529/learning
-  sheetID: "1tQ-hq1nEMXG7RC1foqdatau8Fg-zt1yXdgMKFAn0c6I"
-  sheetName: "Learning-Results"
+  dbDir: /Users/jlewi/foyle_experiments/20250530-1612/learning
+  sheetID: "1iJbkdUSxEkEX24xMH2NYpxqYcM_7-0koSRuANccDAb8"
+  sheetName: "WithRAG"
   agent:
     model: gpt-3.5-turbo-0125
     rag:

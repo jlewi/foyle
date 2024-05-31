@@ -5,7 +5,7 @@
 
 import type { BinaryReadOptions, FieldList, JsonReadOptions, JsonValue, PartialMessage, PlainMessage } from "@bufbuild/protobuf";
 import { Message, proto3 } from "@bufbuild/protobuf";
-import { Example } from "./trainer_pb";
+import { Example, RAGResult } from "./trainer_pb";
 import { Block } from "./doc_pb";
 
 /**
@@ -92,6 +92,13 @@ export class EvalResult extends Message<EvalResult> {
    */
   genTraceId = "";
 
+  /**
+   * Best matching RAG result
+   *
+   * @generated from field: RAGResult best_rag_result = 9;
+   */
+  bestRagResult?: RAGResult;
+
   constructor(data?: PartialMessage<EvalResult>) {
     super();
     proto3.util.initPartial(data, this);
@@ -108,6 +115,7 @@ export class EvalResult extends Message<EvalResult> {
     { no: 5, name: "error", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 6, name: "status", kind: "enum", T: proto3.getEnumType(EvalResultStatus) },
     { no: 8, name: "gen_trace_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 9, name: "best_rag_result", kind: "message", T: RAGResult },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): EvalResult {

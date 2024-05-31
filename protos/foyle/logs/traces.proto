@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "foyle/v1alpha1/agent.proto";
+import "foyle/v1alpha1/trainer.proto";
 import "runme/runner/v1/runner.proto";
 
 import "google/protobuf/struct.proto";
@@ -15,6 +16,7 @@ message Trace {
   google.protobuf.Timestamp  start_time = 2;
   google.protobuf.Timestamp    end_time = 3;
 
+  // TODO(jeremy): Should these really be spans?
   oneof data {
     GenerateTrace generate = 4;
     ExecuteTrace execute = 5;
@@ -23,6 +25,21 @@ message Trace {
 
   // Eval mode is true if the trace was generated in eval mode.
   bool eval_mode = 6;
+
+  repeated Span spans = 8;
+}
+
+message Span {
+  string id = 1;
+  oneof data {
+    RAGSpan rag = 2;
+  }
+}
+
+message RAGSpan {
+  string query = 1;
+
+  repeated RAGResult results = 2;
 }
 
 message GenerateTrace {
