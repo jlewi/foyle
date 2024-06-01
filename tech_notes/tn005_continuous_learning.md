@@ -109,6 +109,18 @@ the watermark.
 
 We could also use this trace ending messages to trigger garbage collection of the raw log entries in our KV store.
 
+#### Implementation Details
+
+* Responsibility for opening up the pebble databases should move into our application class 
+  * This will allow db references to be passed to any classes that need them
+
+* We should define a new DB to store the raw log entries
+  * We should define a new proto to represent the values
+* Analyzer should be changed to continuously process the log files
+  * Create a FIFO for log file events
+  * Persist watermarks to disk
+  * Register a fsnotifier for the directories containing logs
+
 ### BlockLogs
 
 When we perform a reduce operation on the log entries for a trace we can emit an event for any block logs that need to be
