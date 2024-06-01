@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/jlewi/foyle/app/pkg/docs"
 	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
@@ -34,8 +35,11 @@ const (
 
 // Analyzer is responsible for analyzing logs.
 type Analyzer struct {
-	tracesDB *pebble.DB
-	blocksDB *pebble.DB
+	tracesDB            *pebble.DB
+	blocksDB            *pebble.DB
+	queue               workqueue.DelayingInterface
+	handleLogFileIsDone sync.WaitGroup
+	waterMarks          map[string]int64
 }
 
 // NewAnalyzer creates a new Analyzer.
@@ -43,12 +47,136 @@ func NewAnalyzer(tracesDB *pebble.DB, blocksDB *pebble.DB) (*Analyzer, error) {
 	return &Analyzer{
 		tracesDB: tracesDB,
 		blocksDB: blocksDB,
+		queue:    workqueue.NewDelayingQueue(),
 	}, nil
+}
+
+type fileItem struct {
+	path string
 }
 
 // Run runs the analyzer; continually processing logs.
 func (a *Analyzer) Run(ctx context.Context, logDirs []string) error {
-	queue := workqueue.NewDelayingQueue()
+	// Find all the current files
+	jsonFiles, err := findLogFilesInDirs(ctx, logDirs)
+	if err != nil {
+		return err
+	}
+
+	// Enqueue an item to process each file
+	for _, f := range jsonFiles {
+		a.queue.Add(&fileItem{path: f})
+	}
+
+	if err := registerDirWatchers(ctx, a.queue, logDirs); err != nil {
+		return err
+	}
+
+	a.handleLogFileIsDone.Add(1)
+
+	go a.handleLogFileEvents(ctx)
+	return nil
+}
+
+// TODO(jeremy): How do we make the Analyzer thread safe? I believe the DB classes are thread safe
+func (a *Analyzer) handleLogFileEvents(ctx context.Context) {
+	q := a.queue
+	log := logs.FromContext(ctx)
+	for {
+		item, shutdown := q.Get()
+		if shutdown {
+			a.handleLogFileIsDone.Done()
+			return
+		}
+		func() {
+			defer q.Done(item)
+			fileItem, ok := item.(*fileItem)
+			if !ok {
+				log.Error(errors.New("Failed to cast item to fileItem"), "Failed to cast item to fileItem")
+				return
+			}
+
+			if err := a.processLogFile(ctx, fileItem.path); err != nil {
+				log.Error(err, "Error processing log file", "path", fileItem.path)
+			}
+		}()
+	}
+}
+
+func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
+	return errors.New("Not implemented")
+	//log := logs.FromContext(ctx)
+	//log.Info("Processing log file", "path", path)
+	//
+	//f, err := os.Open(path)
+	//if err != nil {
+	//	return errors.Wrapf(err, "Failed to open file %s", path)
+	//}
+	//defer f.Close()
+	//offset, ok := a.waterMarks[path]
+	//if !ok {
+	//	offset = 0
+	//}
+	//startPos, err := f.Seek(offset, 0)
+	//if err != nil {
+	//	return errors.Wrapf(err, "Failed to seek to offset %d in file %s", offset, path)
+	//}
+	//
+	//scanner := bufio.NewScanner(f)
+	//for scanner.Scan() {
+	//
+	//}
+	//
+	//if scanner.Err() != nil {
+	//	return errors.Wrapf(scanner.Err(), "Error scanning file %s", path)
+	//}
+	//
+	//scanner.Bytes()
+	//d := json.NewDecoder(f)
+	//
+	//for {
+	//	entry := &api.LogEntry{}
+	//	err := d.Decode(entry)
+	//
+	//	if err != nil {
+	//		if err == io.EOF {
+	//			break
+	//		}
+	//		log.Error(err, "Error decoding log entry", "path", path)
+	//		continue
+	//	}
+	//
+	//	// Ignore log entries without traces
+	//	if entry.TraceID() == "" {
+	//		continue
+	//	}
+	//
+	//	items, ok := traceEntries[entry.TraceID()]
+	//	if !ok {
+	//		items = make([]*api.LogEntry, 0, 10)
+	//	}
+	//	items = append(items, entry)
+	//	traceEntries[entry.TraceID()] = items
+	//}
+	//
+	//// Now combine all the entries for each trace
+	//for tid, items := range traceEntries {
+	//	log.Info("Combining entries for trace", "traceId", tid, "numEntries", len(items))
+	//	trace, err := combineEntriesForTrace(ctx, items)
+	//	if err != nil {
+	//		log.Error(err, "Error combining entries for trace", "traceId
+	//	}
+	//}
+}
+
+// registerDirWatchers sets up notifications for changes in the log directories.
+// Any time a file is modified it will enqueue the file for processing.
+func registerDirWatchers(ctx context.Context, q workqueue.DelayingInterface, logDirs []string) error {
+	return errors.New("Not implemented")
+	//for _, dir := range logDirs {
+	//	return errors.New("Not implemented")
+	//}
+	//return nil
 }
 
 // Analyze analyzes the logs.
@@ -62,14 +190,9 @@ func (a *Analyzer) Analyze(ctx context.Context, logDirs []string) error {
 	log := logs.FromContext(ctx)
 	log.Info("Analyzing logs", "logDirs", logDirs)
 
-	jsonFiles := make([]string, 0, 100)
-	for _, logsDir := range logDirs {
-		newFiles, err := findLogFiles(ctx, logsDir)
-		if err != nil {
-			return err
-		}
-		log.Info("Found logs", "numFiles", len(newFiles), "logsDir", logsDir)
-		jsonFiles = append(jsonFiles, newFiles...)
+	jsonFiles, err := findLogFilesInDirs(ctx, logDirs)
+	if err != nil {
+		return err
 	}
 
 	if err := buildTraces(ctx, jsonFiles, a.tracesDB, a.blocksDB); err != nil {
@@ -77,6 +200,17 @@ func (a *Analyzer) Analyze(ctx context.Context, logDirs []string) error {
 	}
 
 	return buildBlockLogs(ctx, a.tracesDB, a.blocksDB)
+}
+
+func (a *Analyzer) Shutdown(ctx context.Context) error {
+	log := logs.FromContext(ctx)
+	log.Info("Shutting down analyzer")
+	a.queue.ShutDown()
+	a.handleLogFileIsDone.Wait()
+
+	// TODO(jeremy) Persist the watermarks
+	log.Info("Analyzer shutdown")
+	return nil
 }
 
 // buildTraces creates a map of all the traces and initializes the blocks.
@@ -187,6 +321,20 @@ func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, b
 	}
 
 	return nil
+}
+
+func findLogFilesInDirs(ctx context.Context, logDirs []string) ([]string, error) {
+	log := logs.FromContext(ctx)
+	jsonFiles := make([]string, 0, 100)
+	for _, logsDir := range logDirs {
+		newFiles, err := findLogFiles(ctx, logsDir)
+		if err != nil {
+			return jsonFiles, err
+		}
+		log.Info("Found logs", "numFiles", len(newFiles), "logsDir", logsDir)
+		jsonFiles = append(jsonFiles, newFiles...)
+	}
+	return jsonFiles, nil
 }
 
 func findLogFiles(ctx context.Context, logsDir string) ([]string, error) {

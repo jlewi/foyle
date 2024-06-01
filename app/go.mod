@@ -4,6 +4,7 @@ go 1.22.1
 
 replace (
 	github.com/jlewi/foyle/protos/go => ../protos/go
+	// TODO(jeremy): We can get rid of this replace; we should no longer need to use a jlewi branch.
 	github.com/stateful/runme/v3 => github.com/jlewi/runme/v3 v3.0.0-20240524044247-2657f0b08e0f
 
 	k8s.io/client-go => k8s.io/client-go v0.27.3

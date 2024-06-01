@@ -16,12 +16,7 @@ import (
 	"github.com/jlewi/foyle/app/pkg/config"
 )
 
-func populateDB(blocksDB string) error {
-	db, err := pebble.Open(blocksDB, &pebble.Options{})
-	if err != nil {
-		return err
-	}
-	defer db.Close()
+func populateDB(db *pebble.DB) error {
 
 	bLog := &logspb.BlockLog{
 		Id:         "test-id",
@@ -45,12 +40,19 @@ func TestGetBlockLog(t *testing.T) {
 			LogDir: logsDir,
 		},
 	}
-	if err := populateDB(cfg.GetBlocksDBDir()); err != nil {
+
+	db, err := pebble.Open(cfg.GetBlocksDBDir(), &pebble.Options{})
+	if err != nil {
+		t.Fatalf("Failed to open DB: %v", err)
+	}
+	defer db.Close()
+
+	if err := populateDB(db); err != nil {
 		t.Fatalf("Failed to populate DB: %v", err)
 	}
 
 	// Create a new CrudHandler with a mock configuration
-	handler, err := NewCrudHandler(cfg)
+	handler, err := NewCrudHandler(cfg, db)
 	if err != nil {
 		t.Fatalf("Failed to create handler: %v", err)
 	}

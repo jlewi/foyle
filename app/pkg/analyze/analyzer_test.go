@@ -285,11 +285,6 @@ func Test_Analyzer(t *testing.T) {
 
 	testDir := filepath.Join(cwd, "test_data", "logs")
 
-	a, err := NewAnalyzer()
-	if err != nil {
-		t.Fatalf("Failed to create analyzer: %v", err)
-	}
-
 	oDir, err := os.MkdirTemp("", "analyzeTestDBs")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -298,16 +293,27 @@ func Test_Analyzer(t *testing.T) {
 	tracesDBDir := filepath.Join(oDir, "traces")
 	blocksDBDir := filepath.Join(oDir, "blocks")
 
-	if err := a.Analyze(context.Background(), []string{testDir}, tracesDBDir, blocksDBDir); err != nil {
-		t.Fatalf("Analyze failed: %v", err)
-	}
-	t.Logf("Output written to: %s", oDir)
-
 	blocksDB, err := pebble.Open(blocksDBDir, &pebble.Options{})
 	if err != nil {
 		t.Fatalf("could not open blocks database %s", blocksDBDir)
 	}
 	defer helpers.DeferIgnoreError(blocksDB.Close)
+
+	tracesDB, err := pebble.Open(tracesDBDir, &pebble.Options{})
+	if err != nil {
+		t.Fatalf("could not open blocks database %s", blocksDBDir)
+	}
+	defer helpers.DeferIgnoreError(tracesDB.Close)
+
+	a, err := NewAnalyzer(tracesDB, blocksDB)
+	if err != nil {
+		t.Fatalf("Failed to create analyzer: %v", err)
+	}
+
+	if err := a.Analyze(context.Background(), []string{testDir}); err != nil {
+		t.Fatalf("Analyze failed: %v", err)
+	}
+	t.Logf("Output written to: %s", oDir)
 
 	actual := map[string]*logspb.BlockLog{}
 
