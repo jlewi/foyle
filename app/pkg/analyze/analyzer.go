@@ -22,7 +22,6 @@ import (
 
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -34,16 +33,16 @@ const (
 
 // Analyzer is responsible for analyzing logs.
 type Analyzer struct {
+	tracesDB *pebble.DB
+	blocksDB *pebble.DB
 }
 
 // NewAnalyzer creates a new Analyzer.
-func NewAnalyzer() (*Analyzer, error) {
-	return &Analyzer{}, nil
-}
-
-type ResultFiles struct {
-	BlockDB  string
-	TracesDB string
+func NewAnalyzer(tracesDB *pebble.DB, blocksDB *pebble.DB) (*Analyzer, error) {
+	return &Analyzer{
+		tracesDB: tracesDB,
+		blocksDB: blocksDB,
+	}, nil
 }
 
 // Analyze analyzes the logs.
@@ -53,25 +52,9 @@ type ResultFiles struct {
 //
 // TODO(https://github.com/jlewi/foyle/issues/126): I think we need to pass the DBs in because we can't
 // have them be multi process; so we probably want to have a single DB per process.
-func (a *Analyzer) Analyze(ctx context.Context, logDirs []string, tracesDBDir string, blocksDBDir string) error {
+func (a *Analyzer) Analyze(ctx context.Context, logDirs []string) error {
 	log := logs.FromContext(ctx)
-	log.Info("Analyzing logs", "logDirs", logDirs, "tracesDBDir", tracesDBDir, "blocksDBDir", blocksDBDir)
-
-	log.Info("Opening traces database", "database", tracesDBDir)
-	tracesDB, err := pebble.Open(tracesDBDir, &pebble.Options{})
-	if err != nil {
-		return errors.Wrapf(err, "could not open traces database %s", tracesDBDir)
-	}
-
-	defer helpers.DeferIgnoreError(tracesDB.Close)
-
-	log.Info("Opening blocks database", "database", blocksDBDir)
-	blocksDB, err := pebble.Open(blocksDBDir, &pebble.Options{})
-	if err != nil {
-		return errors.Wrapf(err, "could not open blocks database %s", blocksDBDir)
-	}
-
-	defer helpers.DeferIgnoreError(blocksDB.Close)
+	log.Info("Analyzing logs", "logDirs", logDirs)
 
 	jsonFiles := make([]string, 0, 100)
 	for _, logsDir := range logDirs {
@@ -83,13 +66,11 @@ func (a *Analyzer) Analyze(ctx context.Context, logDirs []string, tracesDBDir st
 		jsonFiles = append(jsonFiles, newFiles...)
 	}
 
-	if err := buildTraces(ctx, jsonFiles, tracesDB, blocksDB); err != nil {
+	if err := buildTraces(ctx, jsonFiles, a.tracesDB, a.blocksDB); err != nil {
 		return err
 	}
 
-	err = buildBlockLogs(ctx, tracesDB, blocksDB)
-
-	return err
+	return buildBlockLogs(ctx, a.tracesDB, a.blocksDB)
 }
 
 // buildTraces creates a map of all the traces and initializes the blocks.

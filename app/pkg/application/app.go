@@ -195,7 +195,7 @@ func (a *App) SetupRegistry() error {
 
 	// Register controllers
 
-	analyzer, err := analyze.NewAnalyzer()
+	analyzer, err := analyze.NewAnalyzer(a.TracesDB, a.BlocksDB)
 	if err != nil {
 		return err
 	}

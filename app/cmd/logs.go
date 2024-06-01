@@ -38,6 +38,9 @@ func NewLogsProcessCmd() *cobra.Command {
 				if err := app.SetupLogging(false); err != nil {
 					return err
 				}
+				if err := app.OpenDBs(); err != nil {
+					return err
+				}
 				defer helpers.DeferIgnoreError(app.Shutdown)
 
 				logVersion()
@@ -50,7 +53,7 @@ func NewLogsProcessCmd() *cobra.Command {
 					}
 				}
 
-				a, err := analyze.NewAnalyzer()
+				a, err := analyze.NewAnalyzer(app.TracesDB, app.BlocksDB)
 				if err != nil {
 					return err
 				}
@@ -58,7 +61,7 @@ func NewLogsProcessCmd() *cobra.Command {
 				log := zapr.NewLogger(zap.L())
 				log.Info("Processing logs", "logDirs", logDirs)
 
-				if err := a.Analyze(context.Background(), logDirs, app.Config.GetTracesDBDir(), app.Config.GetBlocksDBDir()); err != nil {
+				if err := a.Analyze(context.Background(), logDirs); err != nil {
 					return err
 				}
 				log.Info("Processed logs", "logs", logDirs, "traces", app.Config.GetTracesDBDir(), "blocks", app.Config.GetBlocksDBDir())

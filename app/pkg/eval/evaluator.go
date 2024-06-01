@@ -112,7 +112,7 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	// TODO(https://github.com/jlewi/foyle/issues/84): We should do this in real time.
 	// We only need to process the logs for the Agent (raw logs) because we generate predictions but we don't try
 	// to execute them
-	if err := e.analyzer.Analyze(ctx, []string{e.config.GetRawLogDir()}, e.config.GetTracesDBDir(), e.config.GetBlocksDBDir()); err != nil {
+	if err := e.analyzer.Analyze(ctx, []string{e.config.GetRawLogDir()}); err != nil {
 		return err
 	}
 
