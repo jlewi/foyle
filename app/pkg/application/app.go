@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"github.com/cockroachdb/pebble"
 	"io"
 	"net/http"
 	"os"
@@ -46,6 +47,8 @@ type App struct {
 	otelShutdownFn func()
 	logClosers     []logCloser
 	Registry       *controllers.Registry
+	TracesDB       *pebble.DB
+	BlocksDB       *pebble.DB
 }
 
 // NewApp creates a new application. You should call one more setup/Load functions to properly set it up.
@@ -302,7 +305,7 @@ func (a *App) SetupServer() (*server.Server, error) {
 		return nil, errors.New("Config is nil; call LoadConfig first")
 	}
 
-	s, err := server.NewServer(*a.Config)
+	s, err := server.NewServer(*a.Config, a.BlocksDB)
 
 	if err != nil {
 		return nil, err
@@ -381,6 +384,30 @@ func (a *App) apply(ctx context.Context, path string) error {
 	return allErrors
 }
 
+func (a *App) OpenDBs() error {
+	if a.Config == nil {
+		return errors.New("Config is nil; call LoadConfig first")
+	}
+
+	log := zapr.NewLogger(zap.L())
+
+	log.Info("Opening traces database", "database", a.Config.GetTracesDBDir())
+	tracesDB, err := pebble.Open(a.Config.GetTracesDBDir(), &pebble.Options{})
+	if err != nil {
+		return errors.Wrapf(err, "could not open traces database %s", a.Config.GetTracesDBDir())
+	}
+	a.TracesDB = tracesDB
+
+	log.Info("Opening blocks database", "database", a.Config.GetBlocksDBDir())
+	blocksDB, err := pebble.Open(a.Config.GetBlocksDBDir(), &pebble.Options{})
+	if err != nil {
+		return errors.Wrapf(err, "could not open blocks database %s", a.Config.GetBlocksDBDir())
+	}
+	a.BlocksDB = blocksDB
+
+	return nil
+}
+
 // Shutdown the application.
 func (a *App) Shutdown() error {
 	// N.B. This is a placeholder for any operations that should be performed when shutting down the app
@@ -392,6 +419,20 @@ func (a *App) Shutdown() error {
 	if a.otelShutdownFn != nil {
 		log.Info("Shutting down open telemetry")
 		a.otelShutdownFn()
+	}
+
+	if a.TracesDB != nil {
+		log.Info("Closing trace database")
+		if err := a.TracesDB.Close(); err != nil {
+			log.Error(err, "Error closing trace database")
+		}
+	}
+
+	if a.BlocksDB != nil {
+		log.Info("Closing blocks database")
+		if err := a.BlocksDB.Close(); err != nil {
+			log.Error(err, "Error closing blocks database")
+		}
 	}
 
 	log.Info("Shutting down the application")

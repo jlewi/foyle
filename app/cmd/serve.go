@@ -26,6 +26,9 @@ func NewServeCmd() *cobra.Command {
 				if err := app.SetupOTEL(); err != nil {
 					return err
 				}
+				if err := app.OpenDBs(); err != nil {
+					return err
+				}
 				s, err := app.SetupServer()
 				if err != nil {
 					return err

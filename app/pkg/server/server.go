@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cockroachdb/pebble"
 	"time"
 
 	"github.com/jlewi/foyle/app/pkg/runme"
@@ -66,7 +67,7 @@ type Server struct {
 }
 
 // NewServer creates a new server
-func NewServer(config config.Config) (*Server, error) {
+func NewServer(config config.Config, blocksDB *pebble.DB) (*Server, error) {
 	e, err := executor.NewExecutor(config)
 	if err != nil {
 		return nil, err
@@ -88,7 +89,7 @@ func NewServer(config config.Config) (*Server, error) {
 		return nil, err
 	}
 
-	logsCrud, err := analyze.NewCrudHandler(config)
+	logsCrud, err := analyze.NewCrudHandler(config, blocksDB)
 	if err != nil {
 		return nil, err
 	}
