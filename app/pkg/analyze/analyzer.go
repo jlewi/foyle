@@ -24,6 +24,7 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
+	"k8s.io/client-go/util/workqueue"
 )
 
 const (
@@ -43,6 +44,11 @@ func NewAnalyzer(tracesDB *pebble.DB, blocksDB *pebble.DB) (*Analyzer, error) {
 		tracesDB: tracesDB,
 		blocksDB: blocksDB,
 	}, nil
+}
+
+// Run runs the analyzer; continually processing logs.
+func (a *Analyzer) Run(ctx context.Context, logDirs []string) error {
+	queue := workqueue.NewDelayingQueue()
 }
 
 // Analyze analyzes the logs.
