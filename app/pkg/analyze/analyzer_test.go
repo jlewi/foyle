@@ -290,8 +290,15 @@ func Test_Analyzer(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
+	rawLogsDBDir := filepath.Join(oDir, "rawlogs")
 	tracesDBDir := filepath.Join(oDir, "traces")
 	blocksDBDir := filepath.Join(oDir, "blocks")
+
+	rawDB, err := pebble.Open(rawLogsDBDir, &pebble.Options{})
+	if err != nil {
+		t.Fatalf("could not open blocks database %s", blocksDBDir)
+	}
+	defer helpers.DeferIgnoreError(rawDB.Close)
 
 	blocksDB, err := pebble.Open(blocksDBDir, &pebble.Options{})
 	if err != nil {
@@ -305,14 +312,24 @@ func Test_Analyzer(t *testing.T) {
 	}
 	defer helpers.DeferIgnoreError(tracesDB.Close)
 
-	a, err := NewAnalyzer(tracesDB, blocksDB)
+	a, err := NewAnalyzer(rawDB, tracesDB, blocksDB)
 	if err != nil {
 		t.Fatalf("Failed to create analyzer: %v", err)
 	}
 
-	if err := a.Analyze(context.Background(), []string{testDir}); err != nil {
+	// Create a channel for the analyzer to signal when a file has been processed
+	fileProcessed := make(chan string, 10)
+	blockProccessed := make(chan string, 10)
+
+	a.signalFileDone = fileProcessed
+	a.signalBlockDone = blockProccessed
+
+	if err := a.Run(context.Background(), []string{testDir}); err != nil {
 		t.Fatalf("Analyze failed: %v", err)
 	}
+
+	fileDone := <-fileProcessed
+	t.Logf("File processed: %s", fileDone)
 	t.Logf("Output written to: %s", oDir)
 
 	actual := map[string]*logspb.BlockLog{}
@@ -359,6 +376,16 @@ func Test_Analyzer(t *testing.T) {
 		}
 	}
 
+	// This is kludgy and brittle way to to wait for the block to be processed
+	// TODO(jeremy): we should do a timeout
+	for {
+		blockDone := <-blockProccessed
+		t.Logf("Block processed: %s", blockDone)
+		if blockDone == "23706965-8e3b-440d-ba1a-1e1cc035fbd4" {
+			break
+		}
+	}
+
 	// This is a block that was generated via the AI and then executed so run some additional checks
 	block, ok := actual["23706965-8e3b-440d-ba1a-1e1cc035fbd4"]
 	if !ok {
@@ -378,6 +405,10 @@ func Test_Analyzer(t *testing.T) {
 	}
 	if block.ExecutedBlock == nil {
 		t.Errorf("Expected ExecutedBlock to be set")
+	}
+
+	if err := a.Shutdown(context.Background()); err != nil {
+		t.Fatalf("Failed to shutdown analyzer: %v", err)
 	}
 }
 

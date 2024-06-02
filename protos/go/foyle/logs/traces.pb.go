@@ -455,6 +455,54 @@ func (x *RunMeTrace) GetResponse() *v1.ExecuteResponse {
 	return nil
 }
 
+// LogEntries is used to store log lines keyed by a trace id.
+type LogEntries struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Lines []string `protobuf:"bytes,1,rep,name=lines,proto3" json:"lines,omitempty"`
+}
+
+func (x *LogEntries) Reset() {
+	*x = LogEntries{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_foyle_logs_traces_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *LogEntries) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogEntries) ProtoMessage() {}
+
+func (x *LogEntries) ProtoReflect() protoreflect.Message {
+	mi := &file_foyle_logs_traces_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogEntries.ProtoReflect.Descriptor instead.
+func (*LogEntries) Descriptor() ([]byte, []int) {
+	return file_foyle_logs_traces_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *LogEntries) GetLines() []string {
+	if x != nil {
+		return x.Lines
+	}
+	return nil
+}
+
 var File_foyle_logs_traces_proto protoreflect.FileDescriptor
 
 var file_foyle_logs_traces_proto_rawDesc = []byte{
@@ -524,10 +572,13 @@ var file_foyle_logs_traces_proto_rawDesc = []byte{
 	0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x72, 0x75, 0x6e, 0x6d, 0x65, 0x2e, 0x72,
 	0x75, 0x6e, 0x6e, 0x65, 0x72, 0x2e, 0x76, 0x31, 0x2e, 0x45, 0x78, 0x65, 0x63, 0x75, 0x74, 0x65,
 	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x52, 0x08, 0x72, 0x65, 0x73, 0x70, 0x6f, 0x6e,
-	0x73, 0x65, 0x42, 0x34, 0x5a, 0x32, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d,
-	0x2f, 0x6a, 0x6c, 0x65, 0x77, 0x69, 0x2f, 0x66, 0x6f, 0x79, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x73, 0x2f, 0x67, 0x6f, 0x2f, 0x66, 0x6f, 0x79, 0x6c, 0x65, 0x2f, 0x6c, 0x6f, 0x67,
-	0x73, 0x3b, 0x6c, 0x6f, 0x67, 0x73, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x73, 0x65, 0x22, 0x22, 0x0a, 0x0a, 0x4c, 0x6f, 0x67, 0x45, 0x6e, 0x74, 0x72, 0x69, 0x65, 0x73,
+	0x12, 0x14, 0x0a, 0x05, 0x6c, 0x69, 0x6e, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x09, 0x52,
+	0x05, 0x6c, 0x69, 0x6e, 0x65, 0x73, 0x42, 0x34, 0x5a, 0x32, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62,
+	0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6a, 0x6c, 0x65, 0x77, 0x69, 0x2f, 0x66, 0x6f, 0x79, 0x6c, 0x65,
+	0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2f, 0x67, 0x6f, 0x2f, 0x66, 0x6f, 0x79, 0x6c, 0x65,
+	0x2f, 0x6c, 0x6f, 0x67, 0x73, 0x3b, 0x6c, 0x6f, 0x67, 0x73, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -542,7 +593,7 @@ func file_foyle_logs_traces_proto_rawDescGZIP() []byte {
 	return file_foyle_logs_traces_proto_rawDescData
 }
 
-var file_foyle_logs_traces_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_foyle_logs_traces_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_foyle_logs_traces_proto_goTypes = []interface{}{
 	(*Trace)(nil),                     // 0: foyle.logs.Trace
 	(*Span)(nil),                      // 1: foyle.logs.Span
@@ -550,30 +601,31 @@ var file_foyle_logs_traces_proto_goTypes = []interface{}{
 	(*GenerateTrace)(nil),             // 3: foyle.logs.GenerateTrace
 	(*ExecuteTrace)(nil),              // 4: foyle.logs.ExecuteTrace
 	(*RunMeTrace)(nil),                // 5: foyle.logs.RunMeTrace
-	(*timestamppb.Timestamp)(nil),     // 6: google.protobuf.Timestamp
-	(*v1alpha1.RAGResult)(nil),        // 7: RAGResult
-	(*v1alpha1.GenerateRequest)(nil),  // 8: GenerateRequest
-	(*v1alpha1.GenerateResponse)(nil), // 9: GenerateResponse
-	(*v1alpha1.ExecuteRequest)(nil),   // 10: ExecuteRequest
-	(*v1alpha1.ExecuteResponse)(nil),  // 11: ExecuteResponse
-	(*v1.ExecuteRequest)(nil),         // 12: runme.runner.v1.ExecuteRequest
-	(*v1.ExecuteResponse)(nil),        // 13: runme.runner.v1.ExecuteResponse
+	(*LogEntries)(nil),                // 6: foyle.logs.LogEntries
+	(*timestamppb.Timestamp)(nil),     // 7: google.protobuf.Timestamp
+	(*v1alpha1.RAGResult)(nil),        // 8: RAGResult
+	(*v1alpha1.GenerateRequest)(nil),  // 9: GenerateRequest
+	(*v1alpha1.GenerateResponse)(nil), // 10: GenerateResponse
+	(*v1alpha1.ExecuteRequest)(nil),   // 11: ExecuteRequest
+	(*v1alpha1.ExecuteResponse)(nil),  // 12: ExecuteResponse
+	(*v1.ExecuteRequest)(nil),         // 13: runme.runner.v1.ExecuteRequest
+	(*v1.ExecuteResponse)(nil),        // 14: runme.runner.v1.ExecuteResponse
 }
 var file_foyle_logs_traces_proto_depIdxs = []int32{
-	6,  // 0: foyle.logs.Trace.start_time:type_name -> google.protobuf.Timestamp
-	6,  // 1: foyle.logs.Trace.end_time:type_name -> google.protobuf.Timestamp
+	7,  // 0: foyle.logs.Trace.start_time:type_name -> google.protobuf.Timestamp
+	7,  // 1: foyle.logs.Trace.end_time:type_name -> google.protobuf.Timestamp
 	3,  // 2: foyle.logs.Trace.generate:type_name -> foyle.logs.GenerateTrace
 	4,  // 3: foyle.logs.Trace.execute:type_name -> foyle.logs.ExecuteTrace
 	5,  // 4: foyle.logs.Trace.run_me:type_name -> foyle.logs.RunMeTrace
 	1,  // 5: foyle.logs.Trace.spans:type_name -> foyle.logs.Span
 	2,  // 6: foyle.logs.Span.rag:type_name -> foyle.logs.RAGSpan
-	7,  // 7: foyle.logs.RAGSpan.results:type_name -> RAGResult
-	8,  // 8: foyle.logs.GenerateTrace.request:type_name -> GenerateRequest
-	9,  // 9: foyle.logs.GenerateTrace.response:type_name -> GenerateResponse
-	10, // 10: foyle.logs.ExecuteTrace.request:type_name -> ExecuteRequest
-	11, // 11: foyle.logs.ExecuteTrace.response:type_name -> ExecuteResponse
-	12, // 12: foyle.logs.RunMeTrace.request:type_name -> runme.runner.v1.ExecuteRequest
-	13, // 13: foyle.logs.RunMeTrace.response:type_name -> runme.runner.v1.ExecuteResponse
+	8,  // 7: foyle.logs.RAGSpan.results:type_name -> RAGResult
+	9,  // 8: foyle.logs.GenerateTrace.request:type_name -> GenerateRequest
+	10, // 9: foyle.logs.GenerateTrace.response:type_name -> GenerateResponse
+	11, // 10: foyle.logs.ExecuteTrace.request:type_name -> ExecuteRequest
+	12, // 11: foyle.logs.ExecuteTrace.response:type_name -> ExecuteResponse
+	13, // 12: foyle.logs.RunMeTrace.request:type_name -> runme.runner.v1.ExecuteRequest
+	14, // 13: foyle.logs.RunMeTrace.response:type_name -> runme.runner.v1.ExecuteResponse
 	14, // [14:14] is the sub-list for method output_type
 	14, // [14:14] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name
@@ -659,6 +711,18 @@ func file_foyle_logs_traces_proto_init() {
 				return nil
 			}
 		}
+		file_foyle_logs_traces_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*LogEntries); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_foyle_logs_traces_proto_msgTypes[0].OneofWrappers = []interface{}{
 		(*Trace_Generate)(nil),
@@ -674,7 +738,7 @@ func file_foyle_logs_traces_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_foyle_logs_traces_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

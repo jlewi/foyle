@@ -7,10 +7,10 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
-	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	_ "google.golang.org/protobuf/types/known/structpb"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
+	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
@@ -224,6 +224,26 @@ func (m *RunMeTrace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 			enc.AddObject(keyName, marshaler)
 		}
 	}
+
+	return nil
+}
+
+func (m *LogEntries) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "lines" // field lines = 1
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Lines {
+			_ = rv
+			aenc.AppendString(rv)
+		}
+		return nil
+	}))
 
 	return nil
 }

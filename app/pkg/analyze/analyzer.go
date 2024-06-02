@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -35,24 +34,43 @@ const (
 
 // Analyzer is responsible for analyzing logs.
 type Analyzer struct {
-	tracesDB            *pebble.DB
-	blocksDB            *pebble.DB
-	queue               workqueue.DelayingInterface
+	tracesDB  *pebble.DB
+	blocksDB  *pebble.DB
+	rawLogsDB *pebble.DB
+	// queue for log file processing
+	queue workqueue.DelayingInterface
+	// Queue for block log processing
+	// TODO(jeremy): We should really use a durable queue backed by files
+	blockQueue workqueue.DelayingInterface
+
 	handleLogFileIsDone sync.WaitGroup
-	waterMarks          map[string]int64
+	handleBlocksIsDone  sync.WaitGroup
+	logFileOffsets      map[string]int64
+	mu                  sync.Mutex
+
+	// Only used during testing to allow the test to tell when the log file processing is done.
+	signalFileDone  chan<- string
+	signalBlockDone chan<- string
 }
 
 // NewAnalyzer creates a new Analyzer.
-func NewAnalyzer(tracesDB *pebble.DB, blocksDB *pebble.DB) (*Analyzer, error) {
+func NewAnalyzer(rawLogsDB *pebble.DB, tracesDB *pebble.DB, blocksDB *pebble.DB) (*Analyzer, error) {
 	return &Analyzer{
-		tracesDB: tracesDB,
-		blocksDB: blocksDB,
-		queue:    workqueue.NewDelayingQueue(),
+		rawLogsDB:      rawLogsDB,
+		tracesDB:       tracesDB,
+		blocksDB:       blocksDB,
+		queue:          workqueue.NewDelayingQueue(),
+		blockQueue:     workqueue.NewDelayingQueue(),
+		logFileOffsets: make(map[string]int64),
 	}, nil
 }
 
 type fileItem struct {
 	path string
+}
+
+type blockItem struct {
+	id string
 }
 
 // Run runs the analyzer; continually processing logs.
@@ -68,13 +86,17 @@ func (a *Analyzer) Run(ctx context.Context, logDirs []string) error {
 		a.queue.Add(&fileItem{path: f})
 	}
 
-	if err := registerDirWatchers(ctx, a.queue, logDirs); err != nil {
-		return err
-	}
+	// TODO(jeremy): Need to uncomment and implement registerDirWatchers
+	//if err := registerDirWatchers(ctx, a.queue, logDirs); err != nil {
+	//	return err
+	//}
 
 	a.handleLogFileIsDone.Add(1)
+	a.handleBlocksIsDone.Add(1)
 
 	go a.handleLogFileEvents(ctx)
+	go a.handleBlockEvents(ctx)
+
 	return nil
 }
 
@@ -99,74 +121,76 @@ func (a *Analyzer) handleLogFileEvents(ctx context.Context) {
 			if err := a.processLogFile(ctx, fileItem.path); err != nil {
 				log.Error(err, "Error processing log file", "path", fileItem.path)
 			}
+			if a.signalFileDone != nil {
+				a.signalFileDone <- fileItem.path
+			}
 		}()
 	}
 }
 
 func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
-	return errors.New("Not implemented")
-	//log := logs.FromContext(ctx)
-	//log.Info("Processing log file", "path", path)
-	//
-	//f, err := os.Open(path)
-	//if err != nil {
-	//	return errors.Wrapf(err, "Failed to open file %s", path)
-	//}
-	//defer f.Close()
-	//offset, ok := a.waterMarks[path]
-	//if !ok {
-	//	offset = 0
-	//}
-	//startPos, err := f.Seek(offset, 0)
-	//if err != nil {
-	//	return errors.Wrapf(err, "Failed to seek to offset %d in file %s", offset, path)
-	//}
-	//
-	//scanner := bufio.NewScanner(f)
-	//for scanner.Scan() {
-	//
-	//}
-	//
-	//if scanner.Err() != nil {
-	//	return errors.Wrapf(scanner.Err(), "Error scanning file %s", path)
-	//}
-	//
-	//scanner.Bytes()
-	//d := json.NewDecoder(f)
-	//
-	//for {
-	//	entry := &api.LogEntry{}
-	//	err := d.Decode(entry)
-	//
-	//	if err != nil {
-	//		if err == io.EOF {
-	//			break
-	//		}
-	//		log.Error(err, "Error decoding log entry", "path", path)
-	//		continue
-	//	}
-	//
-	//	// Ignore log entries without traces
-	//	if entry.TraceID() == "" {
-	//		continue
-	//	}
-	//
-	//	items, ok := traceEntries[entry.TraceID()]
-	//	if !ok {
-	//		items = make([]*api.LogEntry, 0, 10)
-	//	}
-	//	items = append(items, entry)
-	//	traceEntries[entry.TraceID()] = items
-	//}
-	//
-	//// Now combine all the entries for each trace
-	//for tid, items := range traceEntries {
-	//	log.Info("Combining entries for trace", "traceId", tid, "numEntries", len(items))
-	//	trace, err := combineEntriesForTrace(ctx, items)
-	//	if err != nil {
-	//		log.Error(err, "Error combining entries for trace", "traceId
-	//	}
-	//}
+	log := logs.FromContext(ctx)
+	log.Info("Processing log file", "path", path)
+
+	offset := a.getLogFileOffset(path)
+	lines, offset, err := readLinesFromOffset(ctx, path, offset)
+	if err != nil {
+		return err
+	}
+
+	traceIDs := make(map[string]bool)
+
+	for _, line := range lines {
+		entry := &api.LogEntry{}
+		if err := json.Unmarshal([]byte(line), entry); err != nil {
+			log.Error(err, "Error decoding log entry", "path", path, "line", line)
+			continue
+		}
+
+		// Ignore log entries without traces
+		if entry.TraceID() == "" {
+			continue
+		}
+
+		entries := &logspb.LogEntries{}
+		dbutil.ReadModifyWrite[*logspb.LogEntries](a.rawLogsDB, entry.TraceID(), entries, func(entries *logspb.LogEntries) error {
+			if entries.Lines == nil {
+				entries.Lines = make([]string, 0, 1)
+			}
+			entries.Lines = append(entries.Lines, line)
+			return nil
+		})
+
+		traceIDs[entry.TraceID()] = true
+	}
+
+	// Combine the entries for each trace that we saw.
+	// N.B. We could potentially make this more efficient by checking if the log message is the final message
+	// in a trace. This would avoid potentially doing a combine for a trace on each log message.
+	for tid := range traceIDs {
+		if err := a.buildTrace(ctx, tid); err != nil {
+			log.Error(err, "Error building trace", "traceId", tid)
+		}
+	}
+	// Update the offset
+	a.setLogFileOffset(path, offset)
+	return nil
+}
+
+func (a *Analyzer) getLogFileOffset(path string) int64 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	offset, ok := a.logFileOffsets[path]
+	if !ok {
+		return 0
+	}
+	return offset
+}
+
+func (a *Analyzer) setLogFileOffset(path string, offset int64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.logFileOffsets[path] = offset
 }
 
 // registerDirWatchers sets up notifications for changes in the log directories.
@@ -186,88 +210,73 @@ func registerDirWatchers(ctx context.Context, q workqueue.DelayingInterface, log
 //
 // TODO(https://github.com/jlewi/foyle/issues/126): I think we need to pass the DBs in because we can't
 // have them be multi process; so we probably want to have a single DB per process.
-func (a *Analyzer) Analyze(ctx context.Context, logDirs []string) error {
-	log := logs.FromContext(ctx)
-	log.Info("Analyzing logs", "logDirs", logDirs)
-
-	jsonFiles, err := findLogFilesInDirs(ctx, logDirs)
-	if err != nil {
-		return err
-	}
-
-	if err := buildTraces(ctx, jsonFiles, a.tracesDB, a.blocksDB); err != nil {
-		return err
-	}
-
-	return buildBlockLogs(ctx, a.tracesDB, a.blocksDB)
-}
+//func (a *Analyzer) Analyze(ctx context.Context, logDirs []string) error {
+//	log := logs.FromContext(ctx)
+//	log.Info("Analyzing logs", "logDirs", logDirs)
+//
+//	jsonFiles, err := findLogFilesInDirs(ctx, logDirs)
+//	if err != nil {
+//		return err
+//	}
+//
+//	if err := buildTraces(ctx, jsonFiles, a.tracesDB, a.blocksDB); err != nil {
+//		return err
+//	}
+//
+//	return buildBlockLogs(ctx, a.tracesDB, a.blocksDB)
+//}
 
 func (a *Analyzer) Shutdown(ctx context.Context) error {
 	log := logs.FromContext(ctx)
 	log.Info("Shutting down analyzer")
+	// Shutdown the queues
 	a.queue.ShutDown()
+	a.blockQueue.ShutDown()
+	// Wait for the queues to be shutdown
 	a.handleLogFileIsDone.Wait()
+	a.handleBlocksIsDone.Wait()
 
 	// TODO(jeremy) Persist the watermarks
 	log.Info("Analyzer shutdown")
 	return nil
 }
 
-// buildTraces creates a map of all the traces and initializes the blocks.
-func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, blocksDB *pebble.DB) error {
+// buildTrace creates the trace and initializes the blocks.
+func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 	log := logs.FromContext(ctx)
+
 	// Entries is a mapping from a traceId to a list of logEntries associated with that entry.
-	traceEntries := make(map[string][]*api.LogEntry)
+	logEntries := make([]*api.LogEntry, 0, 10)
 
-	for _, p := range jsonFiles {
-		log.Info("Reading file", "path", p)
-		f, err := os.Open(p)
-		if err != nil {
-			log.Error(err, "Error opening file; file will be skipped", "path", p)
-			continue
-		}
-		d := json.NewDecoder(f)
-
-		for {
-			entry := &api.LogEntry{}
-			err := d.Decode(entry)
-
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				log.Error(err, "Error decoding log entry", "path", p)
-				continue
-			}
-
-			// Ignore log entries without traces
-			if entry.TraceID() == "" {
-				continue
-			}
-
-			items, ok := traceEntries[entry.TraceID()]
-			if !ok {
-				items = make([]*api.LogEntry, 0, 10)
-			}
-			items = append(items, entry)
-			traceEntries[entry.TraceID()] = items
-		}
+	protoEntries := &logspb.LogEntries{}
+	if err := dbutil.GetProto(a.rawLogsDB, tid, protoEntries); err != nil {
+		return err
 	}
 
-	// Now combine all the entries for each trace
-	for tid, items := range traceEntries {
-		log.Info("Combining entries for trace", "traceId", tid, "numEntries", len(items))
-		trace, err := combineEntriesForTrace(ctx, items)
-		if err != nil {
-			log.Error(err, "Error combining entries for trace", "traceId", tid)
+	for _, l := range protoEntries.Lines {
+		entry := &api.LogEntry{}
+		if err := json.Unmarshal([]byte(l), entry); err != nil {
+			log.Error(err, "Error decoding log entry", "line", l)
 			continue
 		}
+		logEntries = append(logEntries, entry)
+	}
 
-		if err := writeProto(tracesDB, tid, trace); err != nil {
-			return err
-		}
+	// Now combine the entries for the trace
+	log.Info("Combining entries for trace", "traceId", tid, "numEntries", len(logEntries))
+	trace, err := combineEntriesForTrace(ctx, logEntries)
+	if err != nil {
+		log.Error(err, "Error combining entries for trace", "traceId", tid)
+		return err
+	}
 
-		// Update the blocks associated with this trace
+	if err := writeProto(a.tracesDB, tid, trace); err != nil {
+		return err
+	}
+
+	// Update the blocks associated with this trace
+	bids, err := func() ([]string, error) {
+		bids := make([]string, 0, 10)
 		switch t := trace.Data.(type) {
 		case *logspb.Trace_Generate:
 			for _, oBlock := range t.Generate.Response.GetBlocks() {
@@ -275,21 +284,24 @@ func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, b
 				if bid == "" {
 					continue
 				}
-				if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+				bids = append(bids, bid)
+				block := &logspb.BlockLog{}
+				if err := dbutil.ReadModifyWrite[*logspb.BlockLog](a.blocksDB, bid, block, func(block *logspb.BlockLog) error {
 					block.Id = bid
 					block.GenTraceId = tid
 					return nil
 				}); err != nil {
-					return errors.Wrapf(err, "Failed to set generate trace on block %s", bid)
+					return bids, errors.Wrapf(err, "Failed to set generate trace on block %s", bid)
 				}
 			}
 		case *logspb.Trace_Execute:
 			bid := t.Execute.Request.GetBlock().GetId()
 			if bid == "" {
-				continue
+				return bids, nil
 			}
-
-			if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+			bids = append(bids, bid)
+			block := &logspb.BlockLog{}
+			if err := dbutil.ReadModifyWrite[*logspb.BlockLog](a.blocksDB, bid, block, func(block *logspb.BlockLog) error {
 				block.Id = bid
 				if block.ExecTraceIds == nil {
 					block.ExecTraceIds = make([]string, 0, 10)
@@ -297,15 +309,16 @@ func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, b
 				block.ExecTraceIds = append(block.ExecTraceIds, tid)
 				return nil
 			}); err != nil {
-				return errors.Wrapf(err, "Failed to set execute trace on block %s", bid)
+				return bids, errors.Wrapf(err, "Failed to set execute trace on block %s", bid)
 			}
 		case *logspb.Trace_RunMe:
 			bid := t.RunMe.Request.GetKnownId()
 			if bid == "" {
-				continue
+				return bids, nil
 			}
-
-			if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+			bids = append(bids, bid)
+			block := &logspb.BlockLog{}
+			if err := dbutil.ReadModifyWrite[*logspb.BlockLog](a.blocksDB, bid, block, func(block *logspb.BlockLog) error {
 				block.Id = bid
 				if block.ExecTraceIds == nil {
 					block.ExecTraceIds = make([]string, 0, 10)
@@ -313,11 +326,22 @@ func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, b
 				block.ExecTraceIds = append(block.ExecTraceIds, tid)
 				return nil
 			}); err != nil {
-				return errors.Wrapf(err, "Failed to set RunMe trace on block %s", bid)
+				return bids, errors.Wrapf(err, "Failed to set RunMe trace on block %s", bid)
 			}
 		default:
 			log.Error(fmt.Errorf("Unknown trace type"), "Unknown trace type", "trace", t)
 		}
+		return bids, nil
+	}()
+
+	// TODO(jeremy): Should we enqueue block update events even if there is an error
+	if err != nil {
+		return err
+	}
+
+	// Enqueue the block updates
+	for _, bid := range bids {
+		a.blockQueue.Add(&blockItem{id: bid})
 	}
 
 	return nil
@@ -377,47 +401,76 @@ func findLogFiles(ctx context.Context, logsDir string) ([]string, error) {
 	return jsonFiles, nil
 }
 
-func buildBlockLogs(ctx context.Context, tracesDB *pebble.DB, blocksDB *pebble.DB) error {
+func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 	log := logs.FromContext(ctx)
+	for {
+		item, shutdown := a.blockQueue.Get()
+		if shutdown {
+			a.handleBlocksIsDone.Done()
+			return
+		}
+		func() {
+			defer a.blockQueue.Done(item)
+			blockItem, ok := item.(*blockItem)
+			if !ok {
+				log.Error(errors.New("Failed to cast item to blockItem"), "Failed to cast item to blockItem")
+				return
+			}
 
-	iter, err := blocksDB.NewIterWithContext(ctx, nil)
-	if err != nil {
-		return err
+			err := dbutil.ReadModifyWrite[*logspb.BlockLog](a.blocksDB, blockItem.id, &logspb.BlockLog{}, func(block *logspb.BlockLog) error {
+				return buildBlockLog(ctx, block, a.tracesDB)
+			})
+			if err != nil {
+				log.Error(err, "Error processing block", "block", blockItem.id)
+			}
+			if a.signalBlockDone != nil {
+				a.signalBlockDone <- blockItem.id
+			}
+		}()
 	}
-	defer iter.Close()
-
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-		if key == nil {
-			break
-		}
-		bid := string(key)
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			return errors.Wrapf(err, "Failed to read block for key %s", string(key))
-		}
-
-		log.Info("Combining entries for block", "blockId", bid)
-
-		blockLog := &logspb.BlockLog{}
-		if err := proto.Unmarshal(value, blockLog); err != nil {
-			return errors.Wrapf(err, "Failed to unmarshal block for id %s", bid)
-		}
-		if err := buildBlockLog(ctx, blockLog, tracesDB); err != nil {
-			log.Error(err, "Error combining entries for block", "blockId", bid)
-			continue
-		}
-		bytes, err := proto.Marshal(blockLog)
-		if err != nil {
-			return errors.Wrapf(err, "Failed to marshal block for id %s", bid)
-		}
-		log.Info("Writing block", "blockId", bid, "block", blockLog)
-		if err := blocksDB.Set([]byte(bid), bytes, pebble.Sync); err != nil {
-			log.Error(err, "Error writing block", "blockId", bid)
-		}
-	}
-	return nil
 }
+
+//func buildBlockLogs(ctx context.Context, tracesDB *pebble.DB, blocksDB *pebble.DB) error {
+//	log := logs.FromContext(ctx)
+//
+//	iter, err := blocksDB.NewIterWithContext(ctx, nil)
+//	if err != nil {
+//		return err
+//	}
+//	defer iter.Close()
+//
+//	for iter.First(); iter.Valid(); iter.Next() {
+//		key := iter.Key()
+//		if key == nil {
+//			break
+//		}
+//		bid := string(key)
+//		value, err := iter.ValueAndErr()
+//		if err != nil {
+//			return errors.Wrapf(err, "Failed to read block for key %s", string(key))
+//		}
+//
+//		log.Info("Combining entries for block", "blockId", bid)
+//
+//		blockLog := &logspb.BlockLog{}
+//		if err := proto.Unmarshal(value, blockLog); err != nil {
+//			return errors.Wrapf(err, "Failed to unmarshal block for id %s", bid)
+//		}
+//		if err := buildBlockLog(ctx, blockLog, tracesDB); err != nil {
+//			log.Error(err, "Error combining entries for block", "blockId", bid)
+//			continue
+//		}
+//		bytes, err := proto.Marshal(blockLog)
+//		if err != nil {
+//			return errors.Wrapf(err, "Failed to marshal block for id %s", bid)
+//		}
+//		log.Info("Writing block", "blockId", bid, "block", blockLog)
+//		if err := blocksDB.Set([]byte(bid), bytes, pebble.Sync); err != nil {
+//			log.Error(err, "Error writing block", "blockId", bid)
+//		}
+//	}
+//	return nil
+//}
 
 func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble.DB) error {
 	log := logs.FromContext(ctx)
@@ -710,6 +763,7 @@ func combineRunMeTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Tr
 	return trace, nil
 }
 
+// TODO(jeremy): We should be able to replace this with the code in dbutil
 func writeProto(db *pebble.DB, key string, pb proto.Message) error {
 	b, err := proto.Marshal(pb)
 	if err != nil {
@@ -720,6 +774,7 @@ func writeProto(db *pebble.DB, key string, pb proto.Message) error {
 
 // readModifyWriteBlock reads a block from the database, modifies it and writes it back.
 // If the block doesn't exist an empty BlockLog will be passed to the function.
+// TODO(jeremy): We should be able to replace this function with usage of dbutil.ReadModifyWrite
 func readModifyWriteBlock(db *pebble.DB, key string, modify func(*logspb.BlockLog) error) error {
 	b, closer, err := db.Get([]byte(key))
 	if err != nil && !errors.Is(err, pebble.ErrNotFound) {
