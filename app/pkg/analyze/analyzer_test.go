@@ -376,16 +376,34 @@ func Test_Analyzer(t *testing.T) {
 		}
 	}
 
-	// This is kludgy and brittle way to to wait for the block to be processed
-	// TODO(jeremy): we should do a timeout
-	for {
-		blockDone := <-blockProccessed
-		t.Logf("Block processed: %s", blockDone)
-		if blockDone == "23706965-8e3b-440d-ba1a-1e1cc035fbd4" {
-			break
-		}
-	}
+	// This is kludgy and brittle way to to wait for the block to be processed.
+	// The blockLog should be triggered N times where N is the number of traces attached to the blocklog.
+	// It will be triggered twice; once for the generate trace and once for the execute trace.
+	timeout := time.Now().Add(1 * time.Minute)
+	numExpected := 2
+	numActual := 0
+	func() {
+		for {
+			if time.Now().After(timeout) {
+				t.Errorf("Timed out waiting for block to be processed %d times", numExpected)
+			}
+			blockDone := ""
+			select {
+			case <-time.After(time.Minute):
+				t.Errorf("Timed out waiting for block to be processed")
+				return
+			case blockDone = <-blockProccessed:
+			}
 
+			t.Logf("Block processed: %s", blockDone)
+			if blockDone == "23706965-8e3b-440d-ba1a-1e1cc035fbd4" {
+				numActual += 1
+				if numActual >= numExpected {
+					break
+				}
+			}
+		}
+	}()
 	// This is a block that was generated via the AI and then executed so run some additional checks
 	block, ok := actual["23706965-8e3b-440d-ba1a-1e1cc035fbd4"]
 	if !ok {
