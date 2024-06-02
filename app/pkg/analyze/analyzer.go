@@ -32,7 +32,13 @@ const (
 	unsetExitCode = -2377
 )
 
-// Analyzer is responsible for analyzing logs.
+// Analyzer is responsible for analyzing logs and building traces. It does this in a streaming fashion so that
+// traces get built in "realtime".
+//
+// The Analyzer is multi-threaded. One potential pitfall is we have multiple writers trying to update the same
+// key. This would result in a last-write win situation with the last write potentially overwriting the changes
+// by the other writer. To avoid this, we use WorkQueue's to schedule updates to each key. The workqueue
+// ensures that a single worker is processing a single key at a time.
 type Analyzer struct {
 	tracesDB  *pebble.DB
 	blocksDB  *pebble.DB
@@ -71,6 +77,10 @@ type fileItem struct {
 
 type blockItem struct {
 	id string
+	// genTraceId is the traceId of the generate trace that generated this block.
+	genTraceId string
+	// execTraceIds is the traceIds of the execution traces that executed this block.
+	execTraceIds []string
 }
 
 // Run runs the analyzer; continually processing logs.
@@ -275,8 +285,8 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 	}
 
 	// Update the blocks associated with this trace
-	bids, err := func() ([]string, error) {
-		bids := make([]string, 0, 10)
+	blockDeltas, err := func() (map[string]blockItem, error) {
+		bids := map[string]blockItem{}
 		switch t := trace.Data.(type) {
 		case *logspb.Trace_Generate:
 			for _, oBlock := range t.Generate.Response.GetBlocks() {
@@ -284,50 +294,44 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 				if bid == "" {
 					continue
 				}
-				bids = append(bids, bid)
-				block := &logspb.BlockLog{}
-				if err := dbutil.ReadModifyWrite[*logspb.BlockLog](a.blocksDB, bid, block, func(block *logspb.BlockLog) error {
-					block.Id = bid
-					block.GenTraceId = tid
-					return nil
-				}); err != nil {
-					return bids, errors.Wrapf(err, "Failed to set generate trace on block %s", bid)
+				delta, ok := bids[bid]
+				if !ok {
+					delta = blockItem{}
 				}
+				delta.id = bid
+				delta.genTraceId = tid
+				bids[bid] = delta
 			}
 		case *logspb.Trace_Execute:
 			bid := t.Execute.Request.GetBlock().GetId()
 			if bid == "" {
 				return bids, nil
 			}
-			bids = append(bids, bid)
-			block := &logspb.BlockLog{}
-			if err := dbutil.ReadModifyWrite[*logspb.BlockLog](a.blocksDB, bid, block, func(block *logspb.BlockLog) error {
-				block.Id = bid
-				if block.ExecTraceIds == nil {
-					block.ExecTraceIds = make([]string, 0, 10)
-				}
-				block.ExecTraceIds = append(block.ExecTraceIds, tid)
-				return nil
-			}); err != nil {
-				return bids, errors.Wrapf(err, "Failed to set execute trace on block %s", bid)
+			delta, ok := bids[bid]
+			if !ok {
+				delta = blockItem{}
 			}
+			delta.id = bid
+			if delta.execTraceIds == nil {
+				delta.execTraceIds = make([]string, 0, 11)
+			}
+			delta.execTraceIds = append(delta.execTraceIds, tid)
+			bids[bid] = delta
 		case *logspb.Trace_RunMe:
 			bid := t.RunMe.Request.GetKnownId()
 			if bid == "" {
 				return bids, nil
 			}
-			bids = append(bids, bid)
-			block := &logspb.BlockLog{}
-			if err := dbutil.ReadModifyWrite[*logspb.BlockLog](a.blocksDB, bid, block, func(block *logspb.BlockLog) error {
-				block.Id = bid
-				if block.ExecTraceIds == nil {
-					block.ExecTraceIds = make([]string, 0, 10)
-				}
-				block.ExecTraceIds = append(block.ExecTraceIds, tid)
-				return nil
-			}); err != nil {
-				return bids, errors.Wrapf(err, "Failed to set RunMe trace on block %s", bid)
+			delta, ok := bids[bid]
+			if !ok {
+				delta = blockItem{}
+				delta.id = bid
 			}
+			if delta.execTraceIds == nil {
+				delta.execTraceIds = make([]string, 0, 11)
+			}
+			delta.execTraceIds = append(delta.execTraceIds, tid)
+			bids[bid] = delta
 		default:
 			log.Error(fmt.Errorf("Unknown trace type"), "Unknown trace type", "trace", t)
 		}
@@ -340,8 +344,8 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 	}
 
 	// Enqueue the block updates
-	for _, bid := range bids {
-		a.blockQueue.Add(&blockItem{id: bid})
+	for _, delta := range blockDeltas {
+		a.blockQueue.Add(&delta)
 	}
 
 	return nil
@@ -418,6 +422,16 @@ func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 			}
 
 			err := dbutil.ReadModifyWrite[*logspb.BlockLog](a.blocksDB, blockItem.id, &logspb.BlockLog{}, func(block *logspb.BlockLog) error {
+				block.Id = blockItem.id
+				if blockItem.genTraceId != "" {
+					block.GenTraceId = blockItem.genTraceId
+				}
+				if blockItem.execTraceIds != nil {
+					if block.ExecTraceIds == nil {
+						block.ExecTraceIds = make([]string, 0, len(blockItem.execTraceIds))
+					}
+					block.ExecTraceIds = append(block.ExecTraceIds, blockItem.execTraceIds...)
+				}
 				return buildBlockLog(ctx, block, a.tracesDB)
 			})
 			if err != nil {
@@ -511,6 +525,16 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 				log.Error(errors.New("Failed to find generated block"), "Error finding generated block", "blockId", block.GetId())
 			}
 		}()
+	}
+
+	// Dedupe the execution traces just in case
+	uEids := make(map[string]bool)
+	for _, eid := range block.GetExecTraceIds() {
+		uEids[eid] = true
+	}
+	block.ExecTraceIds = make([]string, 0, len(uEids))
+	for eid := range uEids {
+		block.ExecTraceIds = append(block.ExecTraceIds, eid)
 	}
 
 	var lastTrace *logspb.Trace

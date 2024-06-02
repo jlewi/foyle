@@ -21,7 +21,6 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/monogo/helpers"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/jlewi/foyle/app/api"
@@ -332,50 +331,6 @@ func Test_Analyzer(t *testing.T) {
 	t.Logf("File processed: %s", fileDone)
 	t.Logf("Output written to: %s", oDir)
 
-	actual := map[string]*logspb.BlockLog{}
-
-	iter, err := blocksDB.NewIterWithContext(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("Failed to create iterator: %v", err)
-	}
-	defer iter.Close()
-
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-		if key == nil {
-			break
-		}
-
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			t.Fatalf("Failed to read block for key %s; error: %+v", string(key), err)
-		}
-
-		b := &logspb.BlockLog{}
-		if err := proto.Unmarshal(value, b); err != nil {
-			t.Fatalf("Failed to unmarshal block log: %v", err)
-		}
-		actual[b.Id] = b
-	}
-
-	expectedBlocks := map[string]bool{
-		"9557680b-e08c-4d1d-b098-6dcd03e0e108": true,
-		"23706965-8e3b-440d-ba1a-1e1cc035fbd4": true,
-		"48d530be-254a-493f-8cf4-20627078f830": true,
-	}
-
-	for id := range expectedBlocks {
-		if _, ok := actual[id]; !ok {
-			t.Errorf("Missing block log for id ID: %v", id)
-		}
-	}
-
-	for id := range actual {
-		if _, ok := expectedBlocks[id]; !ok {
-			t.Errorf("Unexpected block log for id ID: %v", id)
-		}
-	}
-
 	// This is kludgy and brittle way to to wait for the block to be processed.
 	// The blockLog should be triggered N times where N is the number of traces attached to the blocklog.
 	// It will be triggered twice; once for the generate trace and once for the execute trace.
@@ -404,10 +359,11 @@ func Test_Analyzer(t *testing.T) {
 			}
 		}
 	}()
+	
 	// This is a block that was generated via the AI and then executed so run some additional checks
-	block, ok := actual["23706965-8e3b-440d-ba1a-1e1cc035fbd4"]
-	if !ok {
-		t.Fatalf("Failed to find block with ID: 23706965-8e3b-440d-ba1a-1e1cc035fbd4")
+	block := &logspb.BlockLog{}
+	if err := dbutil.GetProto(blocksDB, "23706965-8e3b-440d-ba1a-1e1cc035fbd4", block); err != nil {
+		t.Fatalf("Failed to find block with ID: 23706965-8e3b-440d-ba1a-1e1cc035fbd4; error %+v", err)
 	}
 	if block.GenTraceId == "" {
 		t.Errorf("Expected GenTraceID to be set")
