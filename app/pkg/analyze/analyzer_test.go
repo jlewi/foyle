@@ -289,6 +289,7 @@ func Test_Analyzer(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
+	rawDir := filepath.Join(oDir, "logs")
 	rawLogsDBDir := filepath.Join(oDir, "rawlogs")
 	tracesDBDir := filepath.Join(oDir, "traces")
 	blocksDBDir := filepath.Join(oDir, "blocks")
@@ -311,6 +312,24 @@ func Test_Analyzer(t *testing.T) {
 	}
 	defer helpers.DeferIgnoreError(tracesDB.Close)
 
+	if err := os.MkdirAll(rawDir, 0755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+
+	// Copy the logs to the raw logs directory
+	logContents, err := os.ReadFile(filepath.Join(testDir, "foyle.logs.2024-04-16T19:06:47.json"))
+	if err != nil {
+		t.Fatalf("Failed to read log file: %v", err)
+	}
+
+	logFile := filepath.Join(rawDir, "log.json")
+	if err := os.WriteFile(logFile, logContents, 0644); err != nil {
+		t.Fatalf("Failed to write log file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(rawDir, "log.json"), logContents, 0644); err != nil {
+		t.Fatalf("Failed to write log file: %v", err)
+	}
+
 	a, err := NewAnalyzer(rawDB, tracesDB, blocksDB)
 	if err != nil {
 		t.Fatalf("Failed to create analyzer: %v", err)
@@ -323,7 +342,7 @@ func Test_Analyzer(t *testing.T) {
 	a.signalFileDone = fileProcessed
 	a.signalBlockDone = blockProccessed
 
-	if err := a.Run(context.Background(), []string{testDir}); err != nil {
+	if err := a.Run(context.Background(), []string{rawDir}); err != nil {
 		t.Fatalf("Analyze failed: %v", err)
 	}
 
@@ -331,35 +350,8 @@ func Test_Analyzer(t *testing.T) {
 	t.Logf("File processed: %s", fileDone)
 	t.Logf("Output written to: %s", oDir)
 
-	// This is kludgy and brittle way to to wait for the block to be processed.
-	// The blockLog should be triggered N times where N is the number of traces attached to the blocklog.
-	// It will be triggered twice; once for the generate trace and once for the execute trace.
-	timeout := time.Now().Add(1 * time.Minute)
-	numExpected := 2
-	numActual := 0
-	func() {
-		for {
-			if time.Now().After(timeout) {
-				t.Errorf("Timed out waiting for block to be processed %d times", numExpected)
-			}
-			blockDone := ""
-			select {
-			case <-time.After(time.Minute):
-				t.Errorf("Timed out waiting for block to be processed")
-				return
-			case blockDone = <-blockProccessed:
-			}
+	waitForBlock(t, "23706965-8e3b-440d-ba1a-1e1cc035fbd4", 2, blockProccessed)
 
-			t.Logf("Block processed: %s", blockDone)
-			if blockDone == "23706965-8e3b-440d-ba1a-1e1cc035fbd4" {
-				numActual += 1
-				if numActual >= numExpected {
-					break
-				}
-			}
-		}
-	}()
-	
 	// This is a block that was generated via the AI and then executed so run some additional checks
 	block := &logspb.BlockLog{}
 	if err := dbutil.GetProto(blocksDB, "23706965-8e3b-440d-ba1a-1e1cc035fbd4", block); err != nil {
@@ -381,9 +373,79 @@ func Test_Analyzer(t *testing.T) {
 		t.Errorf("Expected ExecutedBlock to be set")
 	}
 
+	// Now append some logs to the logFile and see that they get processed
+	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Fatalf("Failed to open log file: %v", err)
+	}
+	f.Write([]byte(`{"severity":"info","time":1713319614.911959,"caller":"agent/agent.go:61","function":"github.com/jlewi/foyle/app/pkg/agent.(*Agent).Generate","message":"Agent.Generate","traceId":"newtrace1234","request":{"doc":{"blocks":[{"contents":"echo hello"}]}}}` + "\n"))
+	f.Write([]byte(`{"severity":"info","time":1713319616.654191,"caller":"agent/agent.go:83","function":"github.com/jlewi/foyle/app/pkg/agent.(*Agent).Generate","message":"Agent.Generate returning response","traceId":"newtrace1234","response":{"blocks":[{"kind":"MARKUP","language":"","contents":"To find the merge point","outputs":[],"trace_ids":[],"id":"newblock"}]}}` + "\n"))
+
+	// N.B. When I didn't call sync the contents of the file didn't get updated. I would have thought calling
+	// close was enough.
+	if err := f.Sync(); err != nil {
+		t.Fatalf("Failed to sync log file: %v", err)
+
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("Failed to close log file: %v", err)
+	}
+
+	// Wait for the new block to be processed
+	// N.B. I don't know that we are guaranteed that when waitForBlock returns that we have processed all the log lines
+	// for this newTrace. We might have just processed the first line. This should be ok as long as our assertions
+	// don't require all log entries
+	newBlockID := "newblock"
+	waitForBlock(t, newBlockID, 1, blockProccessed)
+
+	newBock := &logspb.BlockLog{}
+	if err := dbutil.GetProto(blocksDB, newBlockID, newBock); err != nil {
+		t.Fatalf("Failed to find block with ID: %s; error %+v", newBlockID, err)
+	}
+	if newBock.GenTraceId == "" {
+		t.Errorf("Expected GenTraceID to be set")
+	}
+	if newBock.Doc == nil {
+		t.Errorf("Expected Doc to be set")
+	}
+	if newBock.GeneratedBlock == nil {
+		t.Errorf("Expected GeneratedBlock to be set")
+	}
+
 	if err := a.Shutdown(context.Background()); err != nil {
 		t.Fatalf("Failed to shutdown analyzer: %v", err)
 	}
+}
+
+func waitForBlock(t *testing.T, blockId string, numExpected int, blockProccessed <-chan string) {
+	// This is kludgy and brittle way to to wait for the block to be processed.
+	// The blockLog should be triggered N times where N is the number of traces attached to the blocklog.
+	// It will be triggered twice; once for the generate trace and once for the execute trace.
+	timeout := time.Now().Add(1 * time.Minute)
+
+	numActual := 0
+	func() {
+		for {
+			if time.Now().After(timeout) {
+				t.Errorf("Timed out waiting for block to be processed %d times", numExpected)
+			}
+			blockDone := ""
+			select {
+			case <-time.After(time.Minute):
+				t.Errorf("Timed out waiting for block to be processed")
+				return
+			case blockDone = <-blockProccessed:
+			}
+
+			t.Logf("Block processed: %s", blockDone)
+			if blockDone == blockId {
+				numActual += 1
+				if numActual >= numExpected {
+					break
+				}
+			}
+		}
+	}()
 }
 
 func Test_CombineGenerateEntries(t *testing.T) {

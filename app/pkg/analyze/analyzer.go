@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/fsnotify/fsnotify"
 	"os"
 	"path/filepath"
 	"sort"
@@ -48,6 +49,8 @@ type Analyzer struct {
 	// Queue for block log processing
 	// TODO(jeremy): We should really use a durable queue backed by files
 	blockQueue workqueue.DelayingInterface
+
+	watcher *fsnotify.Watcher
 
 	handleLogFileIsDone sync.WaitGroup
 	handleBlocksIsDone  sync.WaitGroup
@@ -96,10 +99,9 @@ func (a *Analyzer) Run(ctx context.Context, logDirs []string) error {
 		a.queue.Add(&fileItem{path: f})
 	}
 
-	// TODO(jeremy): Need to uncomment and implement registerDirWatchers
-	//if err := registerDirWatchers(ctx, a.queue, logDirs); err != nil {
-	//	return err
-	//}
+	if err := a.registerDirWatchers(ctx, a.queue, logDirs); err != nil {
+		return err
+	}
 
 	a.handleLogFileIsDone.Add(1)
 	a.handleBlocksIsDone.Add(1)
@@ -205,12 +207,49 @@ func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 
 // registerDirWatchers sets up notifications for changes in the log directories.
 // Any time a file is modified it will enqueue the file for processing.
-func registerDirWatchers(ctx context.Context, q workqueue.DelayingInterface, logDirs []string) error {
-	return errors.New("Not implemented")
-	//for _, dir := range logDirs {
-	//	return errors.New("Not implemented")
-	//}
-	//return nil
+func (a *Analyzer) registerDirWatchers(ctx context.Context, q workqueue.DelayingInterface, logDirs []string) error {
+	log := logs.FromContext(ctx)
+	watcher, err := fsnotify.NewWatcher()
+	a.watcher = watcher
+	if err != nil {
+		return err
+	}
+	for _, dir := range logDirs {
+		fullPath, err := filepath.Abs(dir)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to get absolute path for %s", dir)
+		}
+
+		log.Info("Watching logs directory", "dir", fullPath)
+		if err := watcher.Add(fullPath); err != nil {
+			return err
+		}
+	}
+
+	go handleFsnotifications(ctx, watcher, q)
+	return nil
+}
+
+// handleFsnotifications processes file system notifications by enqueuing the file for processing.
+func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q workqueue.DelayingInterface) {
+	log := logs.FromContext(ctx)
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				log.Info("File modified", "path", event.Name)
+				q.Add(&fileItem{path: event.Name})
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Error(err, "Error from watcher")
+		}
+	}
 }
 
 // Analyze analyzes the logs.
@@ -239,6 +278,11 @@ func registerDirWatchers(ctx context.Context, q workqueue.DelayingInterface, log
 func (a *Analyzer) Shutdown(ctx context.Context) error {
 	log := logs.FromContext(ctx)
 	log.Info("Shutting down analyzer")
+
+	// Shutdown the watcher
+	if a.watcher != nil {
+		a.watcher.Close()
+	}
 	// Shutdown the queues
 	a.queue.ShutDown()
 	a.blockQueue.ShutDown()
