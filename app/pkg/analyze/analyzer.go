@@ -57,21 +57,42 @@ type Analyzer struct {
 	logFileOffsets      map[string]int64
 	mu                  sync.Mutex
 
+	logOffsetsFile string
 	// Only used during testing to allow the test to tell when the log file processing is done.
 	signalFileDone  chan<- string
 	signalBlockDone chan<- string
 }
 
 // NewAnalyzer creates a new Analyzer.
-func NewAnalyzer(rawLogsDB *pebble.DB, tracesDB *pebble.DB, blocksDB *pebble.DB) (*Analyzer, error) {
+func NewAnalyzer(logOffsetsFile string, rawLogsDB *pebble.DB, tracesDB *pebble.DB, blocksDB *pebble.DB) (*Analyzer, error) {
+	logOffsets, err := initOffsets(logOffsetsFile)
+	if err != nil {
+		return nil, err
+	}
 	return &Analyzer{
+		logOffsetsFile: logOffsetsFile,
 		rawLogsDB:      rawLogsDB,
 		tracesDB:       tracesDB,
 		blocksDB:       blocksDB,
 		queue:          workqueue.NewDelayingQueue(),
 		blockQueue:     workqueue.NewDelayingQueue(),
-		logFileOffsets: make(map[string]int64),
+		logFileOffsets: logOffsets,
 	}, nil
+}
+
+func initOffsets(logOffsetsFile string) (map[string]int64, error) {
+	raw, err := os.ReadFile(logOffsetsFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]int64{}, nil
+		}
+		return nil, errors.Wrapf(err, "Failed to read watermarks file %s", logOffsetsFile)
+	}
+	watermarks := map[string]int64{}
+	if err := json.Unmarshal(raw, &watermarks); err != nil {
+		return nil, errors.Wrapf(err, "Failed to unmarshal watermarks file %s", logOffsetsFile)
+	}
+	return watermarks, nil
 }
 
 type fileItem struct {
@@ -240,7 +261,6 @@ func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q wor
 				return
 			}
 			if event.Op&fsnotify.Write == fsnotify.Write {
-				log.Info("File modified", "path", event.Name)
 				q.Add(&fileItem{path: event.Name})
 			}
 		case err, ok := <-watcher.Errors:
@@ -252,31 +272,9 @@ func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q wor
 	}
 }
 
-// Analyze analyzes the logs.
-// logsDir - Is the directory containing the logs
-// tracesDBDir - Is the directory containing the traces pebble database
-// blocksDBDir - Is the directory containing the blocks pebble database
-//
-// TODO(https://github.com/jlewi/foyle/issues/126): I think we need to pass the DBs in because we can't
-// have them be multi process; so we probably want to have a single DB per process.
-//func (a *Analyzer) Analyze(ctx context.Context, logDirs []string) error {
-//	log := logs.FromContext(ctx)
-//	log.Info("Analyzing logs", "logDirs", logDirs)
-//
-//	jsonFiles, err := findLogFilesInDirs(ctx, logDirs)
-//	if err != nil {
-//		return err
-//	}
-//
-//	if err := buildTraces(ctx, jsonFiles, a.tracesDB, a.blocksDB); err != nil {
-//		return err
-//	}
-//
-//	return buildBlockLogs(ctx, a.tracesDB, a.blocksDB)
-//}
-
 func (a *Analyzer) Shutdown(ctx context.Context) error {
 	log := logs.FromContext(ctx)
+
 	log.Info("Shutting down analyzer")
 
 	// Shutdown the watcher
@@ -289,6 +287,20 @@ func (a *Analyzer) Shutdown(ctx context.Context) error {
 	// Wait for the queues to be shutdown
 	a.handleLogFileIsDone.Wait()
 	a.handleBlocksIsDone.Wait()
+
+	// Persist the watermarks
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	raw, err := json.Marshal(a.logFileOffsets)
+	if err != nil {
+		log.Error(err, "Failed to marshal watermarks")
+	} else {
+		if err := os.WriteFile(a.logOffsetsFile, raw, 0644); err != nil {
+			log.Error(err, "Failed to write watermarks")
+		} else {
+			log.Info("Wrote watermarks", "logOffsetsFile", a.logOffsetsFile)
+		}
+	}
 
 	// TODO(jeremy) Persist the watermarks
 	log.Info("Analyzer shutdown")
@@ -487,48 +499,6 @@ func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 		}()
 	}
 }
-
-//func buildBlockLogs(ctx context.Context, tracesDB *pebble.DB, blocksDB *pebble.DB) error {
-//	log := logs.FromContext(ctx)
-//
-//	iter, err := blocksDB.NewIterWithContext(ctx, nil)
-//	if err != nil {
-//		return err
-//	}
-//	defer iter.Close()
-//
-//	for iter.First(); iter.Valid(); iter.Next() {
-//		key := iter.Key()
-//		if key == nil {
-//			break
-//		}
-//		bid := string(key)
-//		value, err := iter.ValueAndErr()
-//		if err != nil {
-//			return errors.Wrapf(err, "Failed to read block for key %s", string(key))
-//		}
-//
-//		log.Info("Combining entries for block", "blockId", bid)
-//
-//		blockLog := &logspb.BlockLog{}
-//		if err := proto.Unmarshal(value, blockLog); err != nil {
-//			return errors.Wrapf(err, "Failed to unmarshal block for id %s", bid)
-//		}
-//		if err := buildBlockLog(ctx, blockLog, tracesDB); err != nil {
-//			log.Error(err, "Error combining entries for block", "blockId", bid)
-//			continue
-//		}
-//		bytes, err := proto.Marshal(blockLog)
-//		if err != nil {
-//			return errors.Wrapf(err, "Failed to marshal block for id %s", bid)
-//		}
-//		log.Info("Writing block", "blockId", bid, "block", blockLog)
-//		if err := blocksDB.Set([]byte(bid), bytes, pebble.Sync); err != nil {
-//			log.Error(err, "Error writing block", "blockId", bid)
-//		}
-//	}
-//	return nil
-//}
 
 func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble.DB) error {
 	log := logs.FromContext(ctx)

@@ -180,8 +180,16 @@ func (c *Config) GetLogDir() string {
 	return filepath.Join(c.GetConfigDir(), "logs")
 }
 
+func (c *Config) GetLogOffsetsFile() string {
+	return filepath.Join(c.GetLogDir(), "offsets.json")
+}
+
 func (c *Config) GetRawLogDir() string {
 	return filepath.Join(c.GetLogDir(), "raw")
+}
+
+func (c *Config) GetLogEntriesDBDir() string {
+	return filepath.Join(c.GetLogDir(), "logEntries")
 }
 
 func (c *Config) GetBlocksDBDir() string {

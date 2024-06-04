@@ -47,6 +47,7 @@ type App struct {
 	otelShutdownFn func()
 	logClosers     []logCloser
 	Registry       *controllers.Registry
+	LogEntriesDB   *pebble.DB
 	TracesDB       *pebble.DB
 	BlocksDB       *pebble.DB
 }
@@ -194,8 +195,7 @@ func (a *App) SetupRegistry() error {
 	a.Registry = &controllers.Registry{}
 
 	// Register controllers
-
-	analyzer, err := analyze.NewAnalyzer(a.TracesDB, a.BlocksDB)
+	analyzer, err := a.SetupAnalyzer()
 	if err != nil {
 		return err
 	}
@@ -297,6 +297,19 @@ func (a *App) createCoreLoggerForFiles() (zapcore.Core, error) {
 	core := zapcore.NewCore(jsonEncoder, zapcore.AddSync(oFile), zapLvl)
 
 	return core, nil
+}
+
+// SetupAnalyzer sets up the analyzer
+func (a *App) SetupAnalyzer() (*analyze.Analyzer, error) {
+	if a.Config == nil {
+		return nil, errors.New("Config is nil; call LoadConfig first")
+	}
+
+	analyzer, err := analyze.NewAnalyzer(a.Config.GetLogOffsetsFile(), a.LogEntriesDB, a.TracesDB, a.BlocksDB)
+	if err != nil {
+		return nil, err
+	}
+	return analyzer, nil
 }
 
 // SetupServer sets up the server
@@ -404,6 +417,13 @@ func (a *App) OpenDBs() error {
 		return errors.Wrapf(err, "could not open blocks database %s", a.Config.GetBlocksDBDir())
 	}
 	a.BlocksDB = blocksDB
+
+	log.Info("Opening loglines database", "database", a.Config.GetBlocksDBDir())
+	logEntries, err := pebble.Open(a.Config.GetLogEntriesDBDir(), &pebble.Options{})
+	if err != nil {
+		return errors.Wrapf(err, "could not open log entries database %s", a.Config.GetLogEntriesDBDir())
+	}
+	a.LogEntriesDB = logEntries
 
 	return nil
 }

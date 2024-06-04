@@ -330,7 +330,8 @@ func Test_Analyzer(t *testing.T) {
 		t.Fatalf("Failed to write log file: %v", err)
 	}
 
-	a, err := NewAnalyzer(rawDB, tracesDB, blocksDB)
+	logOffsetsFile := filepath.Join(rawDir, "log_offsets.json")
+	a, err := NewAnalyzer(logOffsetsFile, rawDB, tracesDB, blocksDB)
 	if err != nil {
 		t.Fatalf("Failed to create analyzer: %v", err)
 	}

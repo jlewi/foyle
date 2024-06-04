@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 
 	"github.com/go-logr/zapr"
-	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/application"
 	"github.com/jlewi/monogo/helpers"
 	"github.com/spf13/cobra"
@@ -45,26 +43,8 @@ func NewLogsProcessCmd() *cobra.Command {
 
 				logVersion()
 
-				if len(logDirs) == 0 {
-					logDirs = append(logDirs, app.Config.GetRawLogDir())
-
-					if app.Config.Learner != nil {
-						logDirs = append(logDirs, app.Config.Learner.LogDirs...)
-					}
-				}
-
-				a, err := analyze.NewAnalyzer(app.TracesDB, app.BlocksDB)
-				if err != nil {
-					return err
-				}
-
 				log := zapr.NewLogger(zap.L())
-				log.Info("Processing logs", "logDirs", logDirs)
-
-				if err := a.Analyze(context.Background(), logDirs); err != nil {
-					return err
-				}
-				log.Info("Processed logs", "logs", logDirs, "traces", app.Config.GetTracesDBDir(), "blocks", app.Config.GetBlocksDBDir())
+				log.Info("Calling logs process is no longer necessary; logs are processed in real time.", "logDirs", logDirs, "outDir", outDir)
 				return nil
 			}()
 

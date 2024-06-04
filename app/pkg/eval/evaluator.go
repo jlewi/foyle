@@ -82,6 +82,11 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 		return err
 	}
 
+	// Run the analyzer in the background
+	if err := e.analyzer.Run(ctx, []string{e.config.GetRawLogDir()}); err != nil {
+		return err
+	}
+
 	// List all the files
 	files, err := e.listEvalFiles(ctx, experiment.Spec.EvalDir)
 	if err != nil {
@@ -105,14 +110,6 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 
 	// Now generate predictions for any results that are missing them.
 	if err := e.reconcilePredictions(ctx, db, agent); err != nil {
-		return err
-	}
-
-	// We need to process all the logs because we need the traces.
-	// TODO(https://github.com/jlewi/foyle/issues/84): We should do this in real time.
-	// We only need to process the logs for the Agent (raw logs) because we generate predictions but we don't try
-	// to execute them
-	if err := e.analyzer.Analyze(ctx, []string{e.config.GetRawLogDir()}); err != nil {
 		return err
 	}
 
