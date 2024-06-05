@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jlewi/foyle/app/pkg/docs"
 	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
@@ -20,7 +21,6 @@ import (
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -46,13 +46,19 @@ const (
 // The Analyzer is multi-threaded. One potential pitfall is we have multiple writers trying to update the same
 // key. This would result in a last-write win situation with the last write potentially overwriting the changes
 // by the other writer. To avoid this, we use WorkQueue's to schedule updates to each key. The workqueue
-// ensures that a single worker is processing a single key at a time.
+// ensures that a single worker is processing a single key at a time. The items in the workqueue should be concrete
+// types not pointers because the workqueues use the value as the key.
+//
+// If the Analyzer emits any info log messages in the course of processing Foyle's raw log entries; this will result
+// in continual reprocessing of Foyle logs. This is because the Analyzer is watching the log file and fires whenever
+// its updated and invoke handleLogFileEvents. So if handleLogFileEvents updates the log file then we get constant
+// reprocessing. We use a rateLimitingQueue to ensure that we don't process the same file too quickly.
 type Analyzer struct {
 	tracesDB  *pebble.DB
 	blocksDB  *pebble.DB
 	rawLogsDB *pebble.DB
 	// queue for log file processing
-	queue workqueue.DelayingInterface
+	queue workqueue.RateLimitingInterface
 	// Queue for block log processing
 	// TODO(jeremy): We should really use a durable queue backed by files
 	blockQueue workqueue.DelayingInterface
@@ -76,18 +82,29 @@ func NewAnalyzer(logOffsetsFile string, rawLogsDB *pebble.DB, tracesDB *pebble.D
 	if err != nil {
 		return nil, err
 	}
+
+	// Create a rate limiting queue for processing files. We rate limit to each file every 30 seconds. This is because
+	// The logs are constantly being written to and we don't want to process the files too quickly.
+	// We are potentially writing to multiple files at the same time e.g. the Analyzer logs and then a different
+	// log file for each instance of RunMe. So we need to track different backoffs for each file which the rate limiter
+	// does. Using exponential backoff would make sense when we update processLogFile to detect the end of a trace.
+	// In that case, after we detect the start of a trace we would want to retry on a very short interval with backoff
+	// to detect the end of the trace as quickly as possible. Right now we don't do that and in fact we never call
+	// forget so we will basically max out the retry limit at the max delay.
+	fileQueue := workqueue.NewRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 30*time.Second))
 	return &Analyzer{
 		logOffsetsFile: logOffsetsFile,
 		rawLogsDB:      rawLogsDB,
 		tracesDB:       tracesDB,
 		blocksDB:       blocksDB,
-		queue:          workqueue.NewDelayingQueue(),
+		queue:          fileQueue,
 		blockQueue:     workqueue.NewDelayingQueue(),
 		logFileOffsets: logOffsets,
 	}, nil
 }
 
 func initOffsets(logOffsetsFile string) (map[string]int64, error) {
+	log := zapr.NewLogger(zap.L())
 	raw, err := os.ReadFile(logOffsetsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -97,7 +114,7 @@ func initOffsets(logOffsetsFile string) (map[string]int64, error) {
 	}
 	watermarks := map[string]int64{}
 	if err := json.Unmarshal(raw, &watermarks); err != nil {
-		return nil, errors.Wrapf(err, "Failed to unmarshal watermarks file %s", logOffsetsFile)
+		log.Error(err, "Failed to unmarshal watermarks file %s; watermarks will be reinitialized", logOffsetsFile)
 	}
 	return watermarks, nil
 }
@@ -124,7 +141,7 @@ func (a *Analyzer) Run(ctx context.Context, logDirs []string) error {
 
 	// Enqueue an item to process each file
 	for _, f := range jsonFiles {
-		a.queue.Add(&fileItem{path: f})
+		a.queue.Add(fileItem{path: f})
 	}
 
 	if err := a.registerDirWatchers(ctx, a.queue, logDirs); err != nil {
@@ -151,8 +168,12 @@ func (a *Analyzer) handleLogFileEvents(ctx context.Context) {
 			return
 		}
 		func() {
+			// N.B. We currently don't call forget on any files. So for each file we will max out the retry limit
+			// at the max delay. It might make sense to call forget when we detect an open trace that we are waiting
+			// on log entries to complete. In this case, we'd want to retry the file on a shorter interval with backoff
+			// to detect the end of the trace with as little delay as possible.
 			defer q.Done(item)
-			fileItem, ok := item.(*fileItem)
+			fileItem, ok := item.(fileItem)
 			if !ok {
 				log.Error(errors.New("Failed to cast item to fileItem"), "Failed to cast item to fileItem")
 				return
@@ -170,7 +191,7 @@ func (a *Analyzer) handleLogFileEvents(ctx context.Context) {
 
 func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 	log := logs.FromContext(ctx)
-	log.Info("Processing log file", "path", path)
+	log.V(logs.Debug).Info("Processing log file", "path", path)
 
 	offset := a.getLogFileOffset(path)
 	lines, offset, err := readLinesFromOffset(ctx, path, offset)
@@ -249,18 +270,26 @@ func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 	raw, err := json.Marshal(a.logFileOffsets)
 	if err != nil {
 		log.Error(err, "Failed to marshal watermarks")
-	} else {
-		if err := os.WriteFile(a.logOffsetsFile, raw, 0644); err != nil {
-			log.Error(err, "Failed to write watermarks")
-		} else {
-			log.Info("Wrote watermarks", "logOffsetsFile", a.logOffsetsFile)
-		}
+		return
 	}
+	// To do the write atomically we write to a temp file and then rename it.
+	tempFile := fmt.Sprintf("%s.tmp", a.logOffsetsFile)
+	if err := os.WriteFile(tempFile, raw, 0644); err != nil {
+		log.Error(err, "Failed to write watermarks")
+		return
+	}
+
+	if err := os.Rename(tempFile, a.logOffsetsFile); err != nil {
+		log.Error(err, "Failed to rename watermarks file", "tempFile", tempFile, "logOffsetsFile", a.logOffsetsFile)
+	}
+	log.V(logs.Debug).Info("Wrote watermarks", "logOffsetsFile", a.logOffsetsFile)
+
+	return
 }
 
 // registerDirWatchers sets up notifications for changes in the log directories.
 // Any time a file is modified it will enqueue the file for processing.
-func (a *Analyzer) registerDirWatchers(ctx context.Context, q workqueue.DelayingInterface, logDirs []string) error {
+func (a *Analyzer) registerDirWatchers(ctx context.Context, q workqueue.RateLimitingInterface, logDirs []string) error {
 	log := logs.FromContext(ctx)
 	watcher, err := fsnotify.NewWatcher()
 	a.watcher = watcher
@@ -284,7 +313,7 @@ func (a *Analyzer) registerDirWatchers(ctx context.Context, q workqueue.Delaying
 }
 
 // handleFsnotifications processes file system notifications by enqueuing the file for processing.
-func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q workqueue.DelayingInterface) {
+func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q workqueue.RateLimitingInterface) {
 	log := logs.FromContext(ctx)
 	for {
 		select {
@@ -293,7 +322,7 @@ func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q wor
 				return
 			}
 			if event.Op&fsnotify.Write == fsnotify.Write {
-				q.Add(&fileItem{path: event.Name})
+				q.AddRateLimited(fileItem{path: event.Name})
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -353,7 +382,7 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 		return err
 	}
 
-	if err := writeProto(a.tracesDB, tid, trace); err != nil {
+	if err := dbutil.SetProto(a.tracesDB, tid, trace); err != nil {
 		return err
 	}
 
@@ -418,7 +447,7 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 
 	// Enqueue the block updates
 	for _, delta := range blockDeltas {
-		a.blockQueue.Add(&delta)
+		a.blockQueue.Add(delta)
 	}
 
 	return nil
@@ -488,7 +517,10 @@ func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 		}
 		func() {
 			defer a.blockQueue.Done(item)
-			blockItem, ok := item.(*blockItem)
+			// N.B. We need to enqueue concrete types because the workqueue uses the value as the key.
+			// If we use pointers then we would be using the address as the key and we will end up treating the same
+			// values as different keys which would result in multiple workers processing the same item.
+			blockItem, ok := item.(blockItem)
 			if !ok {
 				log.Error(errors.New("Failed to cast item to blockItem"), "Failed to cast item to blockItem")
 				return
@@ -816,42 +848,4 @@ func combineRunMeTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Tr
 	}
 	trace.EvalMode = evalMode
 	return trace, nil
-}
-
-// TODO(jeremy): We should be able to replace this with the code in dbutil
-func writeProto(db *pebble.DB, key string, pb proto.Message) error {
-	b, err := proto.Marshal(pb)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to marshal proto with key %s", key)
-	}
-	return db.Set([]byte(key), b, pebble.Sync)
-}
-
-// readModifyWriteBlock reads a block from the database, modifies it and writes it back.
-// If the block doesn't exist an empty BlockLog will be passed to the function.
-// TODO(jeremy): We should be able to replace this function with usage of dbutil.ReadModifyWrite
-func readModifyWriteBlock(db *pebble.DB, key string, modify func(*logspb.BlockLog) error) error {
-	b, closer, err := db.Get([]byte(key))
-	if err != nil && !errors.Is(err, pebble.ErrNotFound) {
-		return errors.Wrapf(err, "Failed to read block with key %s", key)
-	}
-	// Closer is nil on not found
-	if closer != nil {
-		defer closer.Close()
-	}
-
-	block := &logspb.BlockLog{}
-
-	if err != pebble.ErrNotFound {
-
-		if err := proto.Unmarshal(b, block); err != nil {
-			return errors.Wrapf(err, "Failed to unmarshal block with key %s", key)
-		}
-	}
-
-	if err := modify(block); err != nil {
-		return errors.Wrapf(err, "Failed to modify block with key %s", key)
-	}
-
-	return writeProto(db, key, block)
 }
