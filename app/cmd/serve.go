@@ -42,9 +42,6 @@ func NewServeCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				defer helpers.DeferIgnoreError(func() error {
-					return analyzer.Shutdown(context.Background())
-				})
 
 				analyzer.Run(context.Background(), logDirs)
 				s, err := app.SetupServer()
@@ -52,6 +49,11 @@ func NewServeCmd() *cobra.Command {
 					return err
 				}
 				defer helpers.DeferIgnoreError(app.Shutdown)
+
+				// Analyzer needs to be shutdown before the app because the app will close the database
+				defer helpers.DeferIgnoreError(func() error {
+					return analyzer.Shutdown(context.Background())
+				})
 
 				logVersion()
 				return s.Run()

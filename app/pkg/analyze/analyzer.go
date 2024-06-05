@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 	"os"
 	"path/filepath"
 	"sort"
@@ -31,6 +33,11 @@ import (
 const (
 	// unsetExitCode is a random negative exit code so we can tell when it hasn't been set.
 	unsetExitCode = -2377
+
+	// traceField is the field that contains the traceId in a log entry. We use this to identify processing related
+	// to a particular trace. We don't use the field "traceId" because these log entries aren't actually part of the
+	// trace.
+	traceField = "targetTraceId"
 )
 
 // Analyzer is responsible for analyzing logs and building traces. It does this in a streaming fashion so that
@@ -170,9 +177,13 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
+	if len(lines) == 0 {
+		return nil
+	}
 
 	traceIDs := make(map[string]bool)
 
+	pkgPath := getFullPackagePath()
 	for _, line := range lines {
 		entry := &api.LogEntry{}
 		if err := json.Unmarshal([]byte(line), entry); err != nil {
@@ -183,6 +194,14 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 		// Ignore log entries without traces
 		if entry.TraceID() == "" {
 			continue
+		}
+
+		// Drop all log entries that come from the Analyzer package itself. This should hadn't be neccessary
+		// but its a precaution to guard against someone accidentally adding a log message with the the field "traceId"
+		// to log a message about processing that trace. If we include such messages as part of the trace
+		// we could trigger an infinite loop
+		if strings.HasPrefix(entry.Function(), pkgPath) {
+			log.Error(errors.New("Ignoring log entry from Analyzer package"), "Ignoring log entry from Analyzer package", "entry", entry)
 		}
 
 		entries := &logspb.LogEntries{}
@@ -202,7 +221,7 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 	// in a trace. This would avoid potentially doing a combine for a trace on each log message.
 	for tid := range traceIDs {
 		if err := a.buildTrace(ctx, tid); err != nil {
-			log.Error(err, "Error building trace", "traceId", tid)
+			log.Error(err, "Error building trace", traceField, tid)
 		}
 	}
 	// Update the offset
@@ -224,6 +243,19 @@ func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.logFileOffsets[path] = offset
+
+	log := zapr.NewLogger(zap.L())
+	// Persist the watermarks
+	raw, err := json.Marshal(a.logFileOffsets)
+	if err != nil {
+		log.Error(err, "Failed to marshal watermarks")
+	} else {
+		if err := os.WriteFile(a.logOffsetsFile, raw, 0644); err != nil {
+			log.Error(err, "Failed to write watermarks")
+		} else {
+			log.Info("Wrote watermarks", "logOffsetsFile", a.logOffsetsFile)
+		}
+	}
 }
 
 // registerDirWatchers sets up notifications for changes in the log directories.
@@ -288,21 +320,6 @@ func (a *Analyzer) Shutdown(ctx context.Context) error {
 	a.handleLogFileIsDone.Wait()
 	a.handleBlocksIsDone.Wait()
 
-	// Persist the watermarks
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	raw, err := json.Marshal(a.logFileOffsets)
-	if err != nil {
-		log.Error(err, "Failed to marshal watermarks")
-	} else {
-		if err := os.WriteFile(a.logOffsetsFile, raw, 0644); err != nil {
-			log.Error(err, "Failed to write watermarks")
-		} else {
-			log.Info("Wrote watermarks", "logOffsetsFile", a.logOffsetsFile)
-		}
-	}
-
-	// TODO(jeremy) Persist the watermarks
 	log.Info("Analyzer shutdown")
 	return nil
 }
@@ -329,10 +346,10 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 	}
 
 	// Now combine the entries for the trace
-	log.Info("Combining entries for trace", "traceId", tid, "numEntries", len(logEntries))
+	log.Info("Combining entries for trace", traceField, tid, "numEntries", len(logEntries))
 	trace, err := combineEntriesForTrace(ctx, logEntries)
 	if err != nil {
-		log.Error(err, "Error combining entries for trace", "traceId", tid)
+		log.Error(err, "Error combining entries for trace", traceField, tid)
 		return err
 	}
 
