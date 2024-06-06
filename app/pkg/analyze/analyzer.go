@@ -92,6 +92,10 @@ func NewAnalyzer(logOffsetsFile string, rawLogsDB *pebble.DB, tracesDB *pebble.D
 	// to detect the end of the trace as quickly as possible. Right now we don't do that and in fact we never call
 	// forget so we will basically max out the retry limit at the max delay.
 	fileQueue := workqueue.NewRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 30*time.Second))
+
+	//qDir := path.Dir(logOffsetsFile)
+	//blockPath := path.Join(qDir, "blockEventsQueue")
+	//blockQueue := diskqueue.New("blocks", blockPath)
 	return &Analyzer{
 		logOffsetsFile: logOffsetsFile,
 		rawLogsDB:      rawLogsDB,

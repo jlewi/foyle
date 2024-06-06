@@ -127,6 +127,47 @@ When we perform a reduce operation on the log entries for a trace we can emit an
 updated. We can enqueue these in a durable queue using 
 [nsqio/go-diskqueue](https://github.com/nsqio/go-diskqueue/blob/master/diskqueue.go).
 
+We need to accumulate (block -> traceIds[]string). We need to avoid multiple writers trying to update
+the same block concurrently because that would lead to a last one wins situation. 
+
+One option would be to have a single writer for the blocks database. Then we could just use a queue
+for different block updates. Downside here is we would be limited to a single thread processing all block updates.
+
+An improved version of the above would be to have multiple writers but ensure a given block can only be processed
+by one worker at a time. We can use something like [workqueue](https://pkg.go.dev/k8s.io/client-go/util/workqueue)
+for this. Workqueue alone won't be sufficient because it doesn't let you attach a payload to the enqueued item. The 
+enqueued item is used as the key. Therefore we'd need a separate mechanism to keep track of all the updates that
+need to be applied to the block.
+
+An obvious place to accumulate updates to each block would be in the blocks database itself. Of course that brings
+us back to the problem of ensuring only a single writer to a given block at a time. We'd like to make it easy to
+for code to supply a function that will apply an update to a record in the database.
+
+```go
+func ReadModifyWrite[T proto.Message](db *pebble.DB, key string, msg T, modify func(T) error) error {
+	...
+}
+```
+
+To make this thread safe we need to ensure that we never try to update the same block concurrently. We can do
+that by implementing row level locks. [fishy/rowlock](https://github.com/fishy/rowlock/blob/master/rowlock.go) is
+an example. It is basically, a locked map of row keys to locks. Unfortunately, it doesn't implement any type of
+forgetting so we'd keep accumulating keys. I think we can use the builtin [sync.Map](https://pkg.go.dev/sync#Map)
+to implement RowLocking with optimistic concurrency. The semantics would be like the following
+
+* Add a [ResourceVersion](https://github.com/kubernetes/apimachinery/blob/703232ea6da48aed7ac22260dabc6eac01aab896/pkg/apis/meta/v1/types.go#L172)
+  to the proto that can be used for optimistic locking
+* Read the row from the database
+* Set ResourceVersion if not already set
+* Call LoadOrStore to load or store the resource version in the sync.Map
+  * If a different value is already stored then restart the operation
+* Apply the update
+* Generate a new resource version
+* Call CompareAndSwap to update the resource version in the sync.Map
+  * If the value has changed then restart the operation
+* Write the updated row to the database
+* Call CompareAndDelete to remove the resource version from the sync.Map
+
 ### Continuous Learning
 
 When it comes to continuous learning we have to potential options
