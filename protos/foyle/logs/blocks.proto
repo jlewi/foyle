@@ -30,4 +30,7 @@ message BlockLog {
     int32 exit_code = 7;
     // eval_mode is true if the block was generated as part of an evaluation and shouldn't be used for learning
     bool eval_mode = 8;
+
+    // ResourceVersion is an opaque string that can be used for optimistic concurrency control
+    string resource_version = 9;
 }

@@ -11,6 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cockroachdb/pebble"
+	"github.com/jlewi/foyle/app/pkg/dbutil"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+
 	"github.com/jlewi/foyle/app/pkg/analyze"
 
 	"github.com/jlewi/foyle/app/api"
@@ -41,11 +45,16 @@ type logCloser func()
 // App is a struct to hold values needed across all commands.
 // Intent is to simplify initialization across commands.
 type App struct {
-	Config         *config.Config
-	Out            io.Writer
-	otelShutdownFn func()
-	logClosers     []logCloser
-	Registry       *controllers.Registry
+	Config              *config.Config
+	Out                 io.Writer
+	otelShutdownFn      func()
+	logClosers          []logCloser
+	Registry            *controllers.Registry
+	logEntriesDB        *pebble.DB
+	LockingLogEntriesDB *dbutil.LockingDB[*logspb.LogEntries]
+	TracesDB            *pebble.DB
+	blocksDB            *pebble.DB
+	LockingBlocksDB     *dbutil.LockingDB[*logspb.BlockLog]
 }
 
 // NewApp creates a new application. You should call one more setup/Load functions to properly set it up.
@@ -190,14 +199,7 @@ func (a *App) SetupRegistry() error {
 	}
 	a.Registry = &controllers.Registry{}
 
-	// Register controllers
-
-	analyzer, err := analyze.NewAnalyzer()
-	if err != nil {
-		return err
-	}
-
-	eval, err := eval.NewEvaluator(*a.Config, analyzer)
+	eval, err := eval.NewEvaluator(*a.Config)
 	if err != nil {
 		return err
 	}
@@ -296,13 +298,26 @@ func (a *App) createCoreLoggerForFiles() (zapcore.Core, error) {
 	return core, nil
 }
 
+// SetupAnalyzer sets up the analyzer
+func (a *App) SetupAnalyzer() (*analyze.Analyzer, error) {
+	if a.Config == nil {
+		return nil, errors.New("Config is nil; call LoadConfig first")
+	}
+
+	analyzer, err := analyze.NewAnalyzer(a.Config.GetLogOffsetsFile(), a.LockingLogEntriesDB, a.TracesDB, a.LockingBlocksDB)
+	if err != nil {
+		return nil, err
+	}
+	return analyzer, nil
+}
+
 // SetupServer sets up the server
 func (a *App) SetupServer() (*server.Server, error) {
 	if a.Config == nil {
 		return nil, errors.New("Config is nil; call LoadConfig first")
 	}
 
-	s, err := server.NewServer(*a.Config)
+	s, err := server.NewServer(*a.Config, a.blocksDB)
 
 	if err != nil {
 		return nil, err
@@ -381,6 +396,41 @@ func (a *App) apply(ctx context.Context, path string) error {
 	return allErrors
 }
 
+func (a *App) OpenDBs() error {
+	if a.Config == nil {
+		return errors.New("Config is nil; call LoadConfig first")
+	}
+
+	log := zapr.NewLogger(zap.L())
+
+	log.Info("Opening traces database", "database", a.Config.GetTracesDBDir())
+	tracesDB, err := pebble.Open(a.Config.GetTracesDBDir(), &pebble.Options{})
+	if err != nil {
+		return errors.Wrapf(err, "could not open traces database %s", a.Config.GetTracesDBDir())
+	}
+	a.TracesDB = tracesDB
+
+	log.Info("Opening blocks database", "database", a.Config.GetBlocksDBDir())
+	blocksDB, err := pebble.Open(a.Config.GetBlocksDBDir(), &pebble.Options{})
+	if err != nil {
+		return errors.Wrapf(err, "could not open blocks database %s", a.Config.GetBlocksDBDir())
+	}
+	a.blocksDB = blocksDB
+
+	a.LockingBlocksDB = analyze.NewLockingBlocksDB(blocksDB)
+
+	log.Info("Opening loglines database", "database", a.Config.GetBlocksDBDir())
+	logEntries, err := pebble.Open(a.Config.GetLogEntriesDBDir(), &pebble.Options{})
+	if err != nil {
+		return errors.Wrapf(err, "could not open log entries database %s", a.Config.GetLogEntriesDBDir())
+	}
+	a.logEntriesDB = logEntries
+
+	a.LockingLogEntriesDB = analyze.NewLockingEntriesDB(a.logEntriesDB)
+
+	return nil
+}
+
 // Shutdown the application.
 func (a *App) Shutdown() error {
 	// N.B. This is a placeholder for any operations that should be performed when shutting down the app
@@ -392,6 +442,20 @@ func (a *App) Shutdown() error {
 	if a.otelShutdownFn != nil {
 		log.Info("Shutting down open telemetry")
 		a.otelShutdownFn()
+	}
+
+	if a.TracesDB != nil {
+		log.Info("Closing trace database")
+		if err := a.TracesDB.Close(); err != nil {
+			log.Error(err, "Error closing trace database")
+		}
+	}
+
+	if a.blocksDB != nil {
+		log.Info("Closing blocks database")
+		if err := a.blocksDB.Close(); err != nil {
+			log.Error(err, "Error closing blocks database")
+		}
 	}
 
 	log.Info("Shutting down the application")

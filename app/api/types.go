@@ -32,6 +32,16 @@ func (L *LogEntry) Get(field string) (interface{}, bool) {
 	return v, ok
 }
 
+func (L *LogEntry) GetBool(field string) (bool, bool) {
+	v, ok := (*L)[field]
+	if !ok {
+		return false, false
+	}
+
+	f, ok := v.(bool)
+	return f, ok
+}
+
 func (L *LogEntry) GetFloat64(field string) (float64, bool) {
 	v, ok := (*L)[field]
 	if !ok {

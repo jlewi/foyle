@@ -71,5 +71,8 @@ func (m *BlockLog) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) e
 	keyName = "eval_mode" // field eval_mode = 8
 	enc.AddBool(keyName, m.EvalMode)
 
+	keyName = "resource_version" // field resource_version = 9
+	enc.AddString(keyName, m.ResourceVersion)
+
 	return nil
 }

@@ -4,11 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
 	"github.com/jlewi/foyle/app/pkg/docs"
 	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
@@ -17,136 +22,372 @@ import (
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
+	"k8s.io/client-go/util/workqueue"
 )
 
 const (
 	// unsetExitCode is a random negative exit code so we can tell when it hasn't been set.
 	unsetExitCode = -2377
+
+	// traceField is the field that contains the traceId in a log entry. We use this to identify processing related
+	// to a particular trace. We don't use the field "traceId" because these log entries aren't actually part of the
+	// trace.
+	traceField = "targetTraceId"
 )
 
-// Analyzer is responsible for analyzing logs.
+// Analyzer is responsible for analyzing logs and building traces. It does this in a streaming fashion so that
+// traces get built in "realtime".
+//
+// The Analyzer is multi-threaded. One potential pitfall is we have multiple writers trying to update the same
+// key. This would result in a last-write win situation with the last write potentially overwriting the changes
+// by the other writer. To avoid this, we use WorkQueue's to schedule updates to each key. The workqueue
+// ensures that a single worker is processing a single key at a time. The items in the workqueue should be concrete
+// types not pointers because the workqueues use the value as the key.
+//
+// If the Analyzer emits any info log messages in the course of processing Foyle's raw log entries; this will result
+// in continual reprocessing of Foyle logs. This is because the Analyzer is watching the log file and fires whenever
+// its updated and invoke handleLogFileEvents. So if handleLogFileEvents updates the log file then we get constant
+// reprocessing. We use a rateLimitingQueue to ensure that we don't process the same file too quickly.
 type Analyzer struct {
+	tracesDB  *pebble.DB
+	blocksDB  *dbutil.LockingDB[*logspb.BlockLog]
+	rawLogsDB *dbutil.LockingDB[*logspb.LogEntries]
+	// queue for log file processing
+	queue workqueue.RateLimitingInterface
+	// Queue for block log processing
+	// TODO(jeremy): We should really use a durable queue backed by files
+	blockQueue workqueue.DelayingInterface
+
+	watcher *fsnotify.Watcher
+
+	handleLogFileIsDone sync.WaitGroup
+	handleBlocksIsDone  sync.WaitGroup
+	logFileOffsets      map[string]int64
+	mu                  sync.Mutex
+
+	logOffsetsFile string
+	// Only used during testing to allow the test to tell when the log file processing is done.
+	signalFileDone  chan<- string
+	signalBlockDone chan<- string
 }
 
 // NewAnalyzer creates a new Analyzer.
-func NewAnalyzer() (*Analyzer, error) {
-	return &Analyzer{}, nil
-}
-
-type ResultFiles struct {
-	BlockDB  string
-	TracesDB string
-}
-
-// Analyze analyzes the logs.
-// logsDir - Is the directory containing the logs
-// tracesDBDir - Is the directory containing the traces pebble database
-// blocksDBDir - Is the directory containing the blocks pebble database
-//
-// TODO(https://github.com/jlewi/foyle/issues/126): I think we need to pass the DBs in because we can't
-// have them be multi process; so we probably want to have a single DB per process.
-func (a *Analyzer) Analyze(ctx context.Context, logDirs []string, tracesDBDir string, blocksDBDir string) error {
-	log := logs.FromContext(ctx)
-	log.Info("Analyzing logs", "logDirs", logDirs, "tracesDBDir", tracesDBDir, "blocksDBDir", blocksDBDir)
-
-	log.Info("Opening traces database", "database", tracesDBDir)
-	tracesDB, err := pebble.Open(tracesDBDir, &pebble.Options{})
+func NewAnalyzer(logOffsetsFile string, rawLogsDB *dbutil.LockingDB[*logspb.LogEntries], tracesDB *pebble.DB, blocksDB *dbutil.LockingDB[*logspb.BlockLog]) (*Analyzer, error) {
+	logOffsets, err := initOffsets(logOffsetsFile)
 	if err != nil {
-		return errors.Wrapf(err, "could not open traces database %s", tracesDBDir)
+		return nil, err
 	}
 
-	defer helpers.DeferIgnoreError(tracesDB.Close)
+	// Create a rate limiting queue for processing files. We rate limit to each file every 30 seconds. This is because
+	// The logs are constantly being written to and we don't want to process the files too quickly.
+	// We are potentially writing to multiple files at the same time e.g. the Analyzer logs and then a different
+	// log file for each instance of RunMe. So we need to track different backoffs for each file which the rate limiter
+	// does. Using exponential backoff would make sense when we update processLogFile to detect the end of a trace.
+	// In that case, after we detect the start of a trace we would want to retry on a very short interval with backoff
+	// to detect the end of the trace as quickly as possible. Right now we don't do that and in fact we never call
+	// forget so we will basically max out the retry limit at the max delay.
+	fileQueue := workqueue.NewRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 30*time.Second))
 
-	log.Info("Opening blocks database", "database", blocksDBDir)
-	blocksDB, err := pebble.Open(blocksDBDir, &pebble.Options{})
+	return &Analyzer{
+		logOffsetsFile: logOffsetsFile,
+		rawLogsDB:      rawLogsDB,
+		tracesDB:       tracesDB,
+		blocksDB:       blocksDB,
+		queue:          fileQueue,
+		blockQueue:     workqueue.NewDelayingQueue(),
+		logFileOffsets: logOffsets,
+	}, nil
+}
+
+func initOffsets(logOffsetsFile string) (map[string]int64, error) {
+	log := zapr.NewLogger(zap.L())
+	raw, err := os.ReadFile(logOffsetsFile)
 	if err != nil {
-		return errors.Wrapf(err, "could not open blocks database %s", blocksDBDir)
-	}
-
-	defer helpers.DeferIgnoreError(blocksDB.Close)
-
-	jsonFiles := make([]string, 0, 100)
-	for _, logsDir := range logDirs {
-		newFiles, err := findLogFiles(ctx, logsDir)
-		if err != nil {
-			return err
+		if os.IsNotExist(err) {
+			return map[string]int64{}, nil
 		}
-		log.Info("Found logs", "numFiles", len(newFiles), "logsDir", logsDir)
-		jsonFiles = append(jsonFiles, newFiles...)
+		return nil, errors.Wrapf(err, "Failed to read watermarks file %s", logOffsetsFile)
 	}
+	watermarks := map[string]int64{}
+	if err := json.Unmarshal(raw, &watermarks); err != nil {
+		log.Error(err, "Failed to unmarshal watermarks file %s; watermarks will be reinitialized", logOffsetsFile)
+	}
+	return watermarks, nil
+}
 
-	if err := buildTraces(ctx, jsonFiles, tracesDB, blocksDB); err != nil {
+type fileItem struct {
+	path string
+}
+
+type blockItem struct {
+	id string
+}
+
+// Run runs the analyzer; continually processing logs.
+func (a *Analyzer) Run(ctx context.Context, logDirs []string) error {
+	// Find all the current files
+	jsonFiles, err := findLogFilesInDirs(ctx, logDirs)
+	if err != nil {
 		return err
 	}
 
-	err = buildBlockLogs(ctx, tracesDB, blocksDB)
-
-	return err
-}
-
-// buildTraces creates a map of all the traces and initializes the blocks.
-func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, blocksDB *pebble.DB) error {
-	log := logs.FromContext(ctx)
-	// Entries is a mapping from a traceId to a list of logEntries associated with that entry.
-	traceEntries := make(map[string][]*api.LogEntry)
-
-	for _, p := range jsonFiles {
-		log.Info("Reading file", "path", p)
-		f, err := os.Open(p)
-		if err != nil {
-			log.Error(err, "Error opening file; file will be skipped", "path", p)
-			continue
-		}
-		d := json.NewDecoder(f)
-
-		for {
-			entry := &api.LogEntry{}
-			err := d.Decode(entry)
-
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				log.Error(err, "Error decoding log entry", "path", p)
-				continue
-			}
-
-			// Ignore log entries without traces
-			if entry.TraceID() == "" {
-				continue
-			}
-
-			items, ok := traceEntries[entry.TraceID()]
-			if !ok {
-				items = make([]*api.LogEntry, 0, 10)
-			}
-			items = append(items, entry)
-			traceEntries[entry.TraceID()] = items
-		}
+	// Enqueue an item to process each file
+	for _, f := range jsonFiles {
+		a.queue.Add(fileItem{path: f})
 	}
 
-	// Now combine all the entries for each trace
-	for tid, items := range traceEntries {
-		log.Info("Combining entries for trace", "traceId", tid, "numEntries", len(items))
-		trace, err := combineEntriesForTrace(ctx, items)
-		if err != nil {
-			log.Error(err, "Error combining entries for trace", "traceId", tid)
+	if err := a.registerDirWatchers(ctx, a.queue, logDirs); err != nil {
+		return err
+	}
+
+	a.handleLogFileIsDone.Add(1)
+	a.handleBlocksIsDone.Add(1)
+
+	go a.handleLogFileEvents(ctx)
+	go a.handleBlockEvents(ctx)
+
+	return nil
+}
+
+// TODO(jeremy): How do we make the Analyzer thread safe? I believe the DB classes are thread safe
+func (a *Analyzer) handleLogFileEvents(ctx context.Context) {
+	q := a.queue
+	log := logs.FromContext(ctx)
+	for {
+		item, shutdown := q.Get()
+		if shutdown {
+			a.handleLogFileIsDone.Done()
+			return
+		}
+		func() {
+			// N.B. We currently don't call forget on any files. So for each file we will max out the retry limit
+			// at the max delay. It might make sense to call forget when we detect an open trace that we are waiting
+			// on log entries to complete. In this case, we'd want to retry the file on a shorter interval with backoff
+			// to detect the end of the trace with as little delay as possible.
+			defer q.Done(item)
+			fileItem, ok := item.(fileItem)
+			if !ok {
+				log.Error(errors.New("Failed to cast item to fileItem"), "Failed to cast item to fileItem")
+				return
+			}
+
+			if err := a.processLogFile(ctx, fileItem.path); err != nil {
+				log.Error(err, "Error processing log file", "path", fileItem.path)
+			}
+			if a.signalFileDone != nil {
+				a.signalFileDone <- fileItem.path
+			}
+		}()
+	}
+}
+
+func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
+	log := logs.FromContext(ctx)
+	log.V(logs.Debug).Info("Processing log file", "path", path)
+
+	offset := a.getLogFileOffset(path)
+	lines, offset, err := readLinesFromOffset(ctx, path, offset)
+	if err != nil {
+		return err
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+
+	traceIDs := make(map[string]bool)
+
+	pkgPath := getFullPackagePath()
+	for _, line := range lines {
+		entry := &api.LogEntry{}
+		if err := json.Unmarshal([]byte(line), entry); err != nil {
+			log.Error(err, "Error decoding log entry", "path", path, "line", line)
 			continue
 		}
 
-		if err := writeProto(tracesDB, tid, trace); err != nil {
+		// Ignore log entries without traces
+		if entry.TraceID() == "" {
+			continue
+		}
+
+		// Drop all log entries that come from the Analyzer package itself. This should hadn't be neccessary
+		// but its a precaution to guard against someone accidentally adding a log message with the the field "traceId"
+		// to log a message about processing that trace. If we include such messages as part of the trace
+		// we could trigger an infinite loop
+		if strings.HasPrefix(entry.Function(), pkgPath) {
+			log.Error(errors.New("Ignoring log entry from Analyzer package"), "Ignoring log entry from Analyzer package", "entry", entry)
+		}
+
+		if err := a.rawLogsDB.ReadModifyWrite(entry.TraceID(), func(entries *logspb.LogEntries) error {
+			if entries.Lines == nil {
+				entries.Lines = make([]string, 0, 1)
+			}
+			entries.Lines = append(entries.Lines, line)
+			return nil
+		}); err != nil {
+			// If there is a problem writing to the DB we should probably surface it rather than just keep going.
 			return err
 		}
 
-		// Update the blocks associated with this trace
+		traceIDs[entry.TraceID()] = true
+	}
+
+	// Combine the entries for each trace that we saw.
+	// N.B. We could potentially make this more efficient by checking if the log message is the final message
+	// in a trace. This would avoid potentially doing a combine for a trace on each log message.
+	for tid := range traceIDs {
+		if err := a.buildTrace(ctx, tid); err != nil {
+			log.Error(err, "Error building trace", traceField, tid)
+		}
+	}
+	// Update the offset
+	a.setLogFileOffset(path, offset)
+	return nil
+}
+
+func (a *Analyzer) getLogFileOffset(path string) int64 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	offset, ok := a.logFileOffsets[path]
+	if !ok {
+		return 0
+	}
+	return offset
+}
+
+func (a *Analyzer) setLogFileOffset(path string, offset int64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.logFileOffsets[path] = offset
+
+	log := zapr.NewLogger(zap.L())
+	// Persist the watermarks
+	raw, err := json.Marshal(a.logFileOffsets)
+	if err != nil {
+		log.Error(err, "Failed to marshal watermarks")
+		return
+	}
+	// To do the write atomically we write to a temp file and then rename it.
+	tempFile := fmt.Sprintf("%s.tmp", a.logOffsetsFile)
+	if err := os.WriteFile(tempFile, raw, 0644); err != nil {
+		log.Error(err, "Failed to write watermarks")
+		return
+	}
+
+	if err := os.Rename(tempFile, a.logOffsetsFile); err != nil {
+		log.Error(err, "Failed to rename watermarks file", "tempFile", tempFile, "logOffsetsFile", a.logOffsetsFile)
+	}
+	log.V(logs.Debug).Info("Wrote watermarks", "logOffsetsFile", a.logOffsetsFile)
+}
+
+// registerDirWatchers sets up notifications for changes in the log directories.
+// Any time a file is modified it will enqueue the file for processing.
+func (a *Analyzer) registerDirWatchers(ctx context.Context, q workqueue.RateLimitingInterface, logDirs []string) error {
+	log := logs.FromContext(ctx)
+	watcher, err := fsnotify.NewWatcher()
+	a.watcher = watcher
+	if err != nil {
+		return err
+	}
+	for _, dir := range logDirs {
+		fullPath, err := filepath.Abs(dir)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to get absolute path for %s", dir)
+		}
+
+		log.Info("Watching logs directory", "dir", fullPath)
+		if err := watcher.Add(fullPath); err != nil {
+			return err
+		}
+	}
+
+	go handleFsnotifications(ctx, watcher, q)
+	return nil
+}
+
+// handleFsnotifications processes file system notifications by enqueuing the file for processing.
+func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q workqueue.RateLimitingInterface) {
+	log := logs.FromContext(ctx)
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				q.AddRateLimited(fileItem{path: event.Name})
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Error(err, "Error from watcher")
+		}
+	}
+}
+
+func (a *Analyzer) Shutdown(ctx context.Context) error {
+	log := logs.FromContext(ctx)
+
+	log.Info("Shutting down analyzer")
+
+	// Shutdown the watcher
+	if a.watcher != nil {
+		a.watcher.Close()
+	}
+	// Shutdown the queues
+	a.queue.ShutDown()
+	a.blockQueue.ShutDown()
+	// Wait for the queues to be shutdown
+	a.handleLogFileIsDone.Wait()
+	a.handleBlocksIsDone.Wait()
+
+	log.Info("Analyzer shutdown")
+	return nil
+}
+
+// buildTrace creates the trace and initializes the blocks.
+func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
+	log := logs.FromContext(ctx)
+
+	// Entries is a mapping from a traceId to a list of logEntries associated with that entry.
+	logEntries := make([]*api.LogEntry, 0, 10)
+
+	protoEntries, err := a.rawLogsDB.Get(tid)
+	if err != nil {
+		return err
+	}
+
+	for _, l := range protoEntries.Lines {
+		entry := &api.LogEntry{}
+		if err := json.Unmarshal([]byte(l), entry); err != nil {
+			log.Error(err, "Error decoding log entry", "line", l)
+			continue
+		}
+		logEntries = append(logEntries, entry)
+	}
+
+	// Now combine the entries for the trace
+	log.Info("Combining entries for trace", traceField, tid, "numEntries", len(logEntries))
+	trace, err := combineEntriesForTrace(ctx, logEntries)
+	if err != nil {
+		log.Error(err, "Error combining entries for trace", traceField, tid)
+		return err
+	}
+
+	if err := dbutil.SetProto(a.tracesDB, tid, trace); err != nil {
+		return err
+	}
+
+	// Update the blocks associated with this trace; we need to update the block with any trace ids that it uses.
+	// We will then enqueue the block for processing.
+	blockIds, err := func() ([]string, error) {
+		bids := make([]string, 0, 10)
 		switch t := trace.Data.(type) {
 		case *logspb.Trace_Generate:
 			for _, oBlock := range t.Generate.Response.GetBlocks() {
@@ -154,21 +395,22 @@ func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, b
 				if bid == "" {
 					continue
 				}
-				if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+				bids = append(bids, bid)
+				if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
 					block.Id = bid
 					block.GenTraceId = tid
 					return nil
 				}); err != nil {
-					return errors.Wrapf(err, "Failed to set generate trace on block %s", bid)
+					return bids, errors.Wrapf(err, "Failed to set generate trace on block %s", bid)
 				}
 			}
 		case *logspb.Trace_Execute:
 			bid := t.Execute.Request.GetBlock().GetId()
 			if bid == "" {
-				continue
+				return bids, nil
 			}
-
-			if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+			bids = append(bids, bid)
+			if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
 				block.Id = bid
 				if block.ExecTraceIds == nil {
 					block.ExecTraceIds = make([]string, 0, 10)
@@ -176,15 +418,15 @@ func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, b
 				block.ExecTraceIds = append(block.ExecTraceIds, tid)
 				return nil
 			}); err != nil {
-				return errors.Wrapf(err, "Failed to set execute trace on block %s", bid)
+				return bids, errors.Wrapf(err, "Failed to set execute trace on block %s", bid)
 			}
 		case *logspb.Trace_RunMe:
 			bid := t.RunMe.Request.GetKnownId()
 			if bid == "" {
-				continue
+				return bids, nil
 			}
-
-			if err := readModifyWriteBlock(blocksDB, bid, func(block *logspb.BlockLog) error {
+			bids = append(bids, bid)
+			if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
 				block.Id = bid
 				if block.ExecTraceIds == nil {
 					block.ExecTraceIds = make([]string, 0, 10)
@@ -192,14 +434,41 @@ func buildTraces(ctx context.Context, jsonFiles []string, tracesDB *pebble.DB, b
 				block.ExecTraceIds = append(block.ExecTraceIds, tid)
 				return nil
 			}); err != nil {
-				return errors.Wrapf(err, "Failed to set RunMe trace on block %s", bid)
+				return bids, errors.Wrapf(err, "Failed to set RunMe trace on block %s", bid)
 			}
 		default:
 			log.Error(fmt.Errorf("Unknown trace type"), "Unknown trace type", "trace", t)
 		}
+		return bids, nil
+	}()
+
+	// TODO(jeremy): Should we enqueue block update events even if there is an error
+	if err != nil {
+		return err
+	}
+
+	// Enqueue the block updates
+	for _, delta := range blockIds {
+		a.blockQueue.Add(blockItem{
+			id: delta,
+		})
 	}
 
 	return nil
+}
+
+func findLogFilesInDirs(ctx context.Context, logDirs []string) ([]string, error) {
+	log := logs.FromContext(ctx)
+	jsonFiles := make([]string, 0, 100)
+	for _, logsDir := range logDirs {
+		newFiles, err := findLogFiles(ctx, logsDir)
+		if err != nil {
+			return jsonFiles, err
+		}
+		log.Info("Found logs", "numFiles", len(newFiles), "logsDir", logsDir)
+		jsonFiles = append(jsonFiles, newFiles...)
+	}
+	return jsonFiles, nil
 }
 
 func findLogFiles(ctx context.Context, logsDir string) ([]string, error) {
@@ -242,46 +511,36 @@ func findLogFiles(ctx context.Context, logsDir string) ([]string, error) {
 	return jsonFiles, nil
 }
 
-func buildBlockLogs(ctx context.Context, tracesDB *pebble.DB, blocksDB *pebble.DB) error {
+func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 	log := logs.FromContext(ctx)
+	for {
+		item, shutdown := a.blockQueue.Get()
+		if shutdown {
+			a.handleBlocksIsDone.Done()
+			return
+		}
+		func() {
+			defer a.blockQueue.Done(item)
+			// N.B. We need to enqueue concrete types because the workqueue uses the value as the key.
+			// If we use pointers then we would be using the address as the key and we will end up treating the same
+			// values as different keys which would result in multiple workers processing the same item.
+			blockItem, ok := item.(blockItem)
+			if !ok {
+				log.Error(errors.New("Failed to cast item to blockItem"), "Failed to cast item to blockItem")
+				return
+			}
 
-	iter, err := blocksDB.NewIterWithContext(ctx, nil)
-	if err != nil {
-		return err
+			err := a.blocksDB.ReadModifyWrite(blockItem.id, func(block *logspb.BlockLog) error {
+				return buildBlockLog(ctx, block, a.tracesDB)
+			})
+			if err != nil {
+				log.Error(err, "Error processing block", "block", blockItem.id)
+			}
+			if a.signalBlockDone != nil {
+				a.signalBlockDone <- blockItem.id
+			}
+		}()
 	}
-	defer iter.Close()
-
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-		if key == nil {
-			break
-		}
-		bid := string(key)
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			return errors.Wrapf(err, "Failed to read block for key %s", string(key))
-		}
-
-		log.Info("Combining entries for block", "blockId", bid)
-
-		blockLog := &logspb.BlockLog{}
-		if err := proto.Unmarshal(value, blockLog); err != nil {
-			return errors.Wrapf(err, "Failed to unmarshal block for id %s", bid)
-		}
-		if err := buildBlockLog(ctx, blockLog, tracesDB); err != nil {
-			log.Error(err, "Error combining entries for block", "blockId", bid)
-			continue
-		}
-		bytes, err := proto.Marshal(blockLog)
-		if err != nil {
-			return errors.Wrapf(err, "Failed to marshal block for id %s", bid)
-		}
-		log.Info("Writing block", "blockId", bid, "block", blockLog)
-		if err := blocksDB.Set([]byte(bid), bytes, pebble.Sync); err != nil {
-			log.Error(err, "Error writing block", "blockId", bid)
-		}
-	}
-	return nil
 }
 
 func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble.DB) error {
@@ -323,6 +582,16 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 				log.Error(errors.New("Failed to find generated block"), "Error finding generated block", "blockId", block.GetId())
 			}
 		}()
+	}
+
+	// Dedupe the execution traces just in case
+	uEids := make(map[string]bool)
+	for _, eid := range block.GetExecTraceIds() {
+		uEids[eid] = true
+	}
+	block.ExecTraceIds = make([]string, 0, len(uEids))
+	for eid := range uEids {
+		block.ExecTraceIds = append(block.ExecTraceIds, eid)
 	}
 
 	var lastTrace *logspb.Trace
@@ -573,40 +842,4 @@ func combineRunMeTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Tr
 	}
 	trace.EvalMode = evalMode
 	return trace, nil
-}
-
-func writeProto(db *pebble.DB, key string, pb proto.Message) error {
-	b, err := proto.Marshal(pb)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to marshal proto with key %s", key)
-	}
-	return db.Set([]byte(key), b, pebble.Sync)
-}
-
-// readModifyWriteBlock reads a block from the database, modifies it and writes it back.
-// If the block doesn't exist an empty BlockLog will be passed to the function.
-func readModifyWriteBlock(db *pebble.DB, key string, modify func(*logspb.BlockLog) error) error {
-	b, closer, err := db.Get([]byte(key))
-	if err != nil && !errors.Is(err, pebble.ErrNotFound) {
-		return errors.Wrapf(err, "Failed to read block with key %s", key)
-	}
-	// Closer is nil on not found
-	if closer != nil {
-		defer closer.Close()
-	}
-
-	block := &logspb.BlockLog{}
-
-	if err != pebble.ErrNotFound {
-
-		if err := proto.Unmarshal(b, block); err != nil {
-			return errors.Wrapf(err, "Failed to unmarshal block with key %s", key)
-		}
-	}
-
-	if err := modify(block); err != nil {
-		return errors.Wrapf(err, "Failed to modify block with key %s", key)
-	}
-
-	return writeProto(db, key, block)
 }

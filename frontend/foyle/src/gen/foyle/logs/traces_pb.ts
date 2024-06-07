@@ -321,3 +321,48 @@ export class RunMeTrace extends Message<RunMeTrace> {
   }
 }
 
+/**
+ * LogEntries is used to store log lines keyed by a trace id.
+ *
+ * @generated from message foyle.logs.LogEntries
+ */
+export class LogEntries extends Message<LogEntries> {
+  /**
+   * @generated from field: repeated string lines = 1;
+   */
+  lines: string[] = [];
+
+  /**
+   * @generated from field: string resource_version = 2;
+   */
+  resourceVersion = "";
+
+  constructor(data?: PartialMessage<LogEntries>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "foyle.logs.LogEntries";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "lines", kind: "scalar", T: 9 /* ScalarType.STRING */, repeated: true },
+    { no: 2, name: "resource_version", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): LogEntries {
+    return new LogEntries().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): LogEntries {
+    return new LogEntries().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): LogEntries {
+    return new LogEntries().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: LogEntries | PlainMessage<LogEntries> | undefined, b: LogEntries | PlainMessage<LogEntries> | undefined): boolean {
+    return proto3.util.equals(LogEntries, a, b);
+  }
+}
+

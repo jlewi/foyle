@@ -227,3 +227,26 @@ func (m *RunMeTrace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 
 	return nil
 }
+
+func (m *LogEntries) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "lines" // field lines = 1
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Lines {
+			_ = rv
+			aenc.AppendString(rv)
+		}
+		return nil
+	}))
+
+	keyName = "resource_version" // field resource_version = 2
+	enc.AddString(keyName, m.ResourceVersion)
+
+	return nil
+}

@@ -22,6 +22,7 @@ func GetProto(db *pebble.DB, key string, value proto.Message) error {
 }
 
 // SetProto reads a proto message from a Pebble DB.
+// TODO(jeremy): We should deprecate this. We should always use the locking DB and ReadWriteModify.
 func SetProto(db *pebble.DB, key string, value proto.Message) error {
 	b, err := proto.Marshal(value)
 	if err != nil {

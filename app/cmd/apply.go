@@ -40,6 +40,11 @@ func NewApplyCmd() *cobra.Command {
 					return err
 				}
 
+				// DBs can only be opened in a single process.
+				if err := app.OpenDBs(); err != nil {
+					return err
+				}
+
 				if err := app.SetupRegistry(); err != nil {
 					return err
 				}

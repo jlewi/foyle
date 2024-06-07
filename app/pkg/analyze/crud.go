@@ -21,11 +21,7 @@ type CrudHandler struct {
 	blocksDB *pebble.DB
 }
 
-func NewCrudHandler(cfg config.Config) (*CrudHandler, error) {
-	blocksDB, err := pebble.Open(cfg.GetBlocksDBDir(), &pebble.Options{})
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not open blocks database %s", cfg.GetBlocksDBDir())
-	}
+func NewCrudHandler(cfg config.Config, blocksDB *pebble.DB) (*CrudHandler, error) {
 	return &CrudHandler{
 		cfg:      cfg,
 		blocksDB: blocksDB,

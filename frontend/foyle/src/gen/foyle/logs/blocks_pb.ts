@@ -70,6 +70,13 @@ export class BlockLog extends Message<BlockLog> {
    */
   evalMode = false;
 
+  /**
+   * ResourceVersion is an opaque string that can be used for optimistic concurrency control
+   *
+   * @generated from field: string resource_version = 9;
+   */
+  resourceVersion = "";
+
   constructor(data?: PartialMessage<BlockLog>) {
     super();
     proto3.util.initPartial(data, this);
@@ -86,6 +93,7 @@ export class BlockLog extends Message<BlockLog> {
     { no: 6, name: "executed_block", kind: "message", T: Block },
     { no: 7, name: "exit_code", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
     { no: 8, name: "eval_mode", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 9, name: "resource_version", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): BlockLog {
