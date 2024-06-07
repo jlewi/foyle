@@ -2,9 +2,10 @@ package analyze
 
 import (
 	"context"
-	"github.com/google/go-cmp/cmp"
 	"os"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func Test_readFromOffset(t *testing.T) {
@@ -20,7 +21,9 @@ func Test_readFromOffset(t *testing.T) {
 
 	// Read the data from the file
 	lines, offset, err := readLinesFromOffset(context.Background(), logFile.Name(), 0)
-
+	if err != nil {
+		t.Fatal(err)
+	}
 	if d := cmp.Diff(lines, []string{"line 1", "line 2"}); d != "" {
 		t.Errorf("unexpected lines:\n%v", d)
 	}

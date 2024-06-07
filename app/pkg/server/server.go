@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cockroachdb/pebble"
 	"time"
+
+	"github.com/cockroachdb/pebble"
 
 	"github.com/jlewi/foyle/app/pkg/runme"
 	aiv1alpha1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/ai/v1alpha1"

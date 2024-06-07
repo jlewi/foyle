@@ -3,9 +3,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"github.com/cockroachdb/pebble"
-	"github.com/jlewi/foyle/app/pkg/dbutil"
-	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"io"
 	"net/http"
 	"os"
@@ -13,6 +10,10 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/cockroachdb/pebble"
+	"github.com/jlewi/foyle/app/pkg/dbutil"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/jlewi/foyle/app/pkg/analyze"
 
@@ -197,13 +198,7 @@ func (a *App) SetupRegistry() error {
 	}
 	a.Registry = &controllers.Registry{}
 
-	// Register controllers
-	analyzer, err := a.SetupAnalyzer()
-	if err != nil {
-		return err
-	}
-
-	eval, err := eval.NewEvaluator(*a.Config, analyzer)
+	eval, err := eval.NewEvaluator(*a.Config)
 	if err != nil {
 		return err
 	}

@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/fsnotify/fsnotify"
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
 	"github.com/jlewi/foyle/app/pkg/docs"
 	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
@@ -223,13 +224,16 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 		}
 
 		entries := &logspb.LogEntries{}
-		dbutil.ReadModifyWrite[*logspb.LogEntries](a.rawLogsDB, entry.TraceID(), entries, func(entries *logspb.LogEntries) error {
+		if err := dbutil.ReadModifyWrite[*logspb.LogEntries](a.rawLogsDB, entry.TraceID(), entries, func(entries *logspb.LogEntries) error {
 			if entries.Lines == nil {
 				entries.Lines = make([]string, 0, 1)
 			}
 			entries.Lines = append(entries.Lines, line)
 			return nil
-		})
+		}); err != nil {
+			// If there is a problem writing to the DB we should probably surface it rather than just keep going.
+			return err
+		}
 
 		traceIDs[entry.TraceID()] = true
 	}
@@ -280,8 +284,6 @@ func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 		log.Error(err, "Failed to rename watermarks file", "tempFile", tempFile, "logOffsetsFile", a.logOffsetsFile)
 	}
 	log.V(logs.Debug).Info("Wrote watermarks", "logOffsetsFile", a.logOffsetsFile)
-
-	return
 }
 
 // registerDirWatchers sets up notifications for changes in the log directories.

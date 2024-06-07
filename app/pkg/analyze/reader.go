@@ -3,8 +3,9 @@ package analyze
 import (
 	"bufio"
 	"context"
-	"github.com/pkg/errors"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 // readLinesFromOffset reads lines from a file starting at the given offset.

@@ -43,7 +43,9 @@ func NewServeCmd() *cobra.Command {
 					return err
 				}
 
-				analyzer.Run(context.Background(), logDirs)
+				if err := analyzer.Run(context.Background(), logDirs); err != nil {
+					return err
+				}
 				s, err := app.SetupServer()
 				if err != nil {
 					return err

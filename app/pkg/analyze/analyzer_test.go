@@ -381,8 +381,12 @@ func Test_Analyzer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open log file: %v", err)
 	}
-	f.Write([]byte(`{"severity":"info","time":1713319614.911959,"caller":"agent/agent.go:61","function":"github.com/jlewi/foyle/app/pkg/agent.(*Agent).Generate","message":"Agent.Generate","traceId":"newtrace1234","request":{"doc":{"blocks":[{"contents":"echo hello"}]}}}` + "\n"))
-	f.Write([]byte(`{"severity":"info","time":1713319616.654191,"caller":"agent/agent.go:83","function":"github.com/jlewi/foyle/app/pkg/agent.(*Agent).Generate","message":"Agent.Generate returning response","traceId":"newtrace1234","response":{"blocks":[{"kind":"MARKUP","language":"","contents":"To find the merge point","outputs":[],"trace_ids":[],"id":"newblock"}]}}` + "\n"))
+	if _, err := f.Write([]byte(`{"severity":"info","time":1713319614.911959,"caller":"agent/agent.go:61","function":"github.com/jlewi/foyle/app/pkg/agent.(*Agent).Generate","message":"Agent.Generate","traceId":"newtrace1234","request":{"doc":{"blocks":[{"contents":"echo hello"}]}}}` + "\n")); err != nil {
+		t.Fatalf("Failed to write to log file: %v", err)
+	}
+	if _, err := f.Write([]byte(`{"severity":"info","time":1713319616.654191,"caller":"agent/agent.go:83","function":"github.com/jlewi/foyle/app/pkg/agent.(*Agent).Generate","message":"Agent.Generate returning response","traceId":"newtrace1234","response":{"blocks":[{"kind":"MARKUP","language":"","contents":"To find the merge point","outputs":[],"trace_ids":[],"id":"newblock"}]}}` + "\n")); err != nil {
+		t.Fatalf("Failed to write to log file: %v", err)
+	}
 
 	// N.B. When I didn't call sync the contents of the file didn't get updated. I would have thought calling
 	// close was enough.

@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jlewi/foyle/app/pkg/analyze"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/go-cmd/cmd"
@@ -37,12 +36,15 @@ const (
 )
 
 type Evaluator struct {
-	config   config.Config
-	parser   *executor.BashishParser
-	analyzer *analyze.Analyzer
+	config config.Config
+	parser *executor.BashishParser
 }
 
-func NewEvaluator(cfg config.Config, analyzer *analyze.Analyzer) (*Evaluator, error) {
+// NewEvaluator creates a new Evaluator
+// The evaluator assumes that the analyzer is already running in the background and processing logs.
+// TODO(https://github.com/jlewi/foyle/issues/140): The evaluator may need to be updated now that we continuously
+// process logs in the background.
+func NewEvaluator(cfg config.Config) (*Evaluator, error) {
 	parser, err := executor.NewBashishParser()
 
 	if err != nil {
@@ -50,9 +52,8 @@ func NewEvaluator(cfg config.Config, analyzer *analyze.Analyzer) (*Evaluator, er
 	}
 
 	return &Evaluator{
-		config:   cfg,
-		parser:   parser,
-		analyzer: analyzer,
+		config: cfg,
+		parser: parser,
 	}, nil
 }
 
@@ -79,11 +80,6 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	}
 	agent, err := e.setupAgent(ctx, *experiment.Spec.Agent)
 	if err != nil {
-		return err
-	}
-
-	// Run the analyzer in the background
-	if err := e.analyzer.Run(ctx, []string{e.config.GetRawLogDir()}); err != nil {
 		return err
 	}
 

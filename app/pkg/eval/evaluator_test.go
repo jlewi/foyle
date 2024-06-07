@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jlewi/foyle/app/pkg/analyze"
-
 	"github.com/jlewi/foyle/app/pkg/executor"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 
@@ -25,6 +23,8 @@ func Test_Evaluator(t *testing.T) {
 		t.Skipf("Test is skipped in GitHub actions")
 	}
 
+	t.Fatalf("Evaluator test needs to be updated per https://github.com/jlewi/foyle/issues/140")
+
 	log, err := zap.NewDevelopmentConfig().Build()
 	if err != nil {
 		t.Fatalf("Error creating logger; %v", err)
@@ -36,11 +36,7 @@ func Test_Evaluator(t *testing.T) {
 	}
 	cfg := config.GetConfig()
 
-	a, err := analyze.NewAnalyzer()
-	if err != nil {
-		t.Fatalf("Error creating analyzer; %v", err)
-	}
-	e, err := NewEvaluator(*cfg, a)
+	e, err := NewEvaluator(*cfg)
 	if err != nil {
 		t.Fatalf("Error creating evaluator; %v", err)
 	}
@@ -60,6 +56,8 @@ func Test_Evaluator_Google_Sheets(t *testing.T) {
 		t.Skipf("Test is skipped in GitHub actions")
 	}
 
+	t.Fatalf("Evaluator test needs to be updated per https://github.com/jlewi/foyle/issues/140")
+
 	log, err := zap.NewDevelopmentConfig().Build()
 	if err != nil {
 		t.Fatalf("Error creating logger; %v", err)
@@ -71,11 +69,7 @@ func Test_Evaluator_Google_Sheets(t *testing.T) {
 	}
 	cfg := config.GetConfig()
 
-	a, err := analyze.NewAnalyzer()
-	if err != nil {
-		t.Fatalf("Error creating analyzer; %v", err)
-	}
-	e, err := NewEvaluator(*cfg, a)
+	e, err := NewEvaluator(*cfg)
 	if err != nil {
 		t.Fatalf("Error creating evaluator; %v", err)
 	}

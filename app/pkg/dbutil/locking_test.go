@@ -1,13 +1,14 @@
 package dbutil
 
 import (
+	"os"
+	"sync"
+	"testing"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/google/go-cmp/cmp"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/jlewi/monogo/helpers"
-	"os"
-	"sync"
-	"testing"
 )
 
 func Test_Locking(t *testing.T) {
@@ -33,10 +34,12 @@ func Test_Locking(t *testing.T) {
 	// We want to test concurrent access to the same key
 	// We'll start by writing an initial value to the db
 	key := "key"
-	db.ReadModifyWrite(key, func(log *logspb.BlockLog) error {
+	if err := db.ReadModifyWrite(key, func(log *logspb.BlockLog) error {
 		log.Id = "initialid"
 		return nil
-	})
+	}); err != nil {
+		t.Fatalf("Error writing block: %v", err)
+	}
 
 	// Now to test concurrent access we will start the modify functions in two goroutines.
 	// To verify concurrency we need to ensure that two functions that try to modify the same key both get called
@@ -105,9 +108,7 @@ func Test_Locking(t *testing.T) {
 	waitOn := map[string]bool{setId: true, execId: true}
 	for len(waitOn) > 0 {
 		id := <-controlChan
-		if _, ok := waitOn[id]; ok {
-			delete(waitOn, id)
-		}
+		delete(waitOn, id)
 	}
 
 	// Now that we know both goroutines are ready we can signal the waitgroup to allow them to run

@@ -1,13 +1,14 @@
 package dbutil
 
 import (
+	"sync"
+	"time"
+
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cockroachdb/pebble"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
-	"sync"
-	"time"
 )
 
 // LockingDB is a wrapper around a Pebble DB that provides row locking functionality.
