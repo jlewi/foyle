@@ -7,9 +7,9 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
-	_ "google.golang.org/protobuf/types/known/timestamppb"
 	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	_ "google.golang.org/protobuf/types/known/structpb"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 )
 
@@ -70,6 +70,9 @@ func (m *BlockLog) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) e
 
 	keyName = "eval_mode" // field eval_mode = 8
 	enc.AddBool(keyName, m.EvalMode)
+
+	keyName = "resource_version" // field resource_version = 9
+	enc.AddString(keyName, m.ResourceVersion)
 
 	return nil
 }
