@@ -300,6 +300,8 @@ func Test_Analyzer(t *testing.T) {
 	}
 	defer helpers.DeferIgnoreError(rawDB.Close)
 
+	lockingRawDB := NewLockingEntriesDB(rawDB)
+
 	blocksDB, err := pebble.Open(blocksDBDir, &pebble.Options{})
 	if err != nil {
 		t.Fatalf("could not open blocks database %s", blocksDBDir)
@@ -333,7 +335,7 @@ func Test_Analyzer(t *testing.T) {
 	}
 
 	logOffsetsFile := filepath.Join(rawDir, "log_offsets.json")
-	a, err := NewAnalyzer(logOffsetsFile, rawDB, tracesDB, lockingBlocksDB)
+	a, err := NewAnalyzer(logOffsetsFile, lockingRawDB, tracesDB, lockingBlocksDB)
 	if err != nil {
 		t.Fatalf("Failed to create analyzer: %v", err)
 	}

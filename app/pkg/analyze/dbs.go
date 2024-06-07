@@ -22,3 +22,20 @@ func getBlockVersion(block *logspb.BlockLog) string {
 func setBlockVersion(block *logspb.BlockLog, version string) {
 	block.ResourceVersion = version
 }
+
+// NewLockingEntriesDB helper function to create a new LockingDB for LogEntries.
+func NewLockingEntriesDB(db *pebble.DB) *dbutil.LockingDB[*logspb.LogEntries] {
+	return dbutil.NewLockingDB[*logspb.LogEntries](db, newLogEntries, getLogEntriesVersion, setLogEntriesVersion)
+}
+
+func newLogEntries() *logspb.LogEntries {
+	return &logspb.LogEntries{}
+}
+
+func getLogEntriesVersion(m *logspb.LogEntries) string {
+	return m.ResourceVersion
+}
+
+func setLogEntriesVersion(m *logspb.LogEntries, version string) {
+	m.ResourceVersion = version
+}

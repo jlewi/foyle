@@ -28,8 +28,14 @@ func NewLockingDB[T proto.Message](db *pebble.DB, newFunc func() T, getVersionFu
 	return &LockingDB[T]{db: db, newProto: newFunc, getVersion: getVersionFunc, setVersion: setVersionFunc}
 }
 
+func (d *LockingDB[T]) Get(key string) (T, error) {
+	msg := d.newProto()
+	err := GetProto(d.db, key, msg)
+	return msg, err
+}
+
 // ReadModifyWrite reads a block from the database, modifies it and writes it back.
-// If the block doesn't exist an empty BlockLog will be passed to the function.
+// If the block doesn't exist an empty proto message will be passed to the function.
 //
 // msg is used to deserialize the value into.
 // T should be a pointer to a proto.Message.

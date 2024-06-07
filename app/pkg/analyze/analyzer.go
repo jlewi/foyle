@@ -57,7 +57,7 @@ const (
 type Analyzer struct {
 	tracesDB  *pebble.DB
 	blocksDB  *dbutil.LockingDB[*logspb.BlockLog]
-	rawLogsDB *pebble.DB
+	rawLogsDB *dbutil.LockingDB[*logspb.LogEntries]
 	// queue for log file processing
 	queue workqueue.RateLimitingInterface
 	// Queue for block log processing
@@ -78,7 +78,7 @@ type Analyzer struct {
 }
 
 // NewAnalyzer creates a new Analyzer.
-func NewAnalyzer(logOffsetsFile string, rawLogsDB *pebble.DB, tracesDB *pebble.DB, blocksDB *dbutil.LockingDB[*logspb.BlockLog]) (*Analyzer, error) {
+func NewAnalyzer(logOffsetsFile string, rawLogsDB *dbutil.LockingDB[*logspb.LogEntries], tracesDB *pebble.DB, blocksDB *dbutil.LockingDB[*logspb.BlockLog]) (*Analyzer, error) {
 	logOffsets, err := initOffsets(logOffsetsFile)
 	if err != nil {
 		return nil, err
@@ -223,8 +223,7 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 			log.Error(errors.New("Ignoring log entry from Analyzer package"), "Ignoring log entry from Analyzer package", "entry", entry)
 		}
 
-		entries := &logspb.LogEntries{}
-		if err := dbutil.ReadModifyWrite[*logspb.LogEntries](a.rawLogsDB, entry.TraceID(), entries, func(entries *logspb.LogEntries) error {
+		if err := a.rawLogsDB.ReadModifyWrite(entry.TraceID(), func(entries *logspb.LogEntries) error {
 			if entries.Lines == nil {
 				entries.Lines = make([]string, 0, 1)
 			}
@@ -359,8 +358,8 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 	// Entries is a mapping from a traceId to a list of logEntries associated with that entry.
 	logEntries := make([]*api.LogEntry, 0, 10)
 
-	protoEntries := &logspb.LogEntries{}
-	if err := dbutil.GetProto(a.rawLogsDB, tid, protoEntries); err != nil {
+	protoEntries, err := a.rawLogsDB.Get(tid)
+	if err != nil {
 		return err
 	}
 

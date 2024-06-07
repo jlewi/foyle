@@ -45,15 +45,16 @@ type logCloser func()
 // App is a struct to hold values needed across all commands.
 // Intent is to simplify initialization across commands.
 type App struct {
-	Config          *config.Config
-	Out             io.Writer
-	otelShutdownFn  func()
-	logClosers      []logCloser
-	Registry        *controllers.Registry
-	LogEntriesDB    *pebble.DB
-	TracesDB        *pebble.DB
-	blocksDB        *pebble.DB
-	LockingBlocksDB *dbutil.LockingDB[*logspb.BlockLog]
+	Config              *config.Config
+	Out                 io.Writer
+	otelShutdownFn      func()
+	logClosers          []logCloser
+	Registry            *controllers.Registry
+	logEntriesDB        *pebble.DB
+	LockingLogEntriesDB *dbutil.LockingDB[*logspb.LogEntries]
+	TracesDB            *pebble.DB
+	blocksDB            *pebble.DB
+	LockingBlocksDB     *dbutil.LockingDB[*logspb.BlockLog]
 }
 
 // NewApp creates a new application. You should call one more setup/Load functions to properly set it up.
@@ -303,7 +304,7 @@ func (a *App) SetupAnalyzer() (*analyze.Analyzer, error) {
 		return nil, errors.New("Config is nil; call LoadConfig first")
 	}
 
-	analyzer, err := analyze.NewAnalyzer(a.Config.GetLogOffsetsFile(), a.LogEntriesDB, a.TracesDB, a.LockingBlocksDB)
+	analyzer, err := analyze.NewAnalyzer(a.Config.GetLogOffsetsFile(), a.LockingLogEntriesDB, a.TracesDB, a.LockingBlocksDB)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +424,9 @@ func (a *App) OpenDBs() error {
 	if err != nil {
 		return errors.Wrapf(err, "could not open log entries database %s", a.Config.GetLogEntriesDBDir())
 	}
-	a.LogEntriesDB = logEntries
+	a.logEntriesDB = logEntries
+
+	a.LockingLogEntriesDB = analyze.NewLockingEntriesDB(a.logEntriesDB)
 
 	return nil
 }
