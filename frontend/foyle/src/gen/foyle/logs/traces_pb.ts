@@ -332,6 +332,11 @@ export class LogEntries extends Message<LogEntries> {
    */
   lines: string[] = [];
 
+  /**
+   * @generated from field: string resource_version = 2;
+   */
+  resourceVersion = "";
+
   constructor(data?: PartialMessage<LogEntries>) {
     super();
     proto3.util.initPartial(data, this);
@@ -341,6 +346,7 @@ export class LogEntries extends Message<LogEntries> {
   static readonly typeName = "foyle.logs.LogEntries";
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
     { no: 1, name: "lines", kind: "scalar", T: 9 /* ScalarType.STRING */, repeated: true },
+    { no: 2, name: "resource_version", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): LogEntries {

@@ -245,5 +245,8 @@ func (m *LogEntries) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 		return nil
 	}))
 
+	keyName = "resource_version" // field resource_version = 2
+	enc.AddString(keyName, m.ResourceVersion)
+
 	return nil
 }

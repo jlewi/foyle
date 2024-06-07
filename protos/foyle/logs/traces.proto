@@ -60,4 +60,5 @@ message RunMeTrace {
 // LogEntries is used to store log lines keyed by a trace id.
 message LogEntries {
   repeated string lines = 1;
+  string resource_version = 2;
 }
