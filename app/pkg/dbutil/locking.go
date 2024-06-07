@@ -33,10 +33,10 @@ func NewLockingDB[T proto.Message](db *pebble.DB, newFunc func() T, getVersionFu
 // msg is used to deserialize the value into.
 // T should be a pointer to a proto.Message.
 // N.B. we pass in msg to use as a container because in generics it doesn't seem possible to create instances of t
-func (d *LockingDB[T]) ReadModifyWrite(db *pebble.DB, key string, modify func(T) error) error {
+func (d *LockingDB[T]) ReadModifyWrite(key string, modify func(T) error) error {
 	// Non-nil error means a non retryable error occurred
 	op := func() (bool, error) {
-		b, closer, err := db.Get([]byte(key))
+		b, closer, err := d.db.Get([]byte(key))
 		if err != nil && !errors.Is(err, pebble.ErrNotFound) {
 			return false, errors.Wrapf(err, "Failed to read record with key %s", key)
 		}

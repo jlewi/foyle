@@ -33,7 +33,7 @@ func Test_Locking(t *testing.T) {
 	// We want to test concurrent access to the same key
 	// We'll start by writing an initial value to the db
 	key := "key"
-	db.ReadModifyWrite(baseDB, key, func(log *logspb.BlockLog) error {
+	db.ReadModifyWrite(key, func(log *logspb.BlockLog) error {
 		log.Id = "initialid"
 		return nil
 	})
@@ -87,14 +87,14 @@ func Test_Locking(t *testing.T) {
 	waitForUpdates.Add(2)
 	// Start two goroutines that will modify the same key
 	go func() {
-		err := db.ReadModifyWrite(baseDB, key, setGenerate)
+		err := db.ReadModifyWrite(key, setGenerate)
 		if err != nil {
 			t.Errorf("Error modifying block: %v", err)
 		}
 		waitForUpdates.Done()
 	}()
 	go func() {
-		err := db.ReadModifyWrite(baseDB, key, setExec)
+		err := db.ReadModifyWrite(key, setExec)
 		if err != nil {
 			t.Errorf("Error modifying block: %v", err)
 		}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/cockroachdb/pebble"
+	"github.com/jlewi/foyle/app/pkg/dbutil"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"io"
 	"net/http"
 	"os"
@@ -42,14 +44,15 @@ type logCloser func()
 // App is a struct to hold values needed across all commands.
 // Intent is to simplify initialization across commands.
 type App struct {
-	Config         *config.Config
-	Out            io.Writer
-	otelShutdownFn func()
-	logClosers     []logCloser
-	Registry       *controllers.Registry
-	LogEntriesDB   *pebble.DB
-	TracesDB       *pebble.DB
-	BlocksDB       *pebble.DB
+	Config          *config.Config
+	Out             io.Writer
+	otelShutdownFn  func()
+	logClosers      []logCloser
+	Registry        *controllers.Registry
+	LogEntriesDB    *pebble.DB
+	TracesDB        *pebble.DB
+	blocksDB        *pebble.DB
+	LockingBlocksDB *dbutil.LockingDB[*logspb.BlockLog]
 }
 
 // NewApp creates a new application. You should call one more setup/Load functions to properly set it up.
@@ -305,7 +308,7 @@ func (a *App) SetupAnalyzer() (*analyze.Analyzer, error) {
 		return nil, errors.New("Config is nil; call LoadConfig first")
 	}
 
-	analyzer, err := analyze.NewAnalyzer(a.Config.GetLogOffsetsFile(), a.LogEntriesDB, a.TracesDB, a.BlocksDB)
+	analyzer, err := analyze.NewAnalyzer(a.Config.GetLogOffsetsFile(), a.LogEntriesDB, a.TracesDB, a.LockingBlocksDB)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +321,7 @@ func (a *App) SetupServer() (*server.Server, error) {
 		return nil, errors.New("Config is nil; call LoadConfig first")
 	}
 
-	s, err := server.NewServer(*a.Config, a.BlocksDB)
+	s, err := server.NewServer(*a.Config, a.blocksDB)
 
 	if err != nil {
 		return nil, err
@@ -416,7 +419,9 @@ func (a *App) OpenDBs() error {
 	if err != nil {
 		return errors.Wrapf(err, "could not open blocks database %s", a.Config.GetBlocksDBDir())
 	}
-	a.BlocksDB = blocksDB
+	a.blocksDB = blocksDB
+
+	a.LockingBlocksDB = analyze.NewLockingBlocksDB(blocksDB)
 
 	log.Info("Opening loglines database", "database", a.Config.GetBlocksDBDir())
 	logEntries, err := pebble.Open(a.Config.GetLogEntriesDBDir(), &pebble.Options{})
@@ -448,9 +453,9 @@ func (a *App) Shutdown() error {
 		}
 	}
 
-	if a.BlocksDB != nil {
+	if a.blocksDB != nil {
 		log.Info("Closing blocks database")
-		if err := a.BlocksDB.Close(); err != nil {
+		if err := a.blocksDB.Close(); err != nil {
 			log.Error(err, "Error closing blocks database")
 		}
 	}
