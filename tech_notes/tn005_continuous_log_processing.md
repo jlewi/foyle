@@ -1,13 +1,12 @@
-# Continuous Log Processing and Learning
+# Continuous Log Processing
 
 * **Author**: Jeremy Lewi
 * **Last Updated**: 2024-05-31
-* **Status**: Being Drafted
+* **Status**: Published
 
 ## Objective
 
 * Continuously compute traces and block logs
-* Continuously learn from the traces and block logs
 
 ## TL;DR
 
@@ -24,7 +23,7 @@ This has a number of drawbacks that we'd like to fix [jlewi/foyle#84](https://gi
   from a single process [jlewi/foyle#126](https://github.com/jlewi/foyle/issues/126)
 
 We'd like to fix this so that logs are continuously processed and learned from as a background
-process in the Foyle application. 
+process in the Foyle application. This technote focuses on the first piece which is continuous log processing. 
 
 ## Background
 
@@ -177,6 +176,8 @@ When it comes to continuous learning we have to potential options
 
 I think it makes sense to keep learning as a separate step. The learning process will likely evolve over time and
 its advantageous if we can redo learning without having to reprocess the logs.
+
+The details will be discussed in a subsequent tech note.
 
 
 
