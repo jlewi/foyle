@@ -5,8 +5,6 @@ date: 2024-06-11
 author: "[Jeremy Lewi](https://lewi.us/about)"
 type: blog
 description: This post presents quantitative results showing how human feedback allows Foyle to assist with building and operating Foyle. In 79% of cases, Foyle provided the correct answer, whereas ChatGPT alone would lack sufficient context to achieve the intent. Furthermore, the LLM API calls cost less than $.002 per intent whereas a recursive, agentic approach could easily cost $2-$10.
-images: 
-  - "/docs/blog/foyle_learning_interactions.svg"
 ---
 
 Agents! Agents! Agents! Everywhere we look we are bombarded with the promises of fully autonomous agents. 
