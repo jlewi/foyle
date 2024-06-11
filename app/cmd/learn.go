@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"os"
 
 	"github.com/jlewi/foyle/app/pkg/application"
@@ -25,6 +26,9 @@ func NewLearnCmd() *cobra.Command {
 				if err := app.SetupLogging(false); err != nil {
 					return err
 				}
+				if err := app.OpenDBs(); err != nil {
+					return err
+				}
 				defer helpers.DeferIgnoreError(app.Shutdown)
 
 				logVersion()
@@ -34,15 +38,15 @@ func NewLearnCmd() *cobra.Command {
 					return err
 				}
 
-				l, err := learn.NewLearner(*app.Config, client)
+				l, err := learn.NewLearner(*app.Config, client, app.LockingBlocksDB)
 				if err != nil {
 					return err
 				}
 
-				if err := l.Reconcile(context.Background()); err != nil {
+				if err := l.Reconcile(context.Background(), "someid"); err != nil {
 					return err
 				}
-				return nil
+				return errors.New("Not implemented; code needs to be updated for latest Reconcile implementation")
 			}()
 
 			if err != nil {
