@@ -4,7 +4,7 @@ linkTitle: "Copilots for Devops"
 date: 2024-05-10
 author: "[Jeremy Lewi](https://lewi.us/about)"
 type: blog
-descrption: Foyle is an open source assistant to help software developers deal with the pain of devops. One of Foyle's central premises is that creating a UX that implicitly captures human feedback is critical to building AIs that effectively assist us with operations. This post describes how Foyle logs that feedback.
+description: Foyle is an open source assistant to help software developers deal with the pain of devops. One of Foyle's central premises is that creating a UX that implicitly captures human feedback is critical to building AIs that effectively assist us with operations. This post describes how Foyle logs that feedback.
 ---
 
 Since co-pilot launched in 2021, AI accelerated software development has become the norm. More importantly, as [Simon Willison argued at last year’s AI Engineer Summit ](https://simonwillison.net/2023/Oct/17/open-questions/)with AI there has never been an easier time  to learn to code. This means the population of people writing code is set to explode. All of this begs the question, who is going to operate all this software? While writing code is getting easier, our infrastructure is becoming more complex and harder to understand. Perhaps we shouldn’t be surprised that as the cost of writing software decreases, we see an explosion in the number of tools and abstractions increasing complexity; the expanding [CNCF landscape](https://landscape.cncf.io/) is a great illustration of this.
