@@ -79,7 +79,7 @@ curl http://localhost:8080/api/blocklogs/01HZ0N1ZZ8NJ7PSRYB6WEMH08M | jq .
 ```
 
 
-Notably, this example illustrates that Foyle is learning how to map higher level concepts (e.g. blocklogs) into low level concrete actions (e.g. curl).
+Notably, this example illustrates that Foyle is learning how to map higher level concepts (e.g. block logs) into low level concrete actions (e.g. curl).
 
 
 ## Results
@@ -92,7 +92,9 @@ To measure Foyle’s ability to learn and assist with mapping intent into action
 * Training Data: 27 pairs of (intent, action) representing user interactions logged by Foyle
     * These were the result of our daily use of Foyle to build Foyle
 
-To evaluate the effectiveness of human feedback we compared using GPT3.5 without examples to GPT3.5 with examples. Using examples, we prompt GPT3.5 with similar examples from prior usage([prompt](https://github.com/jlewi/foyle/blob/main/app/pkg/agent/prompt.tmpl)). Prior examples are selected by using similarity search to find the intents most similar to the current one. To measure the correctness of the generated commands we use a version of edit distance that measures the number of arguments that need to be changed. The binary itself counts as an argument. This metric can be normalized so that 0 means the predicted command is an exact match and 1 means the predicted command is completely different (precise details are [here](https://github.com/jlewi/foyle/blob/main/tech_notes/tn003_learning_eval.md#evaluating-correctness)).
+To evaluate the effectiveness of human feedback we compared using GPT3.5 without examples to GPT3.5 with examples. 
+Using examples, we prompt GPT3.5 with similar examples from prior usage(the [prompt is here](https://github.com/jlewi/foyle/blob/main/app/pkg/agent/prompt.tmpl)). 
+Prior examples are selected by using similarity search to find the intents most similar to the current one. To measure the correctness of the generated commands we use a version of edit distance that measures the number of arguments that need to be changed. The binary itself counts as an argument. This metric can be normalized so that 0 means the predicted command is an exact match and 1 means the predicted command is completely different (precise details are [here](https://github.com/jlewi/foyle/blob/main/tech_notes/tn003_learning_eval.md#evaluating-correctness)).
 
 The table below shows that Foyle performs significantly better when using prior examples. Notably, in 15 of the examples where using ChatGPT without examples was wrong it was completely wrong. This isn’t at all surprising given GPT3.5 is missing critical information to answer these questions.
 
