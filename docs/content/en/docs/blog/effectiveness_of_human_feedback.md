@@ -4,12 +4,12 @@ linkTitle: Effectiveness of Human Feedback
 date: 2024-06-11
 author: "[Jeremy Lewi](https://lewi.us/about)"
 type: blog
-description: Foyle is an open source assistant to help software developers deal with the pain of devops. This post presents quantitative results showing how feedback allows Foyle to assist with building and operating Foyle. In 79% of cases, Foyle provided the correct answer, whereas ChatGPT alone would lack sufficient context to achieve the intent. Furthermore, the LLM API calls cost less than $.002 per intent whereas a recursive, agentic approach could easily cost $2-$10.
+description: This post presents quantitative results showing how human feedback allows Foyle to assist with building and operating Foyle. In 79% of cases, Foyle provided the correct answer, whereas ChatGPT alone would lack sufficient context to achieve the intent. Furthermore, the LLM API calls cost less than $.002 per intent whereas a recursive, agentic approach could easily cost $2-$10.
 images: 
   - "/docs/blog/foyle_learning_interactions.svg"
 ---
 
-Agents! Agents! Agents! Everywhere I look I’m bombarded with the grandiose promises of fully autonomous agents. 
+Agents! Agents! Agents! Everywhere we look we are bombarded with the promises of fully autonomous agents. 
 These pesky humans aren’t merely inconveniences, they are budgetary line items to be optimized away. 
 All this hype leaves me wondering; have we forgotten that GPT was fine-tuned using data produced by a small army of[ human labelers](https://scale.com/blog/how-to-label-1m-data-points-week)?  Not to mention who do we think produced the 10 trillion words that foundation models are being trained on? While fully autonomous software agents are capturing the limelight on social media, systems that turn user interactions into training data like [Didact](https://research.google/blog/large-sequence-models-for-software-development-activities/), [Dosu](https://blog.langchain.dev/dosu-langsmith-no-prompt-eng/) and [Replit code repair](https://blog.replit.com/code-repair) are deployed and solving real toil.
 
@@ -21,7 +21,7 @@ In 79% of cases, Foyle provided the correct answer, whereas ChatGPT alone would 
 
 As a thought experiment, we can compare Foyle against an agentic approach that achieves the same accuracy by recursively invoking an LLM on Foyle’s 65K lines of code but without the benefit of learning from user interactions. In this case, we estimate that Foyle could easily save between $2-$10 on LLM API calls per intent. In practice, this likely means learning from prior interactions is critical to making an affordable AI.
 
-# Mapping Intent Into Action
+## Mapping Intent Into Action
 
 The pain of deploying and operating software was famously captured in a 2010 Meme at [Google “I just want to serve 5 Tb”](https://news.ycombinator.com/item?id=29082014). The meme captured that simple objectives (e.g. serving some data) can turn into a bewildering complicated tree of operations due to system complexity and business requirements. The goal of Foyle is to solve this problem of translating intent into actions.
 
@@ -81,7 +81,7 @@ curl http://localhost:8080/api/blocklogs/01HZ0N1ZZ8NJ7PSRYB6WEMH08M | jq .
 Notably, this example illustrates that Foyle is learning how to map higher level concepts (e.g. blocklogs) into low level concrete actions (e.g. curl).
 
 
-# Results
+## Results
 
 To measure Foyle’s ability to learn and assist with mapping intent into action, we created an evaluation dataset of [24 examples](https://github.com/jlewi/foyle/tree/main/data/eval) of intents specific to building and operating Foyle. The dataset consists of the following
 
@@ -89,7 +89,7 @@ To measure Foyle’s ability to learn and assist with mapping intent into action
 
 * Evaluation Data: 24 pairs of (intent, action) where the action is a command that correctly achieves the intent
 * Training Data: 27 pairs of (intent, action) representing user interactions logged by Foyle
-    * These were the result of my daily use of Foyle to build Foyle
+    * These were the result of our daily use of Foyle to build Foyle
 
 To evaluate the effectiveness of human feedback we compared using GPT3.5 without examples to GPT3.5 with examples. Using examples, we prompt GPT3.5 with similar examples from prior usage([prompt](https://github.com/jlewi/foyle/blob/main/app/pkg/agent/prompt.tmpl)). Prior examples are selected by using similarity search to find the intents most similar to the current one. To measure the correctness of the generated commands we use a version of edit distance that measures the number of arguments that need to be changed. The binary itself counts as an argument. This metric can be normalized so that 0 means the predicted command is an exact match and 1 means the predicted command is completely different (precise details are [here](https://github.com/jlewi/foyle/blob/main/tech_notes/tn003_learning_eval.md#evaluating-correctness)).
 
@@ -131,8 +131,7 @@ The table below shows that Foyle performs significantly better when using prior 
   </tr>
 </table>
 
-
-Table 1: Shows that for 19 of the examples (79%); the AI performed better when learning from prior examples. In 22 of the 24 examples (91%) using the prior examples the AI did no worse than baseline. In 2 cases, using prior examples decreased the AI’s performance. The full results are provided in the table below.
+<a name="table1">Table 1</a>: Shows that for 19 of the examples (79%); the AI performed better when learning from prior examples. In 22 of the 24 examples (91%) using the prior examples the AI did no worse than baseline. In 2 cases, using prior examples decreased the AI’s performance. The full results are provided in the table below.
 
 
 
@@ -489,10 +488,10 @@ Table 1: Shows that for 19 of the examples (79%); the AI performed better when l
 </table>
 
 
-Table 2. The full results for the evaluation dataset. The left column shows the evaluation prompt. The second column shows the most similar prior example (only the query is shown).  The third column is the normalized distance for the baseline AI. The 4th column is the normalized distance when learning from prior examples.
+<a name="table2">Table 2</a>. The full results for the evaluation dataset. The left column shows the evaluation prompt. The second column shows the most similar prior example (only the query is shown).  The third column is the normalized distance for the baseline AI. The 4th column is the normalized distance when learning from prior examples.
 
 
-## Distance Metric
+### Distance Metric
 
 Our distance metrics assumes there are specific tools that should be used to accomplish a task even when different solutions might produce identical answers. In the context of devops this is desirable because there is a cost to supporting a tool; e.g. ensuring it is available on all machines. As a result, platform teams are often opinionated about how things should be done.
 
@@ -515,20 +514,20 @@ wget -q -O - http://localhost:8080/api/blocklogs/01HZ0N1ZZ8NJ7PSRYB6WEMH08M | yq
 The distance would end up being .625. The longest command consists of 8 arguments (including the binaries and the pipe operator). 3 deletions and 2 substitutions are needed to transform the actual into the expected answer which yields a distance of  ⅝=.625. So in this case, we’d conclude the AI’s answer was largely wrong even though wget produces the exact same output as curl in this case. If an organization is standardizing on curl over wget then the evaluation metric is capturing that preference.
 
 
-# How much is good data worth?
+## How much is good data worth?
 
 A lot of agents appear to be pursuing a solution based on throwing lots of data and lots of compute at the problem. For example, to figure out how to “Get the log for block XYZ”, an agent could in principle crawl the [Foyle and RunMe repositories](https://github.com/jlewi/foyle) to understand what a block is and that Foyle exposes a REST server to make them accessible.  That approach might cost $2-$10 in LLM calls whereas with Foyle it's less than $.002.
 
 The Foyle repository is ~400K characters of Go Code; the RunMe Go code base is ~1.5M characters. So lets say 2M characters which is about 500K-1M tokens. With [GPT-4-turbo that’s ~$2-$10](https://openai.com/api/pricing/); or about 1-7 SWE minutes (assuming $90 per hour). If the Agent needs to call GPT4 multiple times those costs are going to add up pretty quickly.
 
 
-# Where is Foyle Going
+## Where is Foyle Going
 
 Today, Foyle is only learning single step workflows. While this is valuable, a lot of a developer’s toil involves multi step workflows. We’d like to extend Foyle to support this use case. This likely requires changes to how Foyle learns and how we evaluate Foyle.
 
 Foyle only works if we log user interactions. This means we need to create a UX that is compelling enough for developers to want to use. Foyle is now integrated with [Runme](https://runme.dev/). We want to work with the Runme team to create features (e.g. [Renderers](https://github.com/stateful/vscode-runme/blob/main/README.md), [multiple executor support](https://github.com/stateful/runme/issues/593)) that give users a reason to adopt a new tool even without AI.
 
 
-# How You Can Help
+## How You Can Help
 
 If you’re rethinking how you do playbooks and want to create AI assisted executable playbooks please get in touch via email [jeremy@lewi.us](mailto:jeremy@lewi.us) or by starting a discussion in [GitHub](https://github.com/jlewi/foyle/discussions). In particular, if you’re struggling with observability and want to use AI to assist in query creation and create rich artifacts combining markdown, commands, and rich visualizations, we’d love to learn more about your use case.
