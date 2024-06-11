@@ -168,12 +168,14 @@ For example, to figure out how to “Get the log for block XYZ”, an agent coul
 [Foyle](https://github.com/jlewi/foyle) and [RunMe](https://github.com/stateful/runme) repositories to understand what a block is and that Foyle 
 exposes a REST server to make them accessible.  That approach might cost $2-$10 in LLM calls whereas with Foyle it's less than $.002.
 
-The Foyle repository is ~400K characters of Go Code; the RunMe Go code base is ~1.5M characters. So lets say 2M characters which is about 500K-1M tokens. With [GPT-4-turbo that’s ~$2-$10](https://openai.com/api/pricing/); or about 1-7 SWE minutes (assuming $90 per hour). If the Agent needs to call GPT4 multiple times those costs are going to add up pretty quickly.
-
+The Foyle repository is ~400K characters of Go Code; the RunMe Go code base is ~1.5M characters. So lets say 2M characters which is about 500K-1M tokens. 
+With [GPT-4-turbo that’s ~$2-$10](https://openai.com/api/pricing/); or about 1-7 SWE minutes (assuming $90 per hour). 
+If the Agent needs to call GPT4 multiple times those costs are going to add up pretty quickly.
 
 ## Where is Foyle Going
 
-Today, Foyle is only learning single step workflows. While this is valuable, a lot of a developer’s toil involves multi step workflows. We’d like to extend Foyle to support this use case. This likely requires changes to how Foyle learns and how we evaluate Foyle.
+Today, Foyle is only learning single step workflows. While this is valuable, a lot of a toil involves multi step workflows. 
+We’d like to extend Foyle to support this use case. This likely requires changes to how Foyle learns and how we evaluate Foyle.
 
 Foyle only works if we log user interactions. This means we need to create a UX that is compelling enough for developers to want to use. Foyle is now integrated with [Runme](https://runme.dev/). We want to work with the Runme team to create features (e.g. [Renderers](https://github.com/stateful/vscode-runme/blob/main/README.md), [multiple executor support](https://github.com/stateful/runme/issues/593)) that give users a reason to adopt a new tool even without AI.
 
@@ -183,6 +185,8 @@ Foyle only works if we log user interactions. This means we need to create a UX 
 If you’re rethinking how you do playbooks and want to create AI assisted executable playbooks please get in touch via email [jeremy@lewi.us](mailto:jeremy@lewi.us) or by starting a discussion in [GitHub](https://github.com/jlewi/foyle/discussions). In particular, if you’re struggling with observability and want to use AI to assist in query creation and create rich artifacts combining markdown, commands, and rich visualizations, we’d love to learn more about your use case.
 
 ## Appendix: Full Results
+
+The table below provides the prompts, RAG results, and distances for the entire evaluation dataset.
 
 <table>
   <tr>
