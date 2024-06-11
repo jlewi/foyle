@@ -163,7 +163,10 @@ The distance would end up being .625. The longest command consists of 8 argument
 
 ## How much is good data worth?
 
-A lot of agents appear to be pursuing a solution based on throwing lots of data and lots of compute at the problem. For example, to figure out how to “Get the log for block XYZ”, an agent could in principle crawl the [Foyle and RunMe repositories](https://github.com/jlewi/foyle) to understand what a block is and that Foyle exposes a REST server to make them accessible.  That approach might cost $2-$10 in LLM calls whereas with Foyle it's less than $.002.
+A lot of agents appear to be pursuing a solution based on throwing lots of data and lots of compute at the problem. 
+For example, to figure out how to “Get the log for block XYZ”, an agent could in principle crawl the 
+[Foyle](https://github.com/jlewi/foyle) and [RunMe](https://github.com/stateful/runme) repositories to understand what a block is and that Foyle 
+exposes a REST server to make them accessible.  That approach might cost $2-$10 in LLM calls whereas with Foyle it's less than $.002.
 
 The Foyle repository is ~400K characters of Go Code; the RunMe Go code base is ~1.5M characters. So lets say 2M characters which is about 500K-1M tokens. With [GPT-4-turbo that’s ~$2-$10](https://openai.com/api/pricing/); or about 1-7 SWE minutes (assuming $90 per hour). If the Agent needs to call GPT4 multiple times those costs are going to add up pretty quickly.
 
