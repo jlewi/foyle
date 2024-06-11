@@ -96,8 +96,10 @@ To evaluate the effectiveness of human feedback we compared using GPT3.5 without
 Using examples, we prompt GPT3.5 with similar examples from prior usage(the [prompt is here](https://github.com/jlewi/foyle/blob/main/app/pkg/agent/prompt.tmpl)). 
 Prior examples are selected by using similarity search to find the intents most similar to the current one. To measure the correctness of the generated commands we use a version of edit distance that measures the number of arguments that need to be changed. The binary itself counts as an argument. This metric can be normalized so that 0 means the predicted command is an exact match and 1 means the predicted command is completely different (precise details are [here](https://github.com/jlewi/foyle/blob/main/tech_notes/tn003_learning_eval.md#evaluating-correctness)).
 
-The table below shows that Foyle performs significantly better when using prior examples. Notably, in 15 of the examples where using ChatGPT without examples was wrong it was completely wrong. This isn’t at all surprising given GPT3.5 is missing critical information to answer these questions.
-
+The [Table 1.](#table1) below shows that Foyle performs significantly better when using prior examples.
+The full results are in the [appendix](#table2).
+Notably, in 15 of the examples where using ChatGPT without examples was wrong it was completely wrong. 
+This isn’t at all surprising given GPT3.5 is missing critical information to answer these questions.
 
 <table>
   <tr>
@@ -135,8 +137,6 @@ The table below shows that Foyle performs significantly better when using prior 
 </table>
 
 <a name="table1">Table 1</a>: Shows that for 19 of the examples (79%); the AI performed better when learning from prior examples. In 22 of the 24 examples (91%) using the prior examples the AI did no worse than baseline. In 2 cases, using prior examples decreased the AI’s performance. The full results are provided in the table below.
-
-The full results are in the [appendix](#table2).
 
 ### Distance Metric
 
