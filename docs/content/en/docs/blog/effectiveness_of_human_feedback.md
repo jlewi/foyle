@@ -4,16 +4,20 @@ linkTitle: Effectiveness of Human Feedback
 date: 2024-06-11
 author: "[Jeremy Lewi](https://lewi.us/about)"
 type: blog
-description: Foyle is an open source assistant to help software developers deal with the pain of devops.
+description: Foyle is an open source assistant to help software developers deal with the pain of devops. This post presents quantitative results showing how feedback allows Foyle to assist with building and operating Foyle. In 79% of cases, Foyle provided the correct answer, whereas ChatGPT alone would lack sufficient context to achieve the intent. Furthermore, the LLM API calls cost less than $.002 per intent whereas a recursive, agentic approach could easily cost $2-$10.
 images: 
-  - "/docs/blog/cellids.svg"
+  - "/docs/blog/foyle_learning_interactions.svg"
 ---
 
 Agents! Agents! Agents! Everywhere I look I’m bombarded with the grandiose promises of fully autonomous agents. 
 These pesky humans aren’t merely inconveniences, they are budgetary line items to be optimized away. 
 All this hype leaves me wondering; have we forgotten that GPT was fine-tuned using data produced by a small army of[ human labelers](https://scale.com/blog/how-to-label-1m-data-points-week)?  Not to mention who do we think produced the 10 trillion words that foundation models are being trained on? While fully autonomous software agents are capturing the limelight on social media, systems that turn user interactions into training data like [Didact](https://research.google/blog/large-sequence-models-for-software-development-activities/), [Dosu](https://blog.langchain.dev/dosu-langsmith-no-prompt-eng/) and [Replit code repair](https://blog.replit.com/code-repair) are deployed and solving real toil.
 
-[Foyle](https://foyle.io/) takes a user-centered approach to building an AI to help developers deploy and operate their software. The key premise of Foyle is to instrument a developer's workflow so that we can monitor how they turn intent into actions. Foyle uses that interaction data to constantly improve. A previous post described how Foyle uses this data to learn. This post presents quantitative results showing how feedback allows Foyle to assist with building and operating Foyle. In 79% of cases, Foyle provided the correct answer, whereas ChatGPT alone would lack sufficient context to achieve the intent. In particular, the results show how Foyle lets users express intent at a higher level of abstraction.
+[Foyle](https://foyle.io/) takes a user-centered approach to building an AI to help developers deploy and operate their software. 
+The key premise of Foyle is to instrument a developer's workflow so that we can monitor how they turn intent into actions. 
+Foyle uses that interaction data to constantly improve. A previous post described how Foyle uses this data to learn. 
+This post presents quantitative results showing how feedback allows Foyle to assist with building and operating Foyle. 
+In 79% of cases, Foyle provided the correct answer, whereas ChatGPT alone would lack sufficient context to achieve the intent. In particular, the results show how Foyle lets users express intent at a higher level of abstraction.
 
 As a thought experiment, we can compare Foyle against an agentic approach that achieves the same accuracy by recursively invoking an LLM on Foyle’s 65K lines of code but without the benefit of learning from user interactions. In this case, we estimate that Foyle could easily save between $2-$10 on LLM API calls per intent. In practice, this likely means learning from prior interactions is critical to making an affordable AI.
 
