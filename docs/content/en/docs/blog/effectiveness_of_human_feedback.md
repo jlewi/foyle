@@ -1,6 +1,6 @@
 ---
 title: The Unreasonable Effectiveness of Human Feedback
-linkTitle: Effectiveness of Human Feedback
+linkTitle: The Unreasonable Effectiveness of Human Feedback
 date: 2024-06-11
 author: "[Jeremy Lewi](https://lewi.us/about)"
 type: blog
@@ -19,7 +19,8 @@ Foyle uses that interaction data to constantly improve. A previous post describe
 This post presents quantitative results showing how feedback allows Foyle to assist with building and operating Foyle. 
 In 79% of cases, Foyle provided the correct answer, whereas ChatGPT alone would lack sufficient context to achieve the intent. In particular, the results show how Foyle lets users express intent at a higher level of abstraction.
 
-As a thought experiment, we can compare Foyle against an agentic approach that achieves the same accuracy by recursively invoking an LLM on Foyle’s 65K lines of code but without the benefit of learning from user interactions. In this case, we estimate that Foyle could easily save between $2-$10 on LLM API calls per intent. In practice, this likely means learning from prior interactions is critical to making an affordable AI.
+As a thought experiment, we can compare Foyle against an agentic approach that achieves the same accuracy by recursively invoking an LLM on 
+Foyle’s (& [RunMe's](https://runme.dev/)) 65K lines of code but without the benefit of learning from user interactions. In this case, we estimate that Foyle could easily save between $2-$10 on LLM API calls per intent. In practice, this likely means learning from prior interactions is critical to making an affordable AI.
 
 ## Mapping Intent Into Action
 
