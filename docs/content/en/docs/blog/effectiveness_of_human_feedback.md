@@ -133,8 +133,50 @@ The table below shows that Foyle performs significantly better when using prior 
 
 <a name="table1">Table 1</a>: Shows that for 19 of the examples (79%); the AI performed better when learning from prior examples. In 22 of the 24 examples (91%) using the prior examples the AI did no worse than baseline. In 2 cases, using prior examples decreased the AI’s performance. The full results are provided in the table below.
 
+The full results are in the [appendix](#table2).
+
+### Distance Metric
+
+Our distance metrics assumes there are specific tools that should be used to accomplish a task even when different solutions might produce identical answers. In the context of devops this is desirable because there is a cost to supporting a tool; e.g. ensuring it is available on all machines. As a result, platform teams are often opinionated about how things should be done.
+
+For example to fetch the block logs for block 01HZ0N1ZZ8NJ7PSRYB6WEMH08M we measure the distance to the command
 
 
+```
+curl http://localhost:8080/api/blocklogs/01HZ0N1ZZ8NJ7PSRYB6WEMH08M | jq .
+```
+
+
+Using our metric if the AI answered
+
+
+```
+wget -q -O - http://localhost:8080/api/blocklogs/01HZ0N1ZZ8NJ7PSRYB6WEMH08M | yq .
+```
+
+
+The distance would end up being .625. The longest command consists of 8 arguments (including the binaries and the pipe operator). 3 deletions and 2 substitutions are needed to transform the actual into the expected answer which yields a distance of  ⅝=.625. So in this case, we’d conclude the AI’s answer was largely wrong even though wget produces the exact same output as curl in this case. If an organization is standardizing on curl over wget then the evaluation metric is capturing that preference.
+
+
+## How much is good data worth?
+
+A lot of agents appear to be pursuing a solution based on throwing lots of data and lots of compute at the problem. For example, to figure out how to “Get the log for block XYZ”, an agent could in principle crawl the [Foyle and RunMe repositories](https://github.com/jlewi/foyle) to understand what a block is and that Foyle exposes a REST server to make them accessible.  That approach might cost $2-$10 in LLM calls whereas with Foyle it's less than $.002.
+
+The Foyle repository is ~400K characters of Go Code; the RunMe Go code base is ~1.5M characters. So lets say 2M characters which is about 500K-1M tokens. With [GPT-4-turbo that’s ~$2-$10](https://openai.com/api/pricing/); or about 1-7 SWE minutes (assuming $90 per hour). If the Agent needs to call GPT4 multiple times those costs are going to add up pretty quickly.
+
+
+## Where is Foyle Going
+
+Today, Foyle is only learning single step workflows. While this is valuable, a lot of a developer’s toil involves multi step workflows. We’d like to extend Foyle to support this use case. This likely requires changes to how Foyle learns and how we evaluate Foyle.
+
+Foyle only works if we log user interactions. This means we need to create a UX that is compelling enough for developers to want to use. Foyle is now integrated with [Runme](https://runme.dev/). We want to work with the Runme team to create features (e.g. [Renderers](https://github.com/stateful/vscode-runme/blob/main/README.md), [multiple executor support](https://github.com/stateful/runme/issues/593)) that give users a reason to adopt a new tool even without AI.
+
+
+## How You Can Help
+
+If you’re rethinking how you do playbooks and want to create AI assisted executable playbooks please get in touch via email [jeremy@lewi.us](mailto:jeremy@lewi.us) or by starting a discussion in [GitHub](https://github.com/jlewi/foyle/discussions). In particular, if you’re struggling with observability and want to use AI to assist in query creation and create rich artifacts combining markdown, commands, and rich visualizations, we’d love to learn more about your use case.
+
+## Appendix: Full Results
 
 <table>
   <tr>
@@ -489,45 +531,3 @@ The table below shows that Foyle performs significantly better when using prior 
 
 
 <a name="table2">Table 2</a>. The full results for the evaluation dataset. The left column shows the evaluation prompt. The second column shows the most similar prior example (only the query is shown).  The third column is the normalized distance for the baseline AI. The 4th column is the normalized distance when learning from prior examples.
-
-
-### Distance Metric
-
-Our distance metrics assumes there are specific tools that should be used to accomplish a task even when different solutions might produce identical answers. In the context of devops this is desirable because there is a cost to supporting a tool; e.g. ensuring it is available on all machines. As a result, platform teams are often opinionated about how things should be done.
-
-For example to fetch the block logs for block 01HZ0N1ZZ8NJ7PSRYB6WEMH08M we measure the distance to the command
-
-
-```
-curl http://localhost:8080/api/blocklogs/01HZ0N1ZZ8NJ7PSRYB6WEMH08M | jq .
-```
-
-
-Using our metric if the AI answered
-
-
-```
-wget -q -O - http://localhost:8080/api/blocklogs/01HZ0N1ZZ8NJ7PSRYB6WEMH08M | yq .
-```
-
-
-The distance would end up being .625. The longest command consists of 8 arguments (including the binaries and the pipe operator). 3 deletions and 2 substitutions are needed to transform the actual into the expected answer which yields a distance of  ⅝=.625. So in this case, we’d conclude the AI’s answer was largely wrong even though wget produces the exact same output as curl in this case. If an organization is standardizing on curl over wget then the evaluation metric is capturing that preference.
-
-
-## How much is good data worth?
-
-A lot of agents appear to be pursuing a solution based on throwing lots of data and lots of compute at the problem. For example, to figure out how to “Get the log for block XYZ”, an agent could in principle crawl the [Foyle and RunMe repositories](https://github.com/jlewi/foyle) to understand what a block is and that Foyle exposes a REST server to make them accessible.  That approach might cost $2-$10 in LLM calls whereas with Foyle it's less than $.002.
-
-The Foyle repository is ~400K characters of Go Code; the RunMe Go code base is ~1.5M characters. So lets say 2M characters which is about 500K-1M tokens. With [GPT-4-turbo that’s ~$2-$10](https://openai.com/api/pricing/); or about 1-7 SWE minutes (assuming $90 per hour). If the Agent needs to call GPT4 multiple times those costs are going to add up pretty quickly.
-
-
-## Where is Foyle Going
-
-Today, Foyle is only learning single step workflows. While this is valuable, a lot of a developer’s toil involves multi step workflows. We’d like to extend Foyle to support this use case. This likely requires changes to how Foyle learns and how we evaluate Foyle.
-
-Foyle only works if we log user interactions. This means we need to create a UX that is compelling enough for developers to want to use. Foyle is now integrated with [Runme](https://runme.dev/). We want to work with the Runme team to create features (e.g. [Renderers](https://github.com/stateful/vscode-runme/blob/main/README.md), [multiple executor support](https://github.com/stateful/runme/issues/593)) that give users a reason to adopt a new tool even without AI.
-
-
-## How You Can Help
-
-If you’re rethinking how you do playbooks and want to create AI assisted executable playbooks please get in touch via email [jeremy@lewi.us](mailto:jeremy@lewi.us) or by starting a discussion in [GitHub](https://github.com/jlewi/foyle/discussions). In particular, if you’re struggling with observability and want to use AI to assist in query creation and create rich artifacts combining markdown, commands, and rich visualizations, we’d love to learn more about your use case.
