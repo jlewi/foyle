@@ -3,6 +3,8 @@ package application
 import (
 	"context"
 	"fmt"
+	"github.com/jlewi/foyle/app/pkg/learn"
+	"github.com/jlewi/foyle/app/pkg/oai"
 	"io"
 	"net/http"
 	"os"
@@ -309,6 +311,18 @@ func (a *App) SetupAnalyzer() (*analyze.Analyzer, error) {
 		return nil, err
 	}
 	return analyzer, nil
+}
+
+// SetupLearner	sets up the learner
+func (a *App) SetupLearner() (*learn.Learner, error) {
+	if a.LockingBlocksDB == nil {
+		return nil, errors.New("LockingBlocksDB is nil; call OpenDBs first")
+	}
+	client, err := oai.NewClient(*a.Config)
+	if err != nil {
+		return nil, err
+	}
+	return learn.NewLearner(*a.Config, client, a.LockingBlocksDB)
 }
 
 // SetupServer sets up the server

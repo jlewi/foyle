@@ -43,16 +43,34 @@ func NewServeCmd() *cobra.Command {
 					return err
 				}
 
-				if err := analyzer.Run(context.Background(), logDirs); err != nil {
+				learner, err := app.SetupLearner()
+
+				if err != nil {
 					return err
 				}
+
+				if err := analyzer.Run(context.Background(), logDirs, learner.Enqueue); err != nil {
+					return err
+				}
+
+				if err := learner.Start(context.Background()); err != nil {
+					return err
+				}
+
 				s, err := app.SetupServer()
 				if err != nil {
 					return err
 				}
 				defer helpers.DeferIgnoreError(app.Shutdown)
 
+				// Analyzer should be shutdown before the learner because analyzer tries to enqueue learner items
+				defer helpers.DeferIgnoreError(func() error {
+					return learner.Shutdown(context.Background())
+				})
+
 				// Analyzer needs to be shutdown before the app because the app will close the database
+				// TODO(jeremy): Should we move this into app.shutdown and make app.Shutdown responsible for
+				// shutting down analyzer in the proper order if there is one?
 				defer helpers.DeferIgnoreError(func() error {
 					return analyzer.Shutdown(context.Background())
 				})

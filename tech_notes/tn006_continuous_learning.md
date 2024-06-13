@@ -51,8 +51,19 @@ The learner will listen for events on the event channel and when it receives an 
 for reconciliation. The updates channel will be used to notify `InMemoryDB` that it needs to load/reload an example.
 
 For actual implementation we can simplify `Learning.reconcileExamples` and `Learning.reconcileEmbeddings`
-since we can eliminate the need to iterate over the entire database. It still makes sense to only recompute 
-embeddings if necessary because we want to support backfilling without unnecessary expense.
+since we can eliminate the need to iterate over the entire database.
+
+### Connecting to the Analyzer
+
+The analyzer needs to emit events when there is a block to be added.  We can change the signature of the run function
+to be 
+
+```
+func (a *Analyzer) Run(ctx context.Context, notifier func(string)error ) error
+```
+
+The notifier function will be called whenever there is a block to be added. Using a function means the Analyzer
+doesn't have to worry about the underlying implementation (e.g. channel, workqueue, etc.).
 
 ### Backfilling
 

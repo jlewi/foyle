@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
+	"k8s.io/client-go/util/workqueue"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
@@ -31,6 +34,9 @@ type Learner struct {
 	Config   config.Config
 	client   *openai.Client
 	blocksDB *dbutil.LockingDB[*logspb.BlockLog]
+	queue    workqueue.DelayingInterface
+
+	eventLoopIsDone sync.WaitGroup
 }
 
 func NewLearner(cfg config.Config, client *openai.Client, blocksDB *dbutil.LockingDB[*logspb.BlockLog]) (*Learner, error) {
@@ -41,7 +47,69 @@ func NewLearner(cfg config.Config, client *openai.Client, blocksDB *dbutil.Locki
 		Config:   cfg,
 		client:   client,
 		blocksDB: blocksDB,
+		queue:    workqueue.NewDelayingQueue(),
 	}, nil
+}
+
+// Start starts a worker thread to asynchronously handle blocks enqueued via the Enqueue function
+// Function is non-blocking
+func (l *Learner) Start(ctx context.Context) error {
+	l.eventLoopIsDone.Add(1)
+	go l.eventLoop(ctx)
+	return nil
+}
+
+// Enqueue adds an example id to be reconciled
+func (l *Learner) Enqueue(id string) error {
+	if l.queue.ShuttingDown() {
+		return errors.New("Queue is shutting down; can't enqueue anymore items")
+	}
+	l.queue.Add(id)
+	return nil
+}
+
+func (l *Learner) eventLoop(ctx context.Context) {
+	log := logs.FromContext(ctx)
+	for {
+		item, shutdown := l.queue.Get()
+		if shutdown {
+			l.eventLoopIsDone.Done()
+			return
+		}
+		func() {
+			defer l.queue.Done(item)
+			exampleId, ok := item.(string)
+			if !ok {
+				log.Error(errors.New("Failed to cast item to string"), "Failed to cast item to string", "item", item)
+				return
+			}
+
+			if err := l.Reconcile(ctx, exampleId); err != nil {
+				log.Error(err, "Error learning from example", "example", exampleId)
+				// Requeue the item so we will try again.
+				// TODO(jeremy): should we use a rate limiting queue so we eventually give up?
+				l.queue.AddAfter(exampleId, 30*time.Second)
+				return
+			}
+			// TODO(jeremy): How do we send a notification to InMemoryDB that the example has been learned and we need
+			// to do an update?
+		}()
+	}
+}
+
+func (l *Learner) Shutdown(ctx context.Context) error {
+	log := logs.FromContext(ctx)
+
+	log.Info("Shutting down learner")
+
+	// Shutdown the queues
+	l.queue.ShutDown()
+
+	// Wait for the eventloop to finish
+	l.eventLoopIsDone.Wait()
+
+	log.Info("Learner shutdown")
+	return nil
 }
 
 // Reconcile learns from the block with the given id
