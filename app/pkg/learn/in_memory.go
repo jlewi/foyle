@@ -141,12 +141,12 @@ func (db *InMemoryExampleDB) Start(ctx context.Context) error {
 	return nil
 }
 
-// EnqueueExample enqueues the example file to be loaded. This could be a new example or an existing example
-func (db *InMemoryExampleDB) EnqueueExample(ctx context.Context, exampleFile string) error {
+// EnqueueExample enqueues the exampleId to be loaded. This could be a new example or an existing example
+func (db *InMemoryExampleDB) EnqueueExample(exampleId string) error {
 	if db.q.ShuttingDown() {
 		return errors.New("Queue is shutting down; can't enqueue any more items")
 	}
-	db.q.Add(exampleFile)
+	db.q.Add(exampleId)
 	return nil
 }
 
@@ -162,7 +162,8 @@ func (db *InMemoryExampleDB) eventLoop(ctx context.Context) {
 		func() {
 			defer db.q.Done(obj)
 
-			exampleFile := obj.(string)
+			exampleID := obj.(string)
+			exampleFile := filepath.Join(db.config.GetTrainingDir(), exampleID+fileSuffix)
 			if err := db.loadRow(ctx, exampleFile); err != nil {
 				log.Error(err, "Failed to load example", "file", exampleFile)
 			}

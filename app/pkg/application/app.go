@@ -391,7 +391,7 @@ func (a *App) Serve() error {
 	}
 
 	if a.learner != nil {
-		if err := a.learner.Start(context.Background()); err != nil {
+		if err := a.learner.Start(context.Background(), a.inMemoryExamplesDB.EnqueueExample); err != nil {
 			return err
 		}
 	}

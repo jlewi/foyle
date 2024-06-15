@@ -31,11 +31,11 @@ const (
 //
 // TODO(jeremy): Should we call this a trainer?
 type Learner struct {
-	Config   config.Config
-	client   *openai.Client
-	blocksDB *dbutil.LockingDB[*logspb.BlockLog]
-	queue    workqueue.DelayingInterface
-
+	Config          config.Config
+	client          *openai.Client
+	blocksDB        *dbutil.LockingDB[*logspb.BlockLog]
+	queue           workqueue.DelayingInterface
+	postFunc        PostLearnEvent
 	eventLoopIsDone sync.WaitGroup
 }
 
@@ -51,9 +51,13 @@ func NewLearner(cfg config.Config, client *openai.Client, blocksDB *dbutil.Locki
 	}, nil
 }
 
+// PostLearnEvent interface for functions to post events about new examples.
+type PostLearnEvent func(id string) error
+
 // Start starts a worker thread to asynchronously handle blocks enqueued via the Enqueue function
 // Function is non-blocking
-func (l *Learner) Start(ctx context.Context) error {
+func (l *Learner) Start(ctx context.Context, postFunc PostLearnEvent) error {
+	l.postFunc = postFunc
 	l.eventLoopIsDone.Add(1)
 	go l.eventLoop(ctx)
 	return nil
@@ -91,8 +95,6 @@ func (l *Learner) eventLoop(ctx context.Context) {
 				l.queue.AddAfter(exampleId, 30*time.Second)
 				return
 			}
-			// TODO(jeremy): How do we send a notification to InMemoryDB that the example has been learned and we need
-			// to do an update?
 		}()
 	}
 }
@@ -180,6 +182,9 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 		return errors.Wrapf(err, "Failed to write example file doc %s for id %s", expectedFile, b.GetId())
 	}
 
+	if l.postFunc != nil {
+		l.postFunc(example.Id)
+	}
 	return nil
 }
 

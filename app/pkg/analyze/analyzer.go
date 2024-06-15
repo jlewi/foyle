@@ -131,7 +131,7 @@ type blockItem struct {
 	id string
 }
 
-// PostBlockEvent interface for functions to block events.
+// PostBlockEvent interface for functions to post block events.
 type PostBlockEvent func(id string) error
 
 // Run runs the analyzer; continually processing logs.
