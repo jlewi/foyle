@@ -144,7 +144,15 @@ func (e *Evaluator) setupAgent(ctx context.Context, agentConfig api.AgentConfig)
 	if err != nil {
 		return nil, err
 	}
-	agent, err := agent.NewAgent(cfg, client)
+
+	log := logs.FromContext(ctx)
+	log.Info("Creating agen without inMemoryExampleDB", "config", cfg.Agent)
+	if cfg.Agent.RAG != nil && cfg.Agent.RAG.Enabled {
+		return nil, errors.New("RAG is enabled but eval code needs to be updated to ddeal with streaming logs")
+	}
+
+	// TODO(jeremy): How should we construct inMemoryExampleDB? In the eval case?
+	agent, err := agent.NewAgent(cfg, client, nil)
 
 	if err != nil {
 		return nil, err

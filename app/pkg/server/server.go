@@ -36,7 +36,6 @@ import (
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/executor"
 	"github.com/jlewi/foyle/app/pkg/logs"
-	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -68,24 +67,16 @@ type Server struct {
 }
 
 // NewServer creates a new server
-func NewServer(config config.Config, blocksDB *pebble.DB) (*Server, error) {
+func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent) (*Server, error) {
 	e, err := executor.NewExecutor(config)
 	if err != nil {
 		return nil, err
 	}
 
-	oaiClient, err := oai.NewClient(config)
-
-	if err != nil {
-		return nil, err
+	if agent == nil {
+		return nil, errors.New("Agent is required")
 	}
-
-	a, err := agent.NewAgent(config, oaiClient)
-	if err != nil {
-		return nil, err
-	}
-
-	runmeProxy, err := runme.NewProxy(a)
+	runmeProxy, err := runme.NewProxy(agent)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +88,7 @@ func NewServer(config config.Config, blocksDB *pebble.DB) (*Server, error) {
 	s := &Server{
 		config:     config,
 		executor:   e,
-		agent:      a,
+		agent:      agent,
 		runmeProxy: runmeProxy,
 		logsCrud:   logsCrud,
 	}

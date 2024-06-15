@@ -70,10 +70,10 @@ func (l *Learner) Enqueue(id string) error {
 
 func (l *Learner) eventLoop(ctx context.Context) {
 	log := logs.FromContext(ctx)
+	defer l.eventLoopIsDone.Done()
 	for {
 		item, shutdown := l.queue.Get()
 		if shutdown {
-			l.eventLoopIsDone.Done()
 			return
 		}
 		func() {
