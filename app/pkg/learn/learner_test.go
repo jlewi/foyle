@@ -2,10 +2,11 @@ package learn
 
 import (
 	"context"
-	"github.com/cockroachdb/pebble"
-	"github.com/jlewi/foyle/app/pkg/analyze"
 	"os"
 	"testing"
+
+	"github.com/cockroachdb/pebble"
+	"github.com/jlewi/foyle/app/pkg/analyze"
 
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/oai"

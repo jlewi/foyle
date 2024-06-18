@@ -3,8 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"os"
+
+	"github.com/pkg/errors"
 
 	"github.com/jlewi/foyle/app/pkg/application"
 	"github.com/jlewi/foyle/app/pkg/learn"

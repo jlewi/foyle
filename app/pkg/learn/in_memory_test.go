@@ -2,10 +2,11 @@ package learn
 
 import (
 	"context"
-	"github.com/google/go-cmp/cmp"
 	"os"
 	"sort"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/oai"

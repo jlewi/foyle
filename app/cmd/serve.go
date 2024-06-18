@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jlewi/monogo/helpers"
+
 	"github.com/jlewi/foyle/app/pkg/application"
 
 	"github.com/spf13/cobra"
@@ -29,7 +31,7 @@ func NewServeCmd() *cobra.Command {
 					return err
 				}
 				logVersion()
-				defer app.Shutdown()
+				defer helpers.DeferIgnoreError(app.Shutdown)
 				return app.Serve()
 			}()
 

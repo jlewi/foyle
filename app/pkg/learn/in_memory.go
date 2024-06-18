@@ -2,11 +2,12 @@ package learn
 
 import (
 	"context"
-	"k8s.io/client-go/util/workqueue"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
+
+	"k8s.io/client-go/util/workqueue"
 
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"

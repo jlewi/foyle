@@ -3,13 +3,14 @@ package learn
 import (
 	"context"
 	"fmt"
-	"github.com/jlewi/foyle/app/pkg/dbutil"
-	"k8s.io/client-go/util/workqueue"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jlewi/foyle/app/pkg/dbutil"
+	"k8s.io/client-go/util/workqueue"
 
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
@@ -183,103 +184,12 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 	}
 
 	if l.postFunc != nil {
-		l.postFunc(example.Id)
+		if err := l.postFunc(example.Id); err != nil {
+			return errors.Wrapf(err, "Failed to post learn event for example %s", b.GetId())
+		}
 	}
 	return nil
 }
-
-// Backfill reconciles all blocks in the database
-//func (l *Learner) Backfill(ctx context.Context, blocksDB *pebble.DB) error {
-//	log := logs.FromContext(ctx)
-//
-//	allErrors := &helpers.ListOfErrors{}
-//
-//	iter, err := blocksDB.NewIterWithContext(ctx, nil)
-//	if err != nil {
-//		return err
-//	}
-//	defer iter.Close()
-//
-//	for iter.First(); iter.Valid(); iter.Next() {
-//		key := iter.Key()
-//		if key == nil {
-//			break
-//		}
-//
-//		value, err := iter.ValueAndErr()
-//		if err != nil {
-//			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
-//		}
-//
-//		b := &logspb.BlockLog{}
-//		if err := proto.Unmarshal(value, b); err != nil {
-//			allErrors.AddCause(errors.Wrapf(err, "Failed to read block %s", string(key)))
-//			continue
-//		}
-//
-//		if b.ExecutedBlock == nil {
-//			// Skip unexecuted block
-//			continue
-//		}
-//
-//		if b.GeneratedBlock == nil {
-//			// Block wasn't the result of AI generation
-//			continue
-//		}
-//
-//		if b.EvalMode {
-//			log.V(logs.Debug).Info("Skipping block which was created as part of an eval", "id", b.GetId())
-//			continue
-//		}
-//
-//		// TODO(jeremy): Should we use some sort of distance metric? e.g. edit distance? We could potentially
-//		// Use the metric used for eval.
-//		if strings.TrimSpace(b.ExecutedBlock.GetContents()) == strings.TrimSpace(b.GeneratedBlock.GetContents()) {
-//			log.V(logs.Debug).Info("Skipping executed block which matches generated block", "id", b.GetId())
-//			continue
-//		}
-//
-//		expectedFile := l.getExampleFile(b.GetId())
-//
-//		if _, err := os.Stat(expectedFile); err == nil {
-//			log.V(logs.Debug).Info("File for block exists", "id", b.GetId())
-//			continue
-//		}
-//
-//		log.Info("Found new training example", "blockId", b.GetId())
-//
-//		// TODO(jeremy): Should we take into account execution status when looking for mistakes?
-//
-//		// Deep copy the original message
-//		newDoc := proto.Clone(b.Doc).(*v1alpha1.Doc)
-//		newBlock := proto.Clone(b.ExecutedBlock).(*v1alpha1.Block)
-//		answer := []*v1alpha1.Block{newBlock}
-//
-//		example := &v1alpha1.Example{
-//			Id:     b.GetId(),
-//			Query:  newDoc,
-//			Answer: answer,
-//		}
-//
-//		encoded, err := proto.Marshal(example)
-//		if err != nil {
-//			log.Error(err, "Failed to serialize doc", "id", b.GetId())
-//			allErrors.AddCause(err)
-//			continue
-//		}
-//
-//		if err := os.WriteFile(expectedFile, encoded, 0777); err != nil {
-//			log.Error(err, "Failed to serialize doc", "id", b.GetId())
-//			allErrors.AddCause(err)
-//			continue
-//		}
-//	}
-//
-//	if len(allErrors.Causes) > 0 {
-//		return allErrors
-//	}
-//	return nil
-//}
 
 func (l *Learner) getExampleFile(id string) string {
 	return filepath.Join(l.Config.GetTrainingDir(), fmt.Sprintf("%s%s", id, fileSuffix))

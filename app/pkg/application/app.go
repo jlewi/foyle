@@ -3,10 +3,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"github.com/jlewi/foyle/app/pkg/agent"
-	"github.com/jlewi/foyle/app/pkg/learn"
-	"github.com/jlewi/foyle/app/pkg/oai"
-	"github.com/sashabaranov/go-openai"
 	"io"
 	"net/http"
 	"os"
@@ -14,6 +10,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/jlewi/foyle/app/pkg/agent"
+	"github.com/jlewi/foyle/app/pkg/learn"
+	"github.com/jlewi/foyle/app/pkg/oai"
+	"github.com/sashabaranov/go-openai"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
@@ -64,9 +65,7 @@ type App struct {
 	analyzer           *analyze.Analyzer
 	learner            *learn.Learner
 	client             *openai.Client
-	agent              *agent.Agent
 	inMemoryExamplesDB *learn.InMemoryExampleDB
-	server             *server.Server
 }
 
 // NewApp creates a new application. You should call one more setup/Load functions to properly set it up.
