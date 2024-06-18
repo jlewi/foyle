@@ -42,30 +42,29 @@ type Agent struct {
 	db     *learn.InMemoryExampleDB
 }
 
-func NewAgent(cfg config.Config, client *openai.Client) (*Agent, error) {
+func NewAgent(cfg config.Config, client *openai.Client, inMemoryExampleDB *learn.InMemoryExampleDB) (*Agent, error) {
 	if cfg.Agent == nil {
 		return nil, errors.New("Configuration is missing AgentConfig; configuration must define the agent field.")
 	}
 	log := zapr.NewLogger(zap.L())
 	log.Info("Creating agent", "config", cfg.Agent)
-	var db *learn.InMemoryExampleDB
-	if cfg.Agent.RAG != nil && cfg.Agent.RAG.Enabled {
-		log.Info("RAG is enabled; loading data")
 
-		if client == nil {
-			return nil, errors.New("OpenAI client is required for RAG")
+	if client == nil {
+		return nil, errors.New("OpenAI client is required")
+	}
+	if cfg.Agent.RAG != nil && cfg.Agent.RAG.Enabled {
+		if inMemoryExampleDB == nil {
+			return nil, errors.New("RAG is enabled but learn is nil; learn must be set to use RAG")
 		}
-		var err error
-		db, err = learn.NewInMemoryExampleDB(cfg, client)
-		if err != nil {
-			return nil, errors.Wrap(err, "Failed to create InMemoryExampleDB")
-		}
+		log.Info("RAG is enabled")
+	} else {
+		inMemoryExampleDB = nil
 	}
 
 	return &Agent{
 		client: client,
 		config: cfg,
-		db:     db,
+		db:     inMemoryExampleDB,
 	}, nil
 }
 

@@ -5,6 +5,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jlewi/foyle/app/pkg/learn"
+
 	"github.com/jlewi/foyle/app/api"
 
 	"github.com/jlewi/foyle/app/pkg/config"
@@ -77,7 +79,12 @@ func Test_Generate(t *testing.T) {
 		MaxResults: 3,
 	}
 	cfg.Agent.RAG.Enabled = true
-	agentWithRag, err := NewAgent(*cfg, client)
+
+	inMemoryDB, err := learn.NewInMemoryExampleDB(*cfg, client)
+	if err != nil {
+		t.Fatalf("Error creating in memory DB; %v", err)
+	}
+	agentWithRag, err := NewAgent(*cfg, client, inMemoryDB)
 
 	if err != nil {
 		t.Fatalf("Error creating agent; %v", err)
@@ -85,7 +92,7 @@ func Test_Generate(t *testing.T) {
 
 	cfgNoRag := cfg.DeepCopy()
 	cfgNoRag.Agent.RAG.Enabled = false
-	agentNoRag, err := NewAgent(cfgNoRag, client)
+	agentNoRag, err := NewAgent(cfgNoRag, client, nil)
 
 	if err != nil {
 		t.Fatalf("Error creating agent; %v", err)

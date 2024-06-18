@@ -11,6 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jlewi/foyle/app/pkg/agent"
+	"github.com/jlewi/foyle/app/pkg/learn"
+	"github.com/jlewi/foyle/app/pkg/oai"
+	"github.com/sashabaranov/go-openai"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
@@ -42,8 +47,9 @@ import (
 
 type logCloser func()
 
-// App is a struct to hold values needed across all commands.
-// Intent is to simplify initialization across commands.
+// App is a struct that takes care of wiring together all the different
+// components of the application. It is designed in a modular way so different subcommands
+// can initialize only the parts they need.
 type App struct {
 	Config              *config.Config
 	Out                 io.Writer
@@ -55,6 +61,11 @@ type App struct {
 	TracesDB            *pebble.DB
 	blocksDB            *pebble.DB
 	LockingBlocksDB     *dbutil.LockingDB[*logspb.BlockLog]
+
+	analyzer           *analyze.Analyzer
+	learner            *learn.Learner
+	client             *openai.Client
+	inMemoryExamplesDB *learn.InMemoryExampleDB
 }
 
 // NewApp creates a new application. You should call one more setup/Load functions to properly set it up.
@@ -311,18 +322,101 @@ func (a *App) SetupAnalyzer() (*analyze.Analyzer, error) {
 	return analyzer, nil
 }
 
-// SetupServer sets up the server
-func (a *App) SetupServer() (*server.Server, error) {
-	if a.Config == nil {
-		return nil, errors.New("Config is nil; call LoadConfig first")
+// SetupLearner	sets up the learner
+func (a *App) SetupLearner() (*learn.Learner, error) {
+	if a.LockingBlocksDB == nil {
+		return nil, errors.New("LockingBlocksDB is nil; call OpenDBs first")
 	}
-
-	s, err := server.NewServer(*a.Config, a.blocksDB)
-
+	client, err := oai.NewClient(*a.Config)
 	if err != nil {
 		return nil, err
 	}
-	return s, nil
+	return learn.NewLearner(*a.Config, client, a.LockingBlocksDB)
+}
+
+func (a *App) createComponents() error {
+	analyzer, err := a.SetupAnalyzer()
+	if err != nil {
+		return err
+	}
+	a.analyzer = analyzer
+
+	learner, err := a.SetupLearner()
+
+	if err != nil {
+		return err
+	}
+	a.learner = learner
+
+	client, err := oai.NewClient(*a.Config)
+	if err != nil {
+		return err
+	}
+	a.client = client
+
+	var inMemoryExampleDB *learn.InMemoryExampleDB
+	if learner != nil {
+		inMemoryExampleDB, err = learn.NewInMemoryExampleDB(*a.Config, client)
+		if err != nil {
+			return err
+		}
+	}
+	a.inMemoryExamplesDB = inMemoryExampleDB
+	return nil
+}
+
+// Serve sets up and runs the server
+// This is blocking
+func (a *App) Serve() error {
+	if a.Config == nil {
+		return errors.New("Config is nil; call LoadConfig first")
+	}
+
+	// First we create the components.
+	if err := a.createComponents(); err != nil {
+		return err
+	}
+
+	// Start any asynchronous workers in the components
+	logDirs := make([]string, 0, 2)
+	logDirs = append(logDirs, a.Config.GetRawLogDir())
+
+	if a.Config.Learner != nil {
+		logDirs = append(logDirs, a.Config.Learner.LogDirs...)
+	}
+
+	if err := a.analyzer.Run(context.Background(), logDirs, a.learner.Enqueue); err != nil {
+		return err
+	}
+
+	if a.learner != nil {
+		if err := a.learner.Start(context.Background(), a.inMemoryExamplesDB.EnqueueExample); err != nil {
+			return err
+		}
+	}
+
+	if err := a.inMemoryExamplesDB.Start(context.Background()); err != nil {
+		return err
+	}
+
+	agent, err := agent.NewAgent(*a.Config, a.client, a.inMemoryExamplesDB)
+
+	if err != nil {
+		return err
+	}
+
+	s, err := server.NewServer(*a.Config, a.blocksDB, agent)
+
+	if err != nil {
+		return err
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return s.Run()
+
 }
 
 // ApplyPaths applies the resources in the specified paths.
@@ -438,6 +532,23 @@ func (a *App) Shutdown() error {
 	// that sends the logs somewhere explicitly.
 	l := zap.L()
 	log := zapr.NewLogger(l)
+
+	if err := a.analyzer.Shutdown(context.Background()); err != nil {
+		log.Error(err, "Error shutting down analyzer")
+	}
+
+	// Analyzer should be shutdown before the learner because analyzer tries to enqueue learner items
+	if a.learner != nil {
+		if err := a.learner.Shutdown(context.Background()); err != nil {
+			log.Error(err, "Error shutting down learner")
+		}
+	}
+
+	if a.inMemoryExamplesDB != nil {
+		if err := a.inMemoryExamplesDB.Shutdown(context.Background()); err != nil {
+			log.Error(err, "Error shutting down inMemoryExamplesDB")
+		}
+	}
 
 	if a.otelShutdownFn != nil {
 		log.Info("Shutting down open telemetry")

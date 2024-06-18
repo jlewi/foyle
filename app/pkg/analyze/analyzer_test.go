@@ -347,7 +347,7 @@ func Test_Analyzer(t *testing.T) {
 	a.signalFileDone = fileProcessed
 	a.signalBlockDone = blockProccessed
 
-	if err := a.Run(context.Background(), []string{rawDir}); err != nil {
+	if err := a.Run(context.Background(), []string{rawDir}, nil); err != nil {
 		t.Fatalf("Analyze failed: %v", err)
 	}
 

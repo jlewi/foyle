@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 
+	"github.com/jlewi/monogo/helpers"
+
 	"github.com/jlewi/foyle/app/pkg/application"
 
-	"github.com/jlewi/monogo/helpers"
 	"github.com/spf13/cobra"
 )
 
@@ -30,36 +30,9 @@ func NewServeCmd() *cobra.Command {
 				if err := app.OpenDBs(); err != nil {
 					return err
 				}
-
-				logDirs := make([]string, 0, 2)
-				logDirs = append(logDirs, app.Config.GetRawLogDir())
-
-				if app.Config.Learner != nil {
-					logDirs = append(logDirs, app.Config.Learner.LogDirs...)
-				}
-
-				analyzer, err := app.SetupAnalyzer()
-				if err != nil {
-					return err
-				}
-
-				if err := analyzer.Run(context.Background(), logDirs); err != nil {
-					return err
-				}
-				s, err := app.SetupServer()
-				if err != nil {
-					return err
-				}
-				defer helpers.DeferIgnoreError(app.Shutdown)
-
-				// Analyzer needs to be shutdown before the app because the app will close the database
-				defer helpers.DeferIgnoreError(func() error {
-					return analyzer.Shutdown(context.Background())
-				})
-
 				logVersion()
-				return s.Run()
-
+				defer helpers.DeferIgnoreError(app.Shutdown)
+				return app.Serve()
 			}()
 
 			if err != nil {
