@@ -57,14 +57,3 @@ directory
 ```bash
 foyle config set learner.logDirs=${RUNME_LOGS_DIR}
 ```
-
-## Learning from past mistakes
-
-To learn from past mistakes you should periodically run the command
-
-```
-foyle logs process
-foyle learn
-```
-
-When you run this command Foyle analyzes its logs to learn from implicit human feedback. 
