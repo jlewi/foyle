@@ -6,7 +6,7 @@ weight: 8
 
 # Why Use Honeycomb with Foyle
 
-Honeycomb is often used to query and visualize observability data.
+[Honeycomb](honeycomb.io) is often used to query and visualize observability data.
 
 Using Foyle and RunMe you can
 
