@@ -15,6 +15,11 @@ Using Foyle and RunMe you can
 * Create documents that capture the specific queries you are interested in rather than rely
   on static dashboards
 
+<video controls style="max-width: 50%; height: auto;">
+  <source src="https://storage.googleapis.com/foyle-public/videos/foylehoneycomb.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
 ## How to integrate Honeycomb with RunMe
 
 This section explains how to integrate executing Honeycomb queries from RunMe.
