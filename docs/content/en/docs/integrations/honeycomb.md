@@ -6,7 +6,7 @@ weight: 8
 
 # Why Use Honeycomb with Foyle
 
-Honeycomb is often used to query and visualize observability data.
+[Honeycomb](https://honeycomb.io) is often used to query and visualize observability data.
 
 Using Foyle and RunMe you can
 
@@ -14,6 +14,11 @@ Using Foyle and RunMe you can
 * Capture that query as part of a playbook or incident report
 * Create documents that capture the specific queries you are interested in rather than rely
   on static dashboards
+
+<video controls style="max-width: 50%; height: auto;">
+  <source src="https://storage.googleapis.com/foyle-public/videos/foylehoneycomb.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
 ## How to integrate Honeycomb with RunMe
 
