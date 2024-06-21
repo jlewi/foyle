@@ -62,6 +62,10 @@ type Config struct {
 type LearnerConfig struct {
 	// LogDirs is an additional list of directories to search for logs.
 	LogDirs []string `json:"logDirs" yaml:"logDirs"`
+
+	// ExampleDirs is the list of directories to read/write examples.
+	// Can be a local path or GCS URI.
+	ExampleDirs []string `json:"exampleDirs" yaml:"exampleDirs"`
 }
 
 type EvalConfig struct {
@@ -200,9 +204,22 @@ func (c *Config) GetTracesDBDir() string {
 	return filepath.Join(c.GetLogDir(), "traces")
 }
 
-func (c *Config) GetTrainingDir() string {
-	return filepath.Join(c.GetConfigDir(), "training")
+func (c *Config) GetTrainingDirs() []string {
+	if c.Learner == nil {
+		return []string{}
+	}
+
+	dirs := c.Learner.ExampleDirs
+	// If dirs isn't set default to a local training directory
+	if len(dirs) == 0 {
+		dirs = []string{filepath.Join(c.GetConfigDir(), "training")}
+	}
+	return dirs
 }
+
+//func (c *Config) GetTrainingModelDir() string {
+//	return filepath.Join(c.GetTrainingDir(), c.GetModel())
+//}
 
 func (c *Config) GetLogLevel() string {
 	if c.Logging.Level == "" {

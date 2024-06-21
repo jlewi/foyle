@@ -350,6 +350,10 @@ github.com/jlewi/hydros v0.0.7-0.20240503183011-8f99ead373fb h1:2G2k606S3Qcg40cz
 github.com/jlewi/hydros v0.0.7-0.20240503183011-8f99ead373fb/go.mod h1:4fV+JUCnexPY2ZbKzdfV/RsyrfralN832MsUSq/7FqE=
 github.com/jlewi/monogo v0.0.0-20240123191147-401afe194d74 h1:pbOw/rOMs0AZ494bGnI6DieGKwqoJQEjHWaJZrvxsJo=
 github.com/jlewi/monogo v0.0.0-20240123191147-401afe194d74/go.mod h1:4QWrn/wb+L6rHHO3u5N250qJYWaZlHn1a8tFuWhZCP8=
+github.com/jlewi/monogo v0.0.0-20240621134004-bb6520225771 h1:V6Ek4ZqTMG8iYF6azwbHn3QVyihIZ8GlwU57+WlXkdE=
+github.com/jlewi/monogo v0.0.0-20240621134004-bb6520225771/go.mod h1:s3nTD+owHZ6b+F13JdSpXLtrAH35pOqdwdcZEZ/gwBc=
+github.com/jlewi/monogo v0.0.0-20240621212541-14462684ce69 h1:E13AbOWwrGoFiOcoK+EeSdlXede0nnIuzswgXOT/PYM=
+github.com/jlewi/monogo v0.0.0-20240621212541-14462684ce69/go.mod h1:s3nTD+owHZ6b+F13JdSpXLtrAH35pOqdwdcZEZ/gwBc=
 github.com/jlewi/runme/v3 v3.0.0-20240524042602-a01f865c4617 h1:lyXrThCive3plQ/HyiYvklcdQ6F84bZ7DX+dMU01iik=
 github.com/jlewi/runme/v3 v3.0.0-20240524042602-a01f865c4617/go.mod h1:RSMUWGN5b1i4eXEAKbuksB/z8thptDXVKyZ6lRXMcJc=
 github.com/jlewi/runme/v3 v3.0.0-20240524044247-2657f0b08e0f h1:NFOdz6g8E44q5RPLXbUQBK+Ox+3tRqk+NG+rTXWHgcY=

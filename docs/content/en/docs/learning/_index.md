@@ -57,3 +57,30 @@ directory
 ```bash
 foyle config set learner.logDirs=${RUNME_LOGS_DIR}
 ```
+
+## Sharing Learned Examples
+
+In a team setting, you should build a shared AI that learns from the feedback of all team members and assists
+all members. To do this you can configure Foyle to write and read examples from a shared location like GCS.
+If you'd like S3 support please vote up [issue #153](https://github.com/jlewi/foyle/issues/153).
+
+To configure Foyle to use a shared location for learned examples 
+
+1. Create a GCS bucket to store the learned examples
+
+   ```bash
+    gsutil mb gs://my-foyle-examples
+   ```
+   
+1. Configure Foyle to use the GCS bucket
+
+   ```bash
+   foyle config set learner.exampleDirs=gs://${YOUR_BUCKET}
+   ```
+
+Optionally you can configure Foyle to use a local location as well if you want to be able to use the AI without
+an internet connection.
+
+```bash
+foyle config set learner.exampleDirs=gs://${YOUR_BUCKET},/local/training/examples
+```

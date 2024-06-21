@@ -77,6 +77,12 @@ type Globber interface {
 For object storage we can implement Glob by listing all the objects matching a prefix and then applying the glob;
 similar to this [code for matching a regex](https://github.com/jlewi/monogo/blob/c6693c86e89898f3a65c6f18b6b91b6e031c6dbd/gcp/gcs/util.go#L172)
 
+### Triggering Loading of SharedExamples
+
+For an initial implementation we can load shared examples when Foyle starts and perhaps periodically poll for
+new examples. I don't think there's any need to implement push based notifications for new examples.
+
+
 ## Alternatives
 
 ### Centralize Traces and Block Logs
@@ -88,7 +94,9 @@ no simple solution for moving the traces and block logs to a central location.
 The main thing we lose by not centralizing the traces and block is the ability to do bulk analysis of traces and
 block events across all users. Since we don't have an immediate use case for that there's no reason to support it.
 
+# References
 
+[DuckDB S3 Support](https://duckdb.org/docs/extensions/httpfs/s3api.html#:~:text=DuckDB%20conforms%20to%20the%20S3,common%20among%20industry%20storage%20providers.)
 
 
 
