@@ -3,11 +3,13 @@ package learn
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jlewi/monogo/files"
+	"github.com/jlewi/monogo/helpers"
 
 	"github.com/jlewi/foyle/app/pkg/dbutil"
 	"k8s.io/client-go/util/workqueue"
@@ -38,6 +40,7 @@ type Learner struct {
 	queue           workqueue.DelayingInterface
 	postFunc        PostLearnEvent
 	eventLoopIsDone sync.WaitGroup
+	factory         *files.Factory
 }
 
 func NewLearner(cfg config.Config, client *openai.Client, blocksDB *dbutil.LockingDB[*logspb.BlockLog]) (*Learner, error) {
@@ -49,11 +52,12 @@ func NewLearner(cfg config.Config, client *openai.Client, blocksDB *dbutil.Locki
 		client:   client,
 		blocksDB: blocksDB,
 		queue:    workqueue.NewDelayingQueue(),
+		factory:  &files.Factory{},
 	}, nil
 }
 
 // PostLearnEvent interface for functions to post events about new examples.
-type PostLearnEvent func(id string) error
+type PostLearnEvent func(exampleFile string) error
 
 // Start starts a worker thread to asynchronously handle blocks enqueued via the Enqueue function
 // Function is non-blocking
@@ -146,12 +150,7 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 		return nil
 	}
 
-	expectedFile := l.getExampleFile(b.GetId())
-
-	if _, err := os.Stat(expectedFile); err == nil {
-		log.V(logs.Debug).Info("File for block exists", "id", b.GetId())
-		return nil
-	}
+	expectedFiles := l.getExampleFiles(b.GetId())
 
 	log.Info("Found new training example", "blockId", b.GetId())
 
@@ -178,21 +177,61 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 		return errors.Wrapf(err, "Failed to serialize doc %s", b.GetId())
 	}
 
-	if err := os.WriteFile(expectedFile, encoded, 0777); err != nil {
-		log.Error(err, "Failed to serialize doc", "id", b.GetId())
-		return errors.Wrapf(err, "Failed to write example file doc %s for id %s", expectedFile, b.GetId())
+	writeErrors := &helpers.ListOfErrors{}
+	posted := false
+	for _, expectedFile := range expectedFiles {
+		writeErr := func() error {
+			helper, err := l.factory.Get(expectedFile)
+			if err != nil {
+				return err
+			}
+			w, err := helper.NewWriter(expectedFile)
+			if err != nil {
+				return err
+			}
+			if closer, ok := w.(io.Closer); ok {
+				defer closer.Close()
+			}
+
+			if _, err := w.Write(encoded); err != nil {
+				return errors.Wrapf(err, "Failed to write example %s; to file %s", b.GetId(), expectedFile)
+
+			}
+			return nil
+		}()
+		if writeErr != nil {
+			writeErrors.AddCause(err)
+			continue
+		}
+		// All post a single file because we don't need to read it multiple times
+		if !posted && l.postFunc != nil {
+			if err := l.postFunc(expectedFile); err != nil {
+				return errors.Wrapf(err, "Failed to post learn event for example %s", b.GetId())
+			}
+			posted = true
+		}
 	}
 
-	if l.postFunc != nil {
-		if err := l.postFunc(example.Id); err != nil {
-			return errors.Wrapf(err, "Failed to post learn event for example %s", b.GetId())
-		}
+	if len(writeErrors.Causes) > 0 {
+		return writeErrors
+
 	}
 	return nil
 }
 
-func (l *Learner) getExampleFile(id string) string {
-	return filepath.Join(l.Config.GetTrainingDir(), fmt.Sprintf("%s%s", id, fileSuffix))
+func (l *Learner) getExampleFiles(id string) []string {
+	log := logs.FromContext(context.Background())
+	paths := make([]string, 0)
+	for _, d := range l.Config.GetTrainingDirs() {
+		h, err := l.factory.GetDirHelper(d)
+		if err != nil {
+			log.Error(err, "Unable to DirHelper", "dir", d)
+			continue
+		}
+		paths = append(paths, h.Join(d, fmt.Sprintf("%s%s", id, fileSuffix)))
+	}
+
+	return paths
 }
 
 func (l *Learner) computeEmbeddings(ctx context.Context, example *v1alpha1.Example) error {

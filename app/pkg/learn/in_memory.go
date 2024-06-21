@@ -2,10 +2,11 @@ package learn
 
 import (
 	"context"
-	"os"
-	"path/filepath"
+	"io"
 	"sort"
 	"sync"
+
+	"github.com/jlewi/monogo/files"
 
 	"k8s.io/client-go/util/workqueue"
 
@@ -47,6 +48,8 @@ type InMemoryExampleDB struct {
 
 	// mu protects the examples and embeddings fields so that we can update it safely.
 	lock sync.RWMutex
+
+	factory *files.Factory
 }
 
 func NewInMemoryExampleDB(cfg config.Config, client *openai.Client) (*InMemoryExampleDB, error) {
@@ -58,6 +61,7 @@ func NewInMemoryExampleDB(cfg config.Config, client *openai.Client) (*InMemoryEx
 		client:  client,
 		idToRow: make(map[string]int),
 		q:       workqueue.NewDelayingQueue(),
+		factory: &files.Factory{},
 	}
 
 	if err := db.loadExamples(context.Background()); err != nil {
@@ -142,12 +146,12 @@ func (db *InMemoryExampleDB) Start(ctx context.Context) error {
 	return nil
 }
 
-// EnqueueExample enqueues the exampleId to be loaded. This could be a new example or an existing example
-func (db *InMemoryExampleDB) EnqueueExample(exampleId string) error {
+// EnqueueExample enqueues the exampleFile to be loaded. This could be a new example or an existing example
+func (db *InMemoryExampleDB) EnqueueExample(exampleFile string) error {
 	if db.q.ShuttingDown() {
 		return errors.New("Queue is shutting down; can't enqueue any more items")
 	}
-	db.q.Add(exampleId)
+	db.q.Add(exampleFile)
 	return nil
 }
 
@@ -163,10 +167,9 @@ func (db *InMemoryExampleDB) eventLoop(ctx context.Context) {
 		func() {
 			defer db.q.Done(obj)
 
-			exampleID := obj.(string)
-			exampleFile := filepath.Join(db.config.GetTrainingDir(), exampleID+fileSuffix)
+			exampleFile := obj.(string)
 			if err := db.loadRow(ctx, exampleFile); err != nil {
-				log.Error(err, "Failed to load example", "file", exampleFile)
+				log.Error(err, "Failed to load example", "uri", exampleFile)
 			}
 		}()
 	}
@@ -192,29 +195,43 @@ func sortIndexes(v mat.Vector, dim int) (indexes []int) {
 
 func (db *InMemoryExampleDB) loadExamples(ctx context.Context) error {
 	log := logs.FromContext(ctx)
-	glob := filepath.Join(db.config.GetTrainingDir(), "*"+fileSuffix)
-	matches, err := filepath.Glob(glob)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to match glob %s", glob)
-	}
 
-	// TODO(jeremy): How should we handle there being no examples?
-	if len(matches) == 0 {
-		return nil
-	}
+	stores := db.config.GetTrainingDirs()
 
-	db.examples = make([]*v1alpha1.Example, 0, len(matches))
-	// We intentionally initialize an initial matrix which is too small so that during the initial load
-	// grow will be triggered. Since we grow by a factor of two we should end up with an overallocated matrix
-	// This means that by default the matrix should contain extra rows that haven't been populated with examples
-	// yet. This way we can verify that doesn't trip up rag
-	db.embeddings = mat.NewDense(int(float32(len(matches))/1.5), oai.SmallEmbeddingsDims, nil)
+	for _, s := range stores {
+		filehelper, err := db.factory.GetDirHelper(s)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to get file helper for %s", s)
+		}
+		glob := filehelper.Join(s, "*"+fileSuffix)
+		matches, err := filehelper.Glob(glob)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to match glob %s", glob)
+		}
 
-	// Load the examples.
-	for _, match := range matches {
-		if err := db.loadRow(ctx, match); err != nil {
-			// Just keep going
-			log.Error(err, "Failed to load example", "file", match)
+		// TODO(jeremy): How should we handle there being no examples?
+		if len(matches) == 0 {
+			continue
+		}
+
+		if db.examples == nil {
+			db.examples = make([]*v1alpha1.Example, 0, len(matches))
+		}
+
+		// We intentionally initialize an initial matrix which is too small so that during the initial load
+		// grow will be triggered. Since we grow by a factor of two we should end up with an overallocated matrix
+		// This means that by default the matrix should contain extra rows that haven't been populated with examples
+		// yet. This way we can verify that doesn't trip up rag
+		if db.embeddings == nil {
+			db.embeddings = mat.NewDense(int(float32(len(matches))/1.5), oai.SmallEmbeddingsDims, nil)
+		}
+
+		// Load the examples.
+		for _, match := range matches {
+			if err := db.loadRow(ctx, match); err != nil {
+				// Just keep going
+				log.Error(err, "Failed to load example", "file", match)
+			}
 		}
 	}
 
@@ -241,7 +258,16 @@ func (db *InMemoryExampleDB) loadRow(ctx context.Context, exampleFile string) er
 	log := logs.FromContext(ctx)
 	log.V(logs.Debug).Info("Loading example", "file", exampleFile)
 
-	raw, err := os.ReadFile(exampleFile)
+	fileHelper, err := db.factory.Get(exampleFile)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get file helper for %s", exampleFile)
+	}
+
+	reader, err := fileHelper.NewReader(exampleFile)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to open file %s", exampleFile)
+	}
+	raw, err := io.ReadAll(reader)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to read file %s", exampleFile)
 	}
