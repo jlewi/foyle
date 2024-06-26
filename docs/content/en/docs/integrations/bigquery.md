@@ -1,6 +1,6 @@
 ---
-title: "Bigquery"
-description: "Bigquery
+title: "BigQuery"
+description: "BigQuery"
 weight: 7
 ---
 
