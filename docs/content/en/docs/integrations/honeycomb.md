@@ -132,24 +132,9 @@ You can do this as follows
 
 * You need to restart chrome with remote debugging enabled
 
-* `hccli` will use the most recent browser window so you need to make sure your most recent browser windo
+* `hccli` will use the most recent browser window so you need to make sure your most recent browser window
     is the one with your Honeycomb credentials. This may not be the case if you have different accounts logged
     into different chrome sessions
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # Reference
 
