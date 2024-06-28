@@ -100,7 +100,8 @@ func Test_InMemoryDB(t *testing.T) {
 		t.Fatalf("Error creating OpenAI client; %v", err)
 	}
 
-	db, err := NewInMemoryExampleDB(*cfg, client)
+	vectorizer := oai.NewVectorizer(client)
+	db, err := NewInMemoryExampleDB(*cfg, vectorizer)
 	if err != nil {
 		t.Fatalf("Error creating learner; %v", err)
 	}

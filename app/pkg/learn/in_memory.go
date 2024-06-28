@@ -6,6 +6,8 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/jlewi/foyle/app/pkg/llms"
+
 	"github.com/jlewi/monogo/files"
 
 	"k8s.io/client-go/util/workqueue"
@@ -16,7 +18,6 @@ import (
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
-	"github.com/sashabaranov/go-openai"
 	"go.uber.org/zap"
 	"gonum.org/v1/gonum/mat"
 	"google.golang.org/protobuf/proto"
@@ -25,8 +26,8 @@ import (
 // InMemoryExampleDB is an in-memory example database.
 // It uses brute force to retrieve examples.
 type InMemoryExampleDB struct {
-	config config.Config
-	client *openai.Client
+	config     config.Config
+	vectorizer llms.Vectorizer
 	// examples stores the examples with the embeddings zeroed out.
 	examples []*v1alpha1.Example
 
@@ -52,16 +53,16 @@ type InMemoryExampleDB struct {
 	factory *files.Factory
 }
 
-func NewInMemoryExampleDB(cfg config.Config, client *openai.Client) (*InMemoryExampleDB, error) {
-	if client == nil {
-		return nil, errors.New("OpenAI client is required")
+func NewInMemoryExampleDB(cfg config.Config, vectorizer llms.Vectorizer) (*InMemoryExampleDB, error) {
+	if vectorizer == nil {
+		return nil, errors.New("Vectorizer client is required")
 	}
 	db := &InMemoryExampleDB{
-		config:  cfg,
-		client:  client,
-		idToRow: make(map[string]int),
-		q:       workqueue.NewDelayingQueue(),
-		factory: &files.Factory{},
+		config:     cfg,
+		vectorizer: vectorizer,
+		idToRow:    make(map[string]int),
+		q:          workqueue.NewDelayingQueue(),
+		factory:    &files.Factory{},
 	}
 
 	if err := db.loadExamples(context.Background()); err != nil {
@@ -79,34 +80,12 @@ func (db *InMemoryExampleDB) GetExamples(ctx context.Context, doc *v1alpha1.Doc,
 		return nil, errors.New("No examples available")
 	}
 
-	log.Info("RAG Query", "query", query)
-	request := openai.EmbeddingRequestStrings{
-		Input:          []string{query},
-		Model:          openai.SmallEmbedding3,
-		User:           "",
-		EncodingFormat: "float",
-	}
-	resp, err := db.client.CreateEmbeddings(ctx, request)
+	// Compute the embedding for the query.
+	qVec, err := db.vectorizer.Embed(ctx, query)
 	if err != nil {
-		return nil, errors.Errorf("Failed to create embeddings")
+		return nil, errors.Wrap(err, "Failed to compute embedding for query")
 	}
 
-	if len(resp.Data) != 1 {
-		return nil, errors.Errorf("Expected exactly 1 embedding but got %d", len(resp.Data))
-	}
-
-	if len(resp.Data[0].Embedding) != oai.SmallEmbeddingsDims {
-		return nil, errors.Errorf("Embeddings have wrong dimension; got %v, want %v", len(resp.Data[0].Embedding), oai.SmallEmbeddingsDims)
-	}
-
-	// TODO(jeremy): Should we refactor this code so its easier to test the similarity computation? i.e
-	// write a unittest that verifies we multiple the matrix by the vector and return the correct matches.
-
-	// Compute the cosine similarity between the query and each example.
-	qVec := mat.NewVecDense(oai.SmallEmbeddingsDims, nil)
-	for i := 0; i < oai.SmallEmbeddingsDims; i++ {
-		qVec.SetVec(i, float64(resp.Data[0].Embedding[i]))
-	}
 	// Acquire a lock on the data so we can safely read it.
 	db.lock.RLock()
 	defer db.lock.RUnlock()
