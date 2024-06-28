@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jlewi/foyle/app/pkg/agent"
-	"github.com/jlewi/foyle/app/pkg/learn"
-	"github.com/jlewi/foyle/app/pkg/oai"
-	"github.com/sashabaranov/go-openai"
+	"github.com/jlewi/foyle/app/pkg/llms"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
+	"github.com/jlewi/foyle/app/pkg/learn"
+	"github.com/jlewi/foyle/app/pkg/oai"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/jlewi/foyle/app/pkg/analyze"
@@ -64,7 +64,8 @@ type App struct {
 
 	analyzer           *analyze.Analyzer
 	learner            *learn.Learner
-	client             *openai.Client
+	vectorizer         llms.Vectorizer
+	completer          llms.Completer
 	inMemoryExamplesDB *learn.InMemoryExampleDB
 }
 
@@ -348,20 +349,34 @@ func (a *App) createComponents() error {
 	}
 	a.learner = learner
 
-	client, err := oai.NewClient(*a.Config)
-	if err != nil {
+	if err := a.setupLLM(); err != nil {
 		return err
 	}
-	a.client = client
 
 	var inMemoryExampleDB *learn.InMemoryExampleDB
 	if learner != nil {
-		inMemoryExampleDB, err = learn.NewInMemoryExampleDB(*a.Config, client)
+		inMemoryExampleDB, err = learn.NewInMemoryExampleDB(*a.Config, a.vectorizer)
 		if err != nil {
 			return err
 		}
 	}
 	a.inMemoryExamplesDB = inMemoryExampleDB
+	return nil
+}
+
+func (a *App) setupLLM() error {
+	client, err := oai.NewClient(*a.Config)
+	if err != nil {
+		return err
+	}
+	a.vectorizer = oai.NewVectorizer(client)
+
+	completer, err := oai.NewCompleter(*a.Config, client)
+	if err != nil {
+		return err
+	}
+
+	a.completer = completer
 	return nil
 }
 
@@ -399,7 +414,7 @@ func (a *App) Serve() error {
 		return err
 	}
 
-	agent, err := agent.NewAgent(*a.Config, a.client, a.inMemoryExamplesDB)
+	agent, err := agent.NewAgent(*a.Config, a.completer, a.inMemoryExamplesDB)
 
 	if err != nil {
 		return err

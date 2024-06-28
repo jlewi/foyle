@@ -145,6 +145,12 @@ func (e *Evaluator) setupAgent(ctx context.Context, agentConfig api.AgentConfig)
 		return nil, err
 	}
 
+	// TODO(jeremy): This will need to be updated when we support other configurations.
+	completer, err := oai.NewCompleter(cfg, client)
+	if err != nil {
+		return nil, err
+	}
+
 	log := logs.FromContext(ctx)
 	log.Info("Creating agen without inMemoryExampleDB", "config", cfg.Agent)
 	if cfg.Agent.RAG != nil && cfg.Agent.RAG.Enabled {
@@ -152,7 +158,7 @@ func (e *Evaluator) setupAgent(ctx context.Context, agentConfig api.AgentConfig)
 	}
 
 	// TODO(jeremy): How should we construct inMemoryExampleDB? In the eval case?
-	agent, err := agent.NewAgent(cfg, client, nil)
+	agent, err := agent.NewAgent(cfg, completer, nil)
 
 	if err != nil {
 		return nil, err

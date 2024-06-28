@@ -75,16 +75,23 @@ func Test_Generate(t *testing.T) {
 		t.Fatalf("Error creating OpenAI client; %v", err)
 	}
 
+	vectorizer := oai.NewVectorizer(client)
+
 	cfg.Agent.RAG = &api.RAGConfig{
 		MaxResults: 3,
 	}
 	cfg.Agent.RAG.Enabled = true
 
-	inMemoryDB, err := learn.NewInMemoryExampleDB(*cfg, client)
+	inMemoryDB, err := learn.NewInMemoryExampleDB(*cfg, vectorizer)
 	if err != nil {
 		t.Fatalf("Error creating in memory DB; %v", err)
 	}
-	agentWithRag, err := NewAgent(*cfg, client, inMemoryDB)
+
+	completer, err := oai.NewCompleter(*cfg, client)
+	if err != nil {
+		t.Fatalf("Error creating completer; %v", err)
+	}
+	agentWithRag, err := NewAgent(*cfg, completer, inMemoryDB)
 
 	if err != nil {
 		t.Fatalf("Error creating agent; %v", err)
@@ -92,7 +99,7 @@ func Test_Generate(t *testing.T) {
 
 	cfgNoRag := cfg.DeepCopy()
 	cfgNoRag.Agent.RAG.Enabled = false
-	agentNoRag, err := NewAgent(cfgNoRag, client, nil)
+	agentNoRag, err := NewAgent(cfgNoRag, completer, nil)
 
 	if err != nil {
 		t.Fatalf("Error creating agent; %v", err)
