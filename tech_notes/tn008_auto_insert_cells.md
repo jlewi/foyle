@@ -1,4 +1,4 @@
-# Multi-Step Workflows
+# Auto Insert Cells
 
 * **Author**: Jeremy Lewi
 * **Last Updated**: 2024-06-30
@@ -6,18 +6,36 @@
 
 ## Objective
 
-* Brainstorm some initial ideas for how we can support multi-step workflows
+* Design to have Foyle automatically and continuously generate suggested cells to insert after the current cell
+  as the user edits a cell in a notebook. 
 
 ## TL;DR
 
-Foyle does a good job of achieving intents which require a single action to achieve; 
-e.g. [generating a Honeycomb query](https://foyle.io/docs/integrations/honeycomb/) or 
-[a BigQuery query](https://foyle.io/docs/integrations/bigquery/). We'd like to extend Foyle to support
-multi-step workflows. This is an initial document to brainstorm some ideas. At a high level there are two approaches
-we could take
+Today Foyle generates a completion when the user explicitly asks for a suggestion by invoking the generate completion
+command. The completion results in new cells which are then inserted after the current cell. 
+We'd like to extend Foyle to automatically and continuously generate suggestions as the user edits a cell in a notebook.
+As a user edits the current cell, Foyle will generate one or more suggested cells to insert after the current cell.
+This cells will be rendered in a manner that makes it clear they are suggestions that haven't been accepted or rejected 
+yet. When the user finishes editing the current cell the suggested cells will be accepted or rejected. 
 
-1. Recursively generate next action prediction to achieve multi-step workflows
-2. Directly learn and predict multi-step workflows
+This feature is very similar to how GitHub Copilot AutoComplete works. The key difference is that we won't try to
+autocomplete the current cell. 
+
+Not requiring users to explicitly ask for a suggestion should improve the Foyle UX. Right now users have to enter
+the intent and then wait while Foyle generates a completion. This interrupts the flow state and requires users to
+explicitly think about asking for help. By auto-inserting suggestions we can mask that latency by generating suggestions
+as soon as a user starts typing and updating those suggestions as the expand the intent. This should also
+create a feedback loop which nudges users to improve the expressiveness of their intents to better steer Foyle.
+
+Since Foyle learns by collecting feedback on completions, auto-generating suggestions increases the opportunity for
+learning and should allow Foyle to get smarter faster.
+
+The UX should also be a bigstep towards assisting with intents that require multiple steps to achieve including
+ones where later steps are conditional on the output of earlier steps. One way achieve multi-step workflows is to
+recursively predict the next action given the original intent and all previous actions and their output. 
+By auto-inserting cells we create a seamless UX for recursively generating next action predictions; all a user
+has to do is accept the suggestion and then execute the code cells; as soon as they do the next action will be automatically
+generated.
 
 ## Motivation: Examples of Multi-Step Workflows
 
@@ -26,7 +44,7 @@ Here are some examples of multi-step workflows.
 ### GitOps Workflows
 
 Suppose we are using GitOps and [Flux](https://fluxcd.io/) and want to determine whether the Foo service is up to
-date. We can this as follows. First we can use `git` to get latest commit of the repository
+date. We can do this as follows. First we can use `git` to get latest commit of the repository
 
 ```bash
 git ls-remote https://github.com/acme/foo.git   
@@ -62,31 +80,32 @@ pod on a GKE cluster can't access a GCS bucket. We might do the following
 2. Use kubectl to get the KSA to identify and get the annotation specifying the GCP service account (GSA)
 3. Use `gcloud policy-troubleshoot iam` to check whether the GSA has the necessary permissions to access the GCS bucket
 
-### Design
+## Motivation: Verbose Responses and Chat Models
 
-Two approaches
-
-1. Recursively generate next action prediction to achieve multi-step workflows
-2. Multi step prediction
-
-TODO: With multi-step prediction how do we update a predicted step if it depends on the output of a previous step?
-One way to do this is with variables. e.g.
+One of the problems with the existing UX is that since we use Chat models to generate completions the completions
+often contain markdown cells before or after the code cells.  These cells correspond to the chat model providing additional
+exposition or context. For example if we use a cell with the text
 
 ```
-REVISION=$(kubectl get kustomization foo -o jsonpath='{.status.lastAppliedRevision}')
+Use gcloud to list the buckets
 ```
 
-Down side of this approach is
-1. As humans we don't benefit from the full output
-2. We can't rely on the AI to parse out the relevant information and insert it into the next command. 
+Foyle inserts two cells
 
-For approach 1 - how do we continuously generate predictions in the background? 
+A markdown cell
 
-We could create a streaming connection to continually push user input changes and get back the predictions.
+```
+To list the buckets using `gcloud`, you can use the following command:
+```
 
+and then a code cell
 
-Ghost Cells I'm not sure we can actually render Ghost cells in vcode notebook UI. But maybe we could just render
-normal cells as a starting point and see how that goes. 
+```bash
+gcloud storage buckets list
+```
+
+The markdown cell is redundant with the previous markdown cell and a user would typically delete it. We'd like
+to create a better UX where the user can more easily accept the suggested code cell and reject the markdown cell.
 
 
 ## UX For Continuous Suggestion
@@ -94,48 +113,36 @@ normal cells as a starting point and see how that goes.
 As the user edits one cell (either markdown or code), we'd like Foyle to be continuously running in the background to 
 generate one or more cells to be inserted after the current cell. This is similar to GitHub Copilot and 
 [Continue.Dev Autocomplete](https://docs.continue.dev/walkthroughs/tab-autocomplete. An important difference
-is that we don't need Foyle to autocomplete the current cell. This should simplify the problem because we don't need
-to check that the completion is still valid after each character is typed into the current cell because we aren't
+is that we don't need Foyle to autocomplete the current cell. This should simplify the problem because 
+* we have more time to generate completions
+  * the completion needs to be ready by the time the user is ready to move onto the next cell rather than before
+    they type the next character
+* we can use larger models and longer context windows since we lave a larger latency budget
+* we don't need to check that the completion is still valid after each character is typed into the current cell because we aren't
 trying to auto complete the word(s) and current cell.
 
 If we mimicked ghost text. The experience might look as follows
 
 * User is editing cell N in the notebook
 * Foyle is continuously running in the background to generate suggested cells N+1,..., N+K
-* The suggested cells are N+1,...,N+k are rendered in the notebook in a manner that makes it clear that they are suggestions
+* The suggested cells N+1,...,N+k are rendered in the notebook in a manner that makes it clear that they are suggestions
   that haven't been accepted or rejected yet
   * Following Ghost Text we could use a grayed out font and different border for the cells 
 * As the user edits cell N, Foyle updates and edits N+1,...,N+K to reflect changes to its suggestions
 * The decision to accept or reject the situation is triggered when the user decides to move onto cell N+1 
-  * At this point the user decides to either accept Foyle's suggested cell N+1 or create a new one.
-  * If the user goes back to a previous cell that should be considered rejecting the suggestion for the cell 
+  * If the user switches focus to the suggested N+1 cell that's considered accepting the suggestion
+  * If the user inserts a new cell that's considered a rejection
+* Each time Foyle generates a new completion it replaces any previous suggestions that haven't been accepted and inserts
+  the new suggested cells
+* When the notebook is persisted unapproved suggestions are pruned and not saved 
 
-I don't know if vscode's APIs make it easy to change the rendering of the suggested cells. For a V0 we can ignore that
-and just use [notebook.Edit](https://github.com/stateful/vscode-runme/blob/686f9f0904d65f061d2a270b8de3ea8a4ede9b0f/src/extension/ai/generate.ts#L110)
-to insert the suggested cells.
+Since every notebook cell is just a TextEditor I think we can use the 
+[TextEditorDecoration API](https://github.com/microsoft/vscode/blob/ea1445cc7016315d0f5728f8e8b12a45dc0a7286/src/vscode-dts/vscode.d.ts#L10521)
+to change how text is rendered in the suggested cells to indicate they are unaccepted suggestions.
 
 We can use [Notebook Cell Metadata](https://github.com/stateful/vscode-runme/blob/686f9f0904d65f061d2a270b8de3ea8a4ede9b0f/src/extension/ai/generate.ts#L95)
-to keep track of cells that are associated with a particular suggestion and need to be accepted or rejected.
-
-I think the [INotebookEditor interface](https://github.com/microsoft/vscode/blob/3581a121d1c05455c5bed4e79973c75ef8b9c6de/src/vs/workbench/contrib/notebook/browser/notebookBrowser.ts#L486)
-defines two events that could be used to trigger code that runs when the user switches the focus away from the current
-cell.
-
-```
-export interface INotebookEditor {
-	...
-	readonly onDidChangeActiveCell: Event<void>;
-	readonly onDidChangeActiveKernel: Event<void>;
-}
-```
-
-<TODO update this based on this thread https://discord.com/channels/1102639988832735374/1258178478910603365/1258195073452216392
-it looks like INotebookEditor is an internal only API but there's an API in there we can hopefully use.>
-
-When this happens we can check if there are any unaccepted suggestions
-and if so delete them. See [Appendix](#vscodeevents) for a snippet generated by Claude for registering event handlers.
-
-To accept the suggestion we could add a hotkey that means `accept suggested cells and switch focus to first code cell in the suggestion`
+to keep track of cells that are associated with a particular suggestion and need to be accepted or rejected. Since
+metadata is just a key value store we can add a boolean "unaccepted" to indicate a cell is still waiting on acceptance.
 
 ## Completion Protocol
 
@@ -156,7 +163,6 @@ message StreamGenerateRequest {
   oneof request {
     FullContext full_context = 1;
     BlockUpdate update = 2;
-    Finish finish = 3;
   }
 }
 
@@ -181,8 +187,8 @@ message StreamGenerateResponse {
 ```
 
 The stream will be initiated by the client sending a `FullContext` message with the full document and the index
-of the current cell that is being edited. Subsequent messages will be `BlockUpdate` containing the full content
-of the current cell.
+of the current cell that is being edited. Subsequent messages will be `BlockUpdate`s containing the full content
+of the current active cell. If its a code cell it will include the outputs if the cell has been executed.
 
 Each `StreamGenerateResponse` will contain a complete copy of the latest suggestion. This is simpler than 
 only sending and applying deltas relative to the previous response. 
@@ -200,6 +206,40 @@ i.e. similar to [workqueue](https://github.com/kubernetes/client-go/blob/master/
 but implemented in TypeScript) to ensure we don't send too many requests to the backend. Each time the cell changes
 we can enqueue an event and update the current contents of the cell. We can then process the events with rate limiting
 enforced. Each time we process an event we'd send the most recent version of the cell contents. 
+
+### Accepting or Rejecting Suggestions
+
+We need a handler to accept or reject the suggestion. If the suggestion is accepted it would
+
+1. Update the metadata on the cells to indicate they are accepted
+2. Change the font rendering to indicate the cells are no longer suggestions
+
+This could work as follows
+
+* A suggested cell is accepted when the user moves the focus to the suggested cell
+  * e.g. by using the arrow keys or mouse 
+  * If we find this a noisy signal we could consider requiring additional signals such as a user executes the code cell
+    or for a markdown cell edits or renders it
+* When the document is persisted any unaccepted suggestions would be pruned and not get persisted
+* Any time a new completion is generated; any unaccepted cells would be deleted and replaced by the new suggested
+  cells
+
+Since each cell is a text editor, we can use 
+[onDidChangeActiveTextEditor](https://github.com/microsoft/vscode/blob/ea1445cc7016315d0f5728f8e8b12a45dc0a7286/src/vscode-dts/vscode.d.ts#L10361)
+to detect when the focus changes to a new cell and check if that cell is a suggestion and accept it if it is.
+
+To prune the suggestions when the document is persisted we can update RunMe's serializer to filter out any unapproved
+cells.
+
+As noted in the motivation section, we'd like to create a better UX for rejecting cells containing verbose markdown
+response. With the proposed UX if a user skips over a suggested cell we could use that to reject earlier cells.
+For example, suppose cell N+1 contains verbose markdown the user doesn't want and N+2 contains useful commands.
+In this case a user might use the arrow keys to quickly switch the focus to N+2. In this case, since the user
+didn't render or execute N+1 we could interpret that as a rejection of N+1 and remove that cell.
+
+The proposal also means the user would almost always see some suggested cells after the current active cell. Ideally, to avoid
+spamming the user with low quality suggestions Foyle would filter out low confidence suggestions and just return
+an empty completion. This would trigger the frontend to remove any current suggestions and show nothing.
 
 ## LLM Completions
 
@@ -227,39 +267,42 @@ As described in [TN002 Learning](tn002_learning.md) and in the blog post
 Currently, Foyle only collects feedback when a user asks for a suggestion. By automatically generating suggestions
 we create more opportunities for learning and should hopefully increase Foyle's learning rate.
 
-The protocol defined in the previous section lets us log the final completion and whether it was accepted or rejected.
-When the user changes the selected cell they must either accept or reject the completion. Using the protocol
-we can send a final `StreamGenerateRequest` which contains
-
-* The final input cell 
-* A `Finish` message indicating whether the completion was accepted or rejected.
-
-Using our existing learning protocol we can then log any executed cells and see if the user modified the completion
-cell.
-
-One of the strongest signals we can collect is when the user rejects the completion. In this case, we'd like to log
-and learn from whatever code cell the user ends up manually entering and executing. Right now Foyle relies on
-[RunMe's Runner Service](https://github.com/stateful/runme/blob/main/pkg/api/proto/runme/runner/v2alpha1/runner.proto#L125)
-to log cell executions. This method only contains the executed cell and not any preceeding cells. We need those
-preceeding cells in order to learn.
-
-The easiest thing to do would be to add to Foyle a logging service such as
+We'd like to log when users accept or reject suggestions. We can introduce a new protocol to log events
 
 ```
-service LogService {/
-  rpc LogSnippet (request LogSnippet) returns (response LogResponse) {}
+service LoggingService {/
+  rpc Log (request LogRequest) returns (response LogResponse) {}
 }
 
-message LogSnippet {
-  repeated Cell cells = 1;
+message LogRequest{
+  repeated CellEvent cell_events = 1;
+}
+
+enum EventType {
+  UNKOWN = 0;
+  ACCEPTED = 1;
+  REJECTED = 2;
+  EXECUTED = 3;
+}
+
+message CellEvent {
+  Cell cell = 1;
+  EventType event_type = 2;
 }
 
 message LogResponse {}
 ```
 
-The frontend could then be instrumented to send a log request anytime a block is executed so we can capture the cells
-preceding the cell that is being executed. Since RunMe assigns a unique ID to each cell we can use that ID to link
-the LogSnippet in Foyle's logs with RunMe's logs which contain information about the cell execution.
+When a cell is accepted or rejected we can use the Log RPC to log it to Foyle. 
+
+One of the strongest signals we can collect is when the user rejects the completion. In this case, we'd like to log
+and learn from whatever code the user ends up manually entering and executing. Right now Foyle relies on
+[RunMe's Runner Service](https://github.com/stateful/runme/blob/main/pkg/api/proto/runme/runner/v2alpha1/runner.proto#L125)
+to log cell executions. This method only contains the executed cell and not any preceeding cells. We need those
+preceeding cells in order to learn. 
+
+Using the proposed logging service we can directly log when a cell is executed and include preceeding cells as
+context so we can retrain Foyle to better predict the code cell in the future.
 
 ## Alternative Designs
 
@@ -276,7 +319,7 @@ is a screen shot illustrating GitHub populating the current cell with Ghost Text
 
 ![GitHub Copilot](copilot_in_notebook.png)
 
-More importantly, the problem we want to use Foyle to solve is turning a higher level expression of intent into
+More importantly, the problem we want Foyle to turn high level expressions of intent into concrete low
 level actions. In this context a user edits a markdown cell to express their intent. The actions are rendered
 as code cells that would come next. So by focusing on generating the next code cells we are scoping the problem
 to focus on generating the actions to accomplish the intent rather than helping users express their intent.
@@ -350,58 +393,3 @@ a TextDocument which we should be able to use to listen for onDidChangeTextDocum
 I think you can register a handler that will fire for changes to any TextDocument change and not just for a particular
 cell. The document URI should use the `vscode-notebook-cell` scheme and allow us to identify the notebook document
 and cell that changed ([code example](https://github.com/microsoft/vscode/blob/6eaf6487a4d8301b981036bfa53976546eb6694f/extensions/vscode-api-tests/src/singlefolder-tests/notebook.document.test.ts#L70)).
-
-## <a id="vscodeevents"> Appendix: Registering vscode event handlers </a>
-
-Here's a snippet generated by Claude for registering a handler for VSCode events about changing the cell focus.
-
-```ts
-import * as vscode from 'vscode';
-
-export function activate(context: vscode.ExtensionContext) {
-    // Get the active notebook editor
-    let activeNotebookEditor = vscode.window.activeNotebookEditor;
-
-    // Function to update the active notebook editor
-    function updateActiveEditor() {
-        activeNotebookEditor = vscode.window.activeNotebookEditor;
-        if (activeNotebookEditor) {
-            // Subscribe to events for the new active editor
-            subscribeToEditorEvents(activeNotebookEditor);
-        }
-    }
-
-    // Subscribe to the change of the active notebook editor
-    context.subscriptions.push(
-        vscode.window.onDidChangeActiveNotebookEditor(() => {
-            updateActiveEditor();
-        })
-    );
-
-    // Initial subscription if there's already an active editor
-    updateActiveEditor();
-}
-
-function subscribeToEditorEvents(editor: vscode.NotebookEditor & INotebookEditor) {
-    // Handle active cell change
-    editor.onDidChangeActiveCell(() => {
-        console.log('Active cell changed');
-        const activeCell = editor.notebook.cellAt(editor.selections[0].start);
-        if (activeCell) {
-            console.log('New active cell index:', editor.notebook.getCellIndex(activeCell));
-            console.log('New active cell type:', activeCell.kind);
-            console.log('New active cell content:', activeCell.document.getText());
-        }
-    });
-
-    // Handle active kernel change
-    editor.onDidChangeActiveKernel(() => {
-        console.log('Active kernel changed');
-        if (editor.kernel) {
-            console.log('New kernel:', editor.kernel.id);
-        } else {
-            console.log('No kernel selected');
-        }
-    });
-}
-```
