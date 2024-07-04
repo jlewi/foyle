@@ -156,7 +156,7 @@ message StreamGenerateRequest {
   oneof request {
     FullContext full_context = 1;
     BlockUpdate update = 2;
-    
+    Finish finish = 3;
   }
 }
 
@@ -168,6 +168,11 @@ message FullContext {
 message BlockUpdate {
   string block_id = 1;
   string block_content = 2;
+}
+
+message Finish {
+    // Indicates whether the completion was accepted or rejected.
+    bool accepted = 1;
 }
 
 message StreamGenerateResponse {
@@ -184,28 +189,104 @@ only sending and applying deltas relative to the previous response.
 
 ## Client Changes
 
-<TODO
-When does the client stream updates to the server?
->
+In vscode we can use the 
+[onDidChangeTextDocument](https://github.com/microsoft/vscode/blob/ea1445cc7016315d0f5728f8e8b12a45dc0a7286/src/vscode-dts/vscode.d.ts#L13448)
+to listen for changes to the a notebook cell (for more detail see [appendix](#vscodebackground)). We can handle
+this event by initializing a streaming connection to the backend to generate suggestions. On subsequent changes
+to the cell we can stream the updated cell contents to the backend to get updated suggestions.
 
-## Server Changes
+We could use a rate limiting queue (
+i.e. similar to [workqueue](https://github.com/kubernetes/client-go/blob/master/util/workqueue/rate_limiting_queue.go)
+but implemented in TypeScript) to ensure we don't send too many requests to the backend. Each time the cell changes
+we can enqueue an event and update the current contents of the cell. We can then process the events with rate limiting
+enforced. Each time we process an event we'd send the most recent version of the cell contents. 
 
-How do we prompt the model
+## LLM Completions
 
+The backend will generate an LLM completion in response to each `StreamGenerateRequest` and then return the response
+in a `StreamGenerateResponse`. This is the simplest thing we can do but could be wasteful as we could end up
+recomputing the completion even if the cell hasn't changed sufficiently to alter the completion. In the future, 
+we could explore more sophisticated strategies for deciding when to compute a new completion. One simple thing
+we could do is
 
+* Tokenize the cell contents into words
+* Assign each word a score measuring its information content `-log(p(w))` where `p(w)` is the probability of the word
+  in the training data.
+* Generate a new completion each time a word with a score above a threshold is added or removed from the cell.
 
+### Multiple completions
 
+Another future direction we could explore is generating multiple completions and then trying to rank them and select
+the best one. Alternatively, we could explore a UX that would make it easy to show multiple completions and let the
+user select the best one.
 
+## Collecting Feedback And Learning
+ 
+As described in [TN002 Learning](tn002_learning.md) and in the blog post 
+[Learning](https://foyle.io/docs/blog/learning/), Foyle relies on implicit human feedback to learn from its mistakes.
+Currently, Foyle only collects feedback when a user asks for a suggestion. By automatically generating suggestions
+we create more opportunities for learning and should hopefully increase Foyle's learning rate.
 
+The protocol defined in the previous section lets us log the final completion and whether it was accepted or rejected.
+When the user changes the selected cell they must either accept or reject the completion. Using the protocol
+we can send a final `StreamGenerateRequest` which contains
 
-## Collecting Feedback
+* The final input cell 
+* A `Finish` message indicating whether the completion was accepted or rejected.
 
-<TODO> We should collect feedback about suggestions that are accepted and rejected. 
+Using our existing learning protocol we can then log any executed cells and see if the user modified the completion
+cell.
 
-## Design Decision Points
+One of the strongest signals we can collect is when the user rejects the completion. In this case, we'd like to log
+and learn from whatever code cell the user ends up manually entering and executing. Right now Foyle relies on
+[RunMe's Runner Service](https://github.com/stateful/runme/blob/main/pkg/api/proto/runme/runner/v2alpha1/runner.proto#L125)
+to log cell executions. This method only contains the executed cell and not any preceeding cells. We need those
+preceeding cells in order to learn.
 
-* Streaming or just multiple requests in the background? 
+The easiest thing to do would be to add to Foyle a logging service such as
 
+```
+service LogService {/
+  rpc LogSnippet (request LogSnippet) returns (response LogResponse) {}
+}
+
+message LogSnippet {
+  repeated Cell cells = 1;
+}
+
+message LogResponse {}
+```
+
+The frontend could then be instrumented to send a log request anytime a block is executed so we can capture the cells
+preceding the cell that is being executed. Since RunMe assigns a unique ID to each cell we can use that ID to link
+the LogSnippet in Foyle's logs with RunMe's logs which contain information about the cell execution.
+
+## Alternative Designs
+
+### Complete the current cell
+
+The current proposal calls for "Auto-Inserting" one or more cells but not autocompleting the current cell. An
+alternative would be to do both simultaneously
+
+* Autocomplete the current cell
+* Auto-Insert one or more cells after the current cell
+
+One of the reasons for not autocompleting the current cell is because GitHub copilot already does that. Below
+is a screen shot illustrating GitHub populating the current cell with Ghost Text containing a possible completion.
+
+![GitHub Copilot](copilot_in_notebook.png)
+
+More importantly, the problem we want to use Foyle to solve is turning a higher level expression of intent into
+level actions. In this context a user edits a markdown cell to express their intent. The actions are rendered
+as code cells that would come next. So by focusing on generating the next code cells we are scoping the problem
+to focus on generating the actions to accomplish the intent rather than helping users express their intent.
+
+By focusing on generating the next cell rather than completing the current cell we can tolerate higher latencies
+for completion generation than in a traditional autocomplete system. In a traditional autocomplete system you
+potentially want to update the completion after each character is typed leading to very tight latency requirements. 
+In the proposal our latency bounds are determined by how long it takes the user to complete the current cell and
+move onto the next cell. We can take advantage of this to use larger models and longer context windows which should
+lead to better suggestions.
 
 ## References
 
@@ -231,6 +312,7 @@ How do we prompt the model
 
 * [VSCode GitHub Chat API](https://code.visualstudio.com/api/extension-guides/chat)
     * I think using the VSCode Chat API to contribute a participant still requires GitHub Copilot
+* [VSCode Extension API](https://github.com/microsoft/vscode/blob/1.91.0/src/vscode-dts/vscode.d.ts#L836)
 * [VSCode Extension Comment Controller Sample](https://github.com/microsoft/vscode-extension-samples/tree/main/comment-sample)
     * VSCode has a comment controller API which could potentially be used to allow commenting on cells as a way of
       interacting with the AI
@@ -247,6 +329,27 @@ One way to handle this is each time you generate a completion you could ask the 
 should represent the most likely completions given the current input. Each additional character can then be used
 to invalidate any suggestions that don't match.
 
+
+### <a id="vscodebackground"> Appendix: VSCode Background
+
+This section provides information about how VSCode extensions and notebooks work. It is relevant for figuring
+out how to implement the extension changes.
+
+In VSCode notebooks each cell is just a discrete text editor 
+([discord thread](https://discord.com/channels/1102639988832735374/1258178478910603365/1258195279677624361).
+VScode's extension API is defined [here](https://github.com/microsoft/vscode/blob/1.91.0/src/vscode-dts/vscode.d.ts#L836).
+
+
+The [onDidChangeTextDocument](https://github.com/microsoft/vscode/blob/ea1445cc7016315d0f5728f8e8b12a45dc0a7286/src/vscode-dts/vscode.d.ts#L13448)
+fires when the text in a document changes. This could be used to trigger the AI to generate suggestions.
+
+As described in [vscode_apis](https://github.com/jlewi/foyle/blob/main/frontend/foyle/vscode_apis.md) Notebooks have
+a data API ((NotebookData, NotebookCellData) and and editor API(NotebookDocument, NotebookCell). NotebookCell contains
+a TextDocument which we should be able to use to listen for onDidChangeTextDocument events.
+
+I think you can register a handler that will fire for changes to any TextDocument change and not just for a particular
+cell. The document URI should use the `vscode-notebook-cell` scheme and allow us to identify the notebook document
+and cell that changed ([code example](https://github.com/microsoft/vscode/blob/6eaf6487a4d8301b981036bfa53976546eb6694f/extensions/vscode-api-tests/src/singlefolder-tests/notebook.document.test.ts#L70)).
 
 ## <a id="vscodeevents"> Appendix: Registering vscode event handlers </a>
 
