@@ -119,7 +119,7 @@ them rather than examples corresponding to mistakes.
 
 ### Why duplicate the documents?
 
-The `${BLOCK_ID}.foyle` files are likely very similar to the actual `.foyle` files the user is created. An alternative
+The `${BLOCK_ID}.foyle` files are likely very similar to the actual `.foyle` files the user created. An alternative
 design would be to just reuse the original `.foyle` documents. This is problematic for several reasons. 
 The `{BLOCK_ID}.foyle` files are best considered internal to Foyle's self-learning and shouldn't be directly under
 the user's control. Under the current proposal the `{BLOCK_ID}.foyle` are generated from logs and represent snapshots
