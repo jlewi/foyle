@@ -1,4 +1,4 @@
-# Auto Insert Cells
+# Automatically Inserting Suggested Cells
 
 * **Author**: Jeremy Lewi
 * **Last Updated**: 2024-06-30
