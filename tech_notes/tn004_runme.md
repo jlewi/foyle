@@ -180,7 +180,7 @@ asking for?
 [Proto definitions](https://github.com/stateful/runme/tree/main/internal/api/runme)
 * [Parser Service](https://github.com/stateful/runme/blob/main/internal/api/runme/parser/v1/parser.proto)   
   * Handles serialization to/from markdown to a notebook
-* [Runner Service](https://github.com/stateful/runme/blob/main/internal/api/runme/runner/v2alpha1/runner.proto)
+* [Runner Service](https://github.com/stateful/runme/blob/main/pkg/api/proto/runme/runner/v2alpha1/runner.proto#L125)
   * Responsible for actually executing commands
 
 [runner/service.go](https://github.com/stateful/runme/blob/main/internal/runner/service.go#L203)
