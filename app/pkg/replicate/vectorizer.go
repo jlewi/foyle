@@ -6,7 +6,6 @@ import (
 	"github.com/go-logr/zapr"
 	"github.com/pkg/errors"
 	"github.com/replicate/replicate-go"
-	repGo "github.com/replicate/replicate-go"
 	"go.uber.org/zap"
 	"gonum.org/v1/gonum/mat"
 )
@@ -15,13 +14,13 @@ const (
 	vectorLength = 1024
 )
 
-func NewVectorizer(client *repGo.Client) (*Vectorizer, error) {
+func NewVectorizer(client *replicate.Client) (*Vectorizer, error) {
 	return &Vectorizer{client: client}, nil
 }
 
 // Vectorizer computes embedding representations of text using models on replicate
 type Vectorizer struct {
-	client *repGo.Client
+	client *replicate.Client
 }
 
 func (v *Vectorizer) Embed(ctx context.Context, text string) (*mat.VecDense, error) {
@@ -40,7 +39,7 @@ func (v *Vectorizer) Embed(ctx context.Context, text string) (*mat.VecDense, err
 		"normalize_embeddings": true,
 	}
 
-	id, err := repGo.ParseIdentifier(modelVersion)
+	id, err := replicate.ParseIdentifier(modelVersion)
 	if err != nil {
 		return nil, err
 	}
