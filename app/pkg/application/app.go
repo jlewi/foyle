@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jlewi/foyle/app/pkg/replicate"
+
 	"github.com/jlewi/foyle/app/pkg/llms"
 
 	"github.com/cockroachdb/pebble"
@@ -371,12 +373,29 @@ func (a *App) setupLLM() error {
 	}
 	a.vectorizer = oai.NewVectorizer(client)
 
-	completer, err := oai.NewCompleter(*a.Config, client)
-	if err != nil {
-		return err
+	switch a.Config.Agent.ModelProvider {
+	case api.ModelProviderReplicate:
+		chatClient, err := replicate.NewChatClient(*a.Config)
+		if err != nil {
+			return err
+		}
+		completer, err := replicate.NewCompleter(*a.Config, chatClient)
+		if err != nil {
+			return err
+		}
+
+		a.completer = completer
+
+	case api.ModelProviderOpenAI:
+		fallthrough
+	default:
+		completer, err := oai.NewCompleter(*a.Config, client)
+		if err != nil {
+			return err
+		}
+		a.completer = completer
 	}
 
-	a.completer = completer
 	return nil
 }
 
