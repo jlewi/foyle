@@ -39,9 +39,9 @@ Foyle uses 2 Models
 
 Replicate provides hosted versions of [meta/llama-3-8b-instruct](https://replicate.com/meta/meta-llama-3-8b-instruct) 
 and [meta/llama-3-8b-instruct](https://replicate.com/meta/meta-llama-3-70b-instruct) which are chat models. Notably,
-these models are kept warm so when you send predictions Replicate doesn't need to boot up new instances leading to
-long latencies. Replicate also provides an [OpenAI proxy](https://lifeboat.replicate.dev/) so you can use the OpenAI
+these models are kept warm so when you send predictions Replicate doesn't need to boot up new instances. 
+Replicate also provides an [OpenAI proxy](https://lifeboat.replicate.dev/) so you can use the OpenAI
 APIs to generate responses.
 
-Unfortunately, Replicate doesn't provide hosted, always versions of the embedding models. So Foyle continues to
+Unfortunately, Replicate doesn't provide hosted, always warms versions of embedding models. So Foyle continues to
 use OpenAI for the embedding models.
