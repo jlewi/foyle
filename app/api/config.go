@@ -1,8 +1,18 @@
 package api
 
+type ModelProvider string
+
+const (
+	ModelProviderReplicate ModelProvider = "replicate"
+	ModelProviderOpenAI    ModelProvider = "openai"
+	ModelProviderDefault   ModelProvider = "openai"
+)
+
 type AgentConfig struct {
 	// Model is the name of the model to use to generate completions
 	Model string `json:"model" yaml:"model"`
+	// ModelProvider is the provider of the model
+	ModelProvider ModelProvider `json:"modelProvider" yaml:"modelProvider"`
 
 	// RAG is the configuration for the RAG model
 	RAG *RAGConfig `json:"rag,omitempty" yaml:"rag,omitempty"`

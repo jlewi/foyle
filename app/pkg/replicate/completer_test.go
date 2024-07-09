@@ -2,10 +2,11 @@ package replicate
 
 import (
 	"context"
-	"github.com/jlewi/foyle/app/pkg/config"
-	"github.com/jlewi/foyle/app/pkg/docs"
 	"os"
 	"testing"
+
+	"github.com/jlewi/foyle/app/pkg/config"
+	"github.com/jlewi/foyle/app/pkg/docs"
 )
 
 func Test_ReplicateCompleter(t *testing.T) {

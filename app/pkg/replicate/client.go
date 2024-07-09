@@ -1,6 +1,8 @@
 package replicate
 
 import (
+	"strings"
+
 	"github.com/go-logr/zapr"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/jlewi/foyle/app/pkg/config"
@@ -9,7 +11,6 @@ import (
 	repGo "github.com/replicate/replicate-go"
 	"github.com/sashabaranov/go-openai"
 	"go.uber.org/zap"
-	"strings"
 )
 
 const (

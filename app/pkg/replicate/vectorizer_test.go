@@ -2,9 +2,10 @@ package replicate
 
 import (
 	"context"
-	"github.com/jlewi/foyle/app/pkg/config"
 	"os"
 	"testing"
+
+	"github.com/jlewi/foyle/app/pkg/config"
 )
 
 func TestVectorizer_Embed(t *testing.T) {

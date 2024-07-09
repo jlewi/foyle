@@ -3,6 +3,7 @@ package replicate
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/go-logr/zapr"
 	"github.com/pkg/errors"
 	"github.com/replicate/replicate-go"
@@ -18,7 +19,10 @@ func NewVectorizer(client *replicate.Client) (*Vectorizer, error) {
 	return &Vectorizer{client: client}, nil
 }
 
-// Vectorizer computes embedding representations of text using models on replicate
+// Vectorizer computes embedding representations of text using models on replicate.
+//
+// N.B This uses the model replicate/retriever-embeddings which isn't kept warm so latencies are very high.
+// Therefore the recommendation is to not use Replicate for embeddings but continue to use OpenAI.
 type Vectorizer struct {
 	client *replicate.Client
 }
@@ -53,7 +57,9 @@ func (v *Vectorizer) Embed(ctx context.Context, text string) (*mat.VecDense, err
 		return nil, err
 	}
 
-	err = v.client.Wait(ctx, prediction)
+	if err = v.client.Wait(ctx, prediction); err != nil {
+		return nil, err
+	}
 
 	if prediction.Status != "succeeded" {
 		log.Error(errors.New("Prediction failed"), "Prediction failed", "prediction", prediction)
