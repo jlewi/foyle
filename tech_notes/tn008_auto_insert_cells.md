@@ -405,17 +405,11 @@ to invalidate any suggestions that don't match.
 This section provides information about how VSCode extensions and notebooks work. It is relevant for figuring
 out how to implement the extension changes.
 
-In VSCode notebooks each cell is just a discrete text editor 
-<<<<<<< HEAD
+In VSCode notebooks each cell is just a discrete text editor
 ([discord thread](https://discord.com/channels/1102639988832735374/1258178478910603365/1258195279677624361)).
 VScode's extension API is defined [here](https://github.com/microsoft/vscode/blob/1.91.0/src/vscode-dts/vscode.d.ts#L836).
 
-=======
-([discord thread](https://discord.com/channels/1102639988832735374/1258178478910603365/1258195279677624361).
-VScode's extension API is defined [here](https://github.com/microsoft/vscode/blob/1.91.0/src/vscode-dts/vscode.d.ts#L836).
 
-
->>>>>>> origin/main
 The [onDidChangeTextDocument](https://github.com/microsoft/vscode/blob/ea1445cc7016315d0f5728f8e8b12a45dc0a7286/src/vscode-dts/vscode.d.ts#L13448)
 fires when the text in a document changes. This could be used to trigger the AI to generate suggestions.
 
@@ -426,13 +420,8 @@ a TextDocument which we should be able to use to listen for onDidChangeTextDocum
 I think you can register a handler that will fire for changes to any TextDocument change and not just for a particular
 cell. The document URI should use the `vscode-notebook-cell` scheme and allow us to identify the notebook document
 and cell that changed ([code example](https://github.com/microsoft/vscode/blob/6eaf6487a4d8301b981036bfa53976546eb6694f/extensions/vscode-api-tests/src/singlefolder-tests/notebook.document.test.ts#L70)).
-<<<<<<< HEAD
 
 ### TextDecorations
 
 TextDecorations are properties of TextEditors. Each NotebookCell is a different TextEditor. TextEditors get
 created for a NotebookCell when the cell becomes visible and can be destroyed when the cell is deleted. 
-
-
-=======
->>>>>>> origin/main
