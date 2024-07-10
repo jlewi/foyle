@@ -61,7 +61,7 @@ Lets try installing and reinstalling it
 ```
 
 ```bash {"id":"01HY75KYKE3SFAM5EXMDAVJDTQ"}
-echo "hello world"
+echo "hello world"sdfds
 ```
 
 ## Debugging the Runme Extension in vscode

@@ -241,6 +241,33 @@ The proposal also means the user would almost always see some suggested cells af
 spamming the user with low quality suggestions Foyle would filter out low confidence suggestions and just return
 an empty completion. This would trigger the frontend to remove any current suggestions and show nothing.
 
+## Ghost Cells In VSCode
+
+We'd like to render cells in VSCode so as to make it apparent they are suggestions. An obvious way to represent
+a Ghost Cell would be to render its contents using GhostText; i.e. greyed out text.
+
+In VScode the NotebookDocument and NotebookCell correspond to the in memory data representation of the notebook.
+Importantly, these APIs don't represent the visual representation of the notebook. Each NotebookCell contains
+a TextDocument representing the actual contents of the cell.
+
+A TextEditor is the visual representation of a cell. Each TextEditor has a TextDocument. `TextEditor.setDecorations`
+can be used to change how text is rendered in a TextEditor. We can use `setDecorations` to change how the contents
+of a TextEditor are rendered.
+
+TextEditors aren't guaranteed to exist for all cells in a notebook. A TextEditor is created when a cell becomes visible
+and can be destroyed when the cell is no longer visible.
+
+So we can render Ghost cells as follows
+
+1. Use metadata in `NotebookCell` to indicate that a cell is a suggestion and should be rendered as a GhostCell
+   * This will persist even if the cell isn't visible
+1. Use the `onDidChangeVisibleTextEditors` to respond whenever a TextEditor is created or becomes vibile 
+1. From the `TextEditor` passed to the `onDidChangeVisibleTextEditors` handler get the URI of the `TextDocument`
+   * This URI should uniquely identify the cell
+1. Use the URI to find the corresponding `NotebookCell`
+1. Determine if the cell is a GhostCell by looking at the metadata of the cell
+1. If the cell is a GhostCell use ` vscode.window.createTextEditorDecorationType` to render the cell as a GhostCell
+
 ## LLM Completions
 
 The backend will generate an LLM completion in response to each `StreamGenerateRequest` and then return the response
@@ -378,8 +405,8 @@ to invalidate any suggestions that don't match.
 This section provides information about how VSCode extensions and notebooks work. It is relevant for figuring
 out how to implement the extension changes.
 
-In VSCode notebooks each cell is just a discrete text editor 
-([discord thread](https://discord.com/channels/1102639988832735374/1258178478910603365/1258195279677624361).
+In VSCode notebooks each cell is just a discrete text editor
+([discord thread](https://discord.com/channels/1102639988832735374/1258178478910603365/1258195279677624361)).
 VScode's extension API is defined [here](https://github.com/microsoft/vscode/blob/1.91.0/src/vscode-dts/vscode.d.ts#L836).
 
 
@@ -393,3 +420,8 @@ a TextDocument which we should be able to use to listen for onDidChangeTextDocum
 I think you can register a handler that will fire for changes to any TextDocument change and not just for a particular
 cell. The document URI should use the `vscode-notebook-cell` scheme and allow us to identify the notebook document
 and cell that changed ([code example](https://github.com/microsoft/vscode/blob/6eaf6487a4d8301b981036bfa53976546eb6694f/extensions/vscode-api-tests/src/singlefolder-tests/notebook.document.test.ts#L70)).
+
+### TextDecorations
+
+TextDecorations are properties of TextEditors. Each NotebookCell is a different TextEditor. TextEditors get
+created for a NotebookCell when the cell becomes visible and can be destroyed when the cell is deleted. 
