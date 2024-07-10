@@ -57,6 +57,8 @@ type Config struct {
 	Eval *EvalConfig `json:"eval,omitempty" yaml:"eval,omitempty"`
 
 	Learner *LearnerConfig `json:"learner,omitempty" yaml:"learner,omitempty"`
+
+	Replicate *ReplicateConfig `json:"replicate,omitempty" yaml:"replicate,omitempty"`
 }
 
 type LearnerConfig struct {
@@ -101,6 +103,11 @@ type OpenAIConfig struct {
 
 	// BaseURL is the baseURL for the API.
 	BaseURL string `json:"baseURL" yaml:"baseURL"`
+}
+
+type ReplicateConfig struct {
+	// APIKeyFile is the path to the file containing the API key
+	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
 }
 
 type AzureOpenAIConfig struct {
