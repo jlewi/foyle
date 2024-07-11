@@ -25,6 +25,14 @@ plugins:
       # because our vscode extension is relying on transpilation from typescript to js.
       - import_extension=none
     out: ../frontend/foyle/src/gen
+  # Generate connect typescript client
+  # TODO(jeremy): We aren't actually using this I did it because I wanted to look at the generated clients for
+  # a streaming service.
+  - plugin: connect-es
+    # TODO not sure if this is what we'd want
+    out: ../frontend/foyle/src/gen
+    opt: target=ts
+
   - name: zap-marshaler
     out: go/
     opt: paths=source_relative
