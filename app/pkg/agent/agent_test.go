@@ -251,7 +251,9 @@ func setupAndRunServer(addr string, a *Agent) error {
 	mux.Handle(path, handler)
 
 	srv := &http.Server{
-		Addr:    addr,
+		Addr: addr,
+		// NB that we are using h2c here to support HTTP/2 without TLS
+		// bidirectional streaming requires HTTP/2
 		Handler: h2c.NewHandler(mux, &http2.Server{}),
 	}
 

@@ -3,13 +3,16 @@ package application
 import (
 	"connectrpc.com/connect"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/net/http2"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"testing"
@@ -143,16 +146,17 @@ func waitForServer(addr string) error {
 func runClient(baseURL string) error {
 	log := zapr.NewLogger(zap.L())
 	client := v1alpha1connect.NewAIServiceClient(
-		http.DefaultClient,
-		//&http.Client{
-		//	Transport: &http2.Transport{
-		//		AllowHTTP: true,
-		//		DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-		//			// Use the standard Dial function to create a plain TCP connection
-		//			return net.Dial(network, addr)
-		//		},
-		//	},
-		//},
+		// N.B. We need to use HTTP2 if we want to support bidirectional streaming
+		//http.DefaultClient,
+		&http.Client{
+			Transport: &http2.Transport{
+				AllowHTTP: true,
+				DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+					// Use the standard Dial function to create a plain TCP connection
+					return net.Dial(network, addr)
+				},
+			},
+		},
 		baseURL,
 	)
 

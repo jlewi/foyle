@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"time"
 
 	"github.com/cockroachdb/pebble"
@@ -406,8 +408,11 @@ func (s *Server) Run() error {
 	hServer := &http.Server{
 		WriteTimeout: s.config.Server.HttpMaxWriteTimeout,
 		ReadTimeout:  s.config.Server.HttpMaxReadTimeout,
-		Handler:      s.engine,
+		// We need to wrap it in h2c to support HTTP/2 without TLS
+		Handler: h2c.NewHandler(s.engine, &http2.Server{}),
 	}
+	// Enable HTTP/2 support
+	http2.ConfigureServer(hServer, &http2.Server{})
 
 	s.hServer = hServer
 
