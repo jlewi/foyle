@@ -237,6 +237,11 @@ func (s *Server) createGinEngine() error {
 	// Refer to https://connectrpc.com/docs/go/routing#prefixing-routes. Note that grpc-go clients don't
 	// support prefixes.
 	router.Any(apiPrefix+"/"+path+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, handler)))
+
+	generatePath, generateHandler := v1alpha1connect.NewAIServiceHandler(s.agent)
+	log.Info("Setting up generate service", "path", apiPrefix+"/"+generatePath)
+	router.Any(apiPrefix+"/"+generatePath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, generateHandler)))
+
 	s.engine = router
 
 	// Setup the logs viewer

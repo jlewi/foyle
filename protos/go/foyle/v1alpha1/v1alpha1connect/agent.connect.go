@@ -25,6 +25,8 @@ const (
 	GenerateServiceName = "GenerateService"
 	// ExecuteServiceName is the fully-qualified name of the ExecuteService service.
 	ExecuteServiceName = "ExecuteService"
+	// AIServiceName is the fully-qualified name of the AIService service.
+	AIServiceName = "AIService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -40,6 +42,11 @@ const (
 	GenerateServiceGenerateProcedure = "/GenerateService/Generate"
 	// ExecuteServiceExecuteProcedure is the fully-qualified name of the ExecuteService's Execute RPC.
 	ExecuteServiceExecuteProcedure = "/ExecuteService/Execute"
+	// AIServiceStreamGenerateProcedure is the fully-qualified name of the AIService's StreamGenerate
+	// RPC.
+	AIServiceStreamGenerateProcedure = "/AIService/StreamGenerate"
+	// AIServiceSimpleProcedure is the fully-qualified name of the AIService's Simple RPC.
+	AIServiceSimpleProcedure = "/AIService/Simple"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -48,6 +55,9 @@ var (
 	generateServiceGenerateMethodDescriptor = generateServiceServiceDescriptor.Methods().ByName("Generate")
 	executeServiceServiceDescriptor         = v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("ExecuteService")
 	executeServiceExecuteMethodDescriptor   = executeServiceServiceDescriptor.Methods().ByName("Execute")
+	aIServiceServiceDescriptor              = v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("AIService")
+	aIServiceStreamGenerateMethodDescriptor = aIServiceServiceDescriptor.Methods().ByName("StreamGenerate")
+	aIServiceSimpleMethodDescriptor         = aIServiceServiceDescriptor.Methods().ByName("Simple")
 )
 
 // GenerateServiceClient is a client for the GenerateService service.
@@ -188,4 +198,102 @@ type UnimplementedExecuteServiceHandler struct{}
 
 func (UnimplementedExecuteServiceHandler) Execute(context.Context, *connect.Request[v1alpha1.ExecuteRequest]) (*connect.Response[v1alpha1.ExecuteResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ExecuteService.Execute is not implemented"))
+}
+
+// AIServiceClient is a client for the AIService service.
+type AIServiceClient interface {
+	// StreamGenerate is a bidirectional streaming RPC for generating completions
+	StreamGenerate(context.Context) *connect.BidiStreamForClient[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]
+	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
+	Simple(context.Context, *connect.Request[v1alpha1.StreamGenerateRequest]) (*connect.Response[v1alpha1.StreamGenerateResponse], error)
+}
+
+// NewAIServiceClient constructs a client for the AIService service. By default, it uses the Connect
+// protocol with the binary Protobuf Codec, asks for gzipped responses, and sends uncompressed
+// requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
+// connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) AIServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	return &aIServiceClient{
+		streamGenerate: connect.NewClient[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse](
+			httpClient,
+			baseURL+AIServiceStreamGenerateProcedure,
+			connect.WithSchema(aIServiceStreamGenerateMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		simple: connect.NewClient[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse](
+			httpClient,
+			baseURL+AIServiceSimpleProcedure,
+			connect.WithSchema(aIServiceSimpleMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// aIServiceClient implements AIServiceClient.
+type aIServiceClient struct {
+	streamGenerate *connect.Client[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]
+	simple         *connect.Client[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]
+}
+
+// StreamGenerate calls AIService.StreamGenerate.
+func (c *aIServiceClient) StreamGenerate(ctx context.Context) *connect.BidiStreamForClient[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse] {
+	return c.streamGenerate.CallBidiStream(ctx)
+}
+
+// Simple calls AIService.Simple.
+func (c *aIServiceClient) Simple(ctx context.Context, req *connect.Request[v1alpha1.StreamGenerateRequest]) (*connect.Response[v1alpha1.StreamGenerateResponse], error) {
+	return c.simple.CallUnary(ctx, req)
+}
+
+// AIServiceHandler is an implementation of the AIService service.
+type AIServiceHandler interface {
+	// StreamGenerate is a bidirectional streaming RPC for generating completions
+	StreamGenerate(context.Context, *connect.BidiStream[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]) error
+	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
+	Simple(context.Context, *connect.Request[v1alpha1.StreamGenerateRequest]) (*connect.Response[v1alpha1.StreamGenerateResponse], error)
+}
+
+// NewAIServiceHandler builds an HTTP handler from the service implementation. It returns the path
+// on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	aIServiceStreamGenerateHandler := connect.NewBidiStreamHandler(
+		AIServiceStreamGenerateProcedure,
+		svc.StreamGenerate,
+		connect.WithSchema(aIServiceStreamGenerateMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	aIServiceSimpleHandler := connect.NewUnaryHandler(
+		AIServiceSimpleProcedure,
+		svc.Simple,
+		connect.WithSchema(aIServiceSimpleMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/AIService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case AIServiceStreamGenerateProcedure:
+			aIServiceStreamGenerateHandler.ServeHTTP(w, r)
+		case AIServiceSimpleProcedure:
+			aIServiceSimpleHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedAIServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedAIServiceHandler struct{}
+
+func (UnimplementedAIServiceHandler) StreamGenerate(context.Context, *connect.BidiStream[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("AIService.StreamGenerate is not implemented"))
+}
+
+func (UnimplementedAIServiceHandler) Simple(context.Context, *connect.Request[v1alpha1.StreamGenerateRequest]) (*connect.Response[v1alpha1.StreamGenerateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("AIService.Simple is not implemented"))
 }

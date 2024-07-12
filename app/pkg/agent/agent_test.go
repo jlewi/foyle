@@ -2,8 +2,20 @@ package agent
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
+	"github.com/go-logr/zapr"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
+	"github.com/pkg/errors"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
+	"io"
+	"net"
+	"net/http"
 	"os"
+	"os/signal"
 	"testing"
+	"time"
 
 	"github.com/jlewi/foyle/app/pkg/learn"
 
@@ -124,4 +136,130 @@ func Test_Generate(t *testing.T) {
 			t.Logf("Response: %+v", resp)
 		})
 	}
+}
+
+func Test_Streaming(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") != "" {
+		t.Skipf("Test is skipped in GitHub actions")
+	}
+
+	// Setup logs
+	c := zap.NewDevelopmentConfig()
+	newLog, err := c.Build()
+	if err != nil {
+		t.Fatalf("Error creating logger; %v", err)
+	}
+	zap.ReplaceGlobals(newLog)
+	log := zapr.NewLogger(newLog)
+	// This is code to help us test streaming with the connect protocol
+	a := &Agent{}
+
+	addr := "localhost:8088"
+	go func() {
+		if err := setupAndRunServer(addr, a); err != nil {
+			log.Error(err, "Error running server")
+		}
+	}()
+
+	// N.B. There's probably a race condition here because the client might start before the server is fully up.
+	// Or maybe that's implicitly handled because the connection won't succeed until the server is up?
+
+	log.Info("Server started")
+	runClient(addr)
+}
+
+func runClient(addr string) {
+	log := zapr.NewLogger(zap.L())
+	baseURL := fmt.Sprintf("http://%s", addr)
+	client := v1alpha1connect.NewAIServiceClient(
+		&http.Client{
+			Transport: &http2.Transport{
+				AllowHTTP: true,
+				DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+					// Use the standard Dial function to create a plain TCP connection
+					return net.Dial(network, addr)
+				},
+			},
+		},
+		baseURL,
+	)
+
+	ctx := context.Background()
+	stream := client.StreamGenerate(ctx)
+
+	// Send requests
+	requests := []string{"Hello", "How are you?", "Goodbye"}
+	for _, prompt := range requests {
+
+		req := &v1alpha1.StreamGenerateRequest{
+			Request: &v1alpha1.StreamGenerateRequest_Update{
+				Update: &v1alpha1.BlockUpdate{
+					BlockId:      "1234",
+					BlockContent: prompt,
+				},
+			},
+		}
+		err := stream.Send(req)
+
+		if err != nil {
+			log.Error(err, "Failed to send request")
+		}
+		fmt.Printf("Sent request: %s\n", prompt)
+	}
+
+	// Signal that we're done sending
+	if err := stream.CloseRequest(); err != nil {
+		log.Error(err, "Failed to close request stream: %v")
+	}
+
+	// Receive responses
+	for {
+		response, err := stream.Receive()
+		if errors.Is(err, io.EOF) {
+			fmt.Println("Stream closed")
+			break
+		}
+		if err != nil {
+			log.Error(err, "Failed to receive response")
+		}
+		log.Info("Received response", "response", response)
+	}
+}
+
+func setupAndRunServer(addr string, a *Agent) error {
+	log := zapr.NewLogger(zap.L())
+	mux := http.NewServeMux()
+	path, handler := v1alpha1connect.NewAIServiceHandler(a)
+	mux.Handle(path, handler)
+
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: h2c.NewHandler(mux, &http2.Server{}),
+	}
+
+	// Graceful shutdown setup
+	idleConnsClosed := make(chan struct{})
+	go func() {
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, os.Interrupt)
+		<-sigint
+
+		log.Info("Shutting down server...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Info("HTTP server Shutdown: %v", err)
+		}
+		close(idleConnsClosed)
+	}()
+
+	log.Info("Server starting on ", "address", addr)
+	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		return err
+	}
+
+	<-idleConnsClosed
+	log.Info("Server stopped")
+	return nil
 }

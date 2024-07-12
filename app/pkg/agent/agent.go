@@ -1,7 +1,11 @@
 package agent
 
 import (
+	"connectrpc.com/connect"
 	"context"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
+	"google.golang.org/protobuf/encoding/protojson"
+	"io"
 	"strings"
 
 	"github.com/jlewi/foyle/app/pkg/llms"
@@ -38,6 +42,7 @@ const (
 // Agent is the agent.
 type Agent struct {
 	v1alpha1.UnimplementedGenerateServiceServer
+	v1alpha1connect.UnimplementedAIServiceHandler
 	completer llms.Completer
 	config    config.Config
 	db        *learn.InMemoryExampleDB
@@ -157,4 +162,72 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 	err := errors.Errorf("Failed to generate a chat completion after %d tries", maxTries)
 	log.Error(err, "Failed to generate a chat completion", "maxTries", maxTries)
 	return nil, err
+}
+
+func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]) error {
+	log := logs.FromContext(ctx)
+	log.Info("Agent.StreamGenerate")
+	for {
+		req, err := stream.Receive()
+
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				// The client has closed the stream
+				log.Info("Client closed the stream")
+				return nil
+			}
+			if errors.Is(err, context.Canceled) {
+				// The context was cancelled (e.g., client disconnected)
+				log.Info("Stream context cancelled")
+				return nil
+			}
+			// Some other error occurred
+			log.Error(err, "Error receiving from stream")
+			return err
+		}
+
+		b, err := protojson.Marshal(req)
+		if err != nil {
+			log.Error(err, "Failed to marshal request")
+			return err
+		}
+		// Process the request and generate a response
+		// This is where you'd implement your AI logic
+		response := &v1alpha1.StreamGenerateResponse{
+			// Fill in the response fields based on your protobuf definition
+			Blocks: []*v1alpha1.Block{
+				{
+					Contents: "Generated text based on: " + string(b),
+				},
+			},
+		}
+
+		if err := stream.Send(response); err != nil {
+			return err
+		}
+	}
+}
+
+func (a *Agent) Simple(ctx context.Context, req *connect.Request[v1alpha1.StreamGenerateRequest]) (*connect.Response[v1alpha1.StreamGenerateResponse], error) {
+	log := logs.FromContext(ctx)
+	log.Info("Agent.Simple")
+
+	b, err := protojson.Marshal(req.Msg)
+	if err != nil {
+		log.Error(err, "Failed to marshal request")
+		return nil, err
+	}
+	// Process the request and generate a response
+	// This is where you'd implement your AI logic
+	response := &v1alpha1.StreamGenerateResponse{
+		// Fill in the response fields based on your protobuf definition
+		Blocks: []*v1alpha1.Block{
+			{
+				Contents: "Generated text based on: " + string(b),
+			},
+		},
+	}
+	res := connect.NewResponse(response)
+	res.Header().Set("AIService-Version", "v1alpha1")
+	return res, nil
 }

@@ -58,6 +58,9 @@ service ExecuteService {
 service AIService {
   // StreamGenerate is a bidirectional streaming RPC for generating completions
   rpc StreamGenerate (stream StreamGenerateRequest) returns (stream StreamGenerateResponse) {}
+
+  // N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
+  rpc Simple(StreamGenerateRequest) returns (StreamGenerateResponse) {}
 }
 
 message StreamGenerateRequest {
