@@ -367,6 +367,16 @@ func InitViper(cmd *cobra.Command) error {
 	return nil
 }
 
+func (c *Config) APIPrefix() string {
+	// N.B. don't include leading or trailing slashes in the prefix because the code in server.go assumes there isn't any
+	return "api"
+}
+
+// APIBaseURL returns the base URL for the API
+func (c *Config) APIBaseURL() string {
+	return fmt.Sprintf("http://%s:%d/%s", c.Server.BindAddress, c.Server.HttpPort, c.APIPrefix())
+}
+
 // GetConfig returns a configuration created from the viper configuration.
 func GetConfig() *Config {
 	// We do this as a way to load the configuration while still allowing values to be overwritten by viper

@@ -113,6 +113,10 @@ func (s *Server) createGinEngine() error {
 	router := gin.Default()
 
 	router.GET("/healthz", s.healthCheck)
+	router.NoRoute(func(c *gin.Context) {
+		log.Info("Request for not found path", "path", c.Request.URL.Path)
+		c.JSON(http.StatusNotFound, gin.H{"message": "Not found", "path": c.Request.URL.Path})
+	})
 
 	// Serve the static assets for vscode.
 	// There should be several directories located in ${ASSETS_DIR}/vscode
@@ -224,10 +228,9 @@ func (s *Server) createGinEngine() error {
 		router.Use(corsMiddleWare)
 	}
 
-	// N.B. don't include leading or trailing slashes in the prefix because the code below assumes there isn't any
-	apiPrefix := "api"
 	// Add REST handlers for blocklogs
 	// TODO(jeremy): We should probably standardize on connect-rpc
+	apiPrefix := s.config.APIPrefix()
 	router.GET(apiPrefix+"/blocklogs/:id", s.logsCrud.GetBlockLog)
 
 	// Set  up the connect-rpc handlers for the EvalServer
@@ -571,7 +574,7 @@ func (s *Server) healthCheck(ctx *gin.Context) {
 		"grpcConnectionState": connState.String(),
 	}
 	code := http.StatusOK
-	if connState != connectivity.Ready {
+	if connState != connectivity.Ready && connState != connectivity.Idle {
 		d["status"] = "unhealthy"
 		code = http.StatusServiceUnavailable
 	}

@@ -485,7 +485,8 @@ func findLogFiles(ctx context.Context, logsDir string) ([]string, error) {
 	paths := map[string]bool{}
 
 	if _, err := os.Stat(logsDir); err != nil && os.IsNotExist(err) {
-		return jsonFiles, fmt.Errorf("Analyze invoked for non-existent path: %v", logsDir)
+
+		return jsonFiles, errors.WithStack(fmt.Errorf("Analyze invoked for non-existent path: %v", logsDir))
 	}
 
 	// Walk the directory and add all JSON files.

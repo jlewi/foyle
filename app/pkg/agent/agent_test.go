@@ -163,11 +163,29 @@ func Test_Streaming(t *testing.T) {
 
 	// N.B. There's probably a race condition here because the client might start before the server is fully up.
 	// Or maybe that's implicitly handled because the connection won't succeed until the server is up?
-
+	if err := waitForServer(addr); err != nil {
+		t.Fatalf("Error waiting for server; %v", err)
+	}
 	log.Info("Server started")
 	runClient(addr)
 }
 
+func waitForServer(addr string) error {
+	endTime := time.Now().Add(30 * time.Second)
+	wait := 2 * time.Second
+	for time.Now().Before(endTime) {
+		resp, err := http.Get(fmt.Sprintf("http://%s/healthz", addr))
+		if err != nil {
+			time.Sleep(wait)
+			continue
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			return nil
+		}
+	}
+	return errors.Errorf("Server didn't start in time")
+}
 func runClient(addr string) {
 	log := zapr.NewLogger(zap.L())
 	baseURL := fmt.Sprintf("http://%s", addr)
