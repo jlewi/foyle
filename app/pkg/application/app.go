@@ -567,8 +567,10 @@ func (a *App) Shutdown() error {
 	l := zap.L()
 	log := zapr.NewLogger(l)
 
-	if err := a.analyzer.Shutdown(context.Background()); err != nil {
-		log.Error(err, "Error shutting down analyzer")
+	if a.analyzer != nil {
+		if err := a.analyzer.Shutdown(context.Background()); err != nil {
+			log.Error(err, "Error shutting down analyzer")
+		}
 	}
 
 	// Analyzer should be shutdown before the learner because analyzer tries to enqueue learner items
