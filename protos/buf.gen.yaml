@@ -32,7 +32,13 @@ plugins:
   # TODO(jeremy): We aren't actually using this I did it because I wanted to look at the generated clients for
   # a streaming service.
   - plugin: connect-es
-    opt: target=ts
+    opt:
+      - target=ts
+      # see
+      # https://github.com/bufbuild/protobuf-es/tree/main/packages/protoc-gen-es#import_extensionjs
+      # By default buf generates imports with js extensions which doesn't work with our vscode extension
+      # because our vscode extension is relying on transpilation from typescript to js.
+      - import_extension=none
     #out: ../frontend/foyle/src/gen
     # nb: THis is a hack as a way of getting the generated client into the vscode-runme directory
     # Normally the generated code is pulled into vscode-runme by creating a buf package from the generated code

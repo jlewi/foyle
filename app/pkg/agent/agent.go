@@ -191,6 +191,9 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 			log.Error(err, "Failed to marshal request")
 			return err
 		}
+
+		// TODO(jeremy): Get rid of this its only for debugging.
+		log.Info("Received request", "request", string(b))
 		// Process the request and generate a response
 		// This is where you'd implement your AI logic
 		response := &v1alpha1.StreamGenerateResponse{

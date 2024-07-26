@@ -218,6 +218,9 @@ func (x *ExecuteResponse) GetOutputs() []*BlockOutput {
 	return nil
 }
 
+// TODO(jeremy): We should probably be using RunMe Notebook and Cell protos
+// https://github.com/stateful/runme/blob/9658f77dde406abc775fd3f1eb249b5a06e20f4f/pkg/api/proto/runme/ai/v1alpha1/ai.proto#L9
+// Because the primary client will be RunMe and we will want to send vscode data structures rather than our own.
 type StreamGenerateRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
