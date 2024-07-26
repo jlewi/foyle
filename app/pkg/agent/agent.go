@@ -167,9 +167,19 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]) error {
 	log := logs.FromContext(ctx)
 	log.Info("Agent.StreamGenerate")
+	notebookUri := ""
+	var selectedCell int32
 	for {
 		req, err := stream.Receive()
 
+		if req.GetFullContext() != nil {
+			log.Info("Received full context", "context", req.GetFullContext())
+			if req.GetFullContext().GetNotebookUri() != "" {
+				notebookUri = req.GetFullContext().GetNotebookUri()
+			}
+
+			selectedCell = req.GetFullContext().GetSelected()
+		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				// The client has closed the stream
@@ -203,8 +213,11 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					Contents: "Generated text based on: " + string(b),
 				},
 			},
-		}
 
+			NotebookUri: notebookUri,
+			InsertAt:    selectedCell + 1,
+		}
+		log.Info("Sending response", "notebook", response.GetNotebookUri(), "insertAt", response.GetInsertAt(), "numBlocks", len(response.GetBlocks()))
 		if err := stream.Send(response); err != nil {
 			return err
 		}

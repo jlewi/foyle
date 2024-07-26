@@ -75,7 +75,9 @@ message StreamGenerateRequest {
 
 message FullContext {
   Doc doc = 1;
+  // TODO(jeremy): Should we move selected and notebook_uri out of the full_context and into the StreamGenerateRequest?
   int32 selected = 2;
+  string notebook_uri = 3;
 }
 
 message BlockUpdate {
@@ -90,4 +92,13 @@ message Finish {
 
 message StreamGenerateResponse {
   repeated Block blocks = 1;
+
+  // Each response should include the information to identify the notebook and cell where it should be inserted.
+  // TODO(jeremy): Should we implement some type of optimistic locking so we can check if the notebook has modified
+  // in a way that would invalidate the request?
+
+  // The URI of the notebook to which the block belongs.
+  string notebook_uri = 3;
+  // The cell index at which to insert at
+  int32 insert_at = 4;
 }

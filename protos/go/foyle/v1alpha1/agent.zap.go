@@ -160,6 +160,9 @@ func (m *FullContext) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder
 	keyName = "selected" // field selected = 2
 	enc.AddInt32(keyName, m.Selected)
 
+	keyName = "notebook_uri" // field notebook_uri = 3
+	enc.AddString(keyName, m.NotebookUri)
+
 	return nil
 }
 
@@ -215,6 +218,12 @@ func (m *StreamGenerateResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Ob
 		}
 		return nil
 	}))
+
+	keyName = "notebook_uri" // field notebook_uri = 3
+	enc.AddString(keyName, m.NotebookUri)
+
+	keyName = "insert_at" // field insert_at = 4
+	enc.AddInt32(keyName, m.InsertAt)
 
 	return nil
 }
