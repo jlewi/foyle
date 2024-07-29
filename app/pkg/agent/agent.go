@@ -26,6 +26,8 @@ import (
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
+
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 )
 
 const (
@@ -231,17 +233,16 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 		// Process the request and generate a response
 		// This is where you'd implement your AI logic
 		response := &v1alpha1.StreamGenerateResponse{
-			// Fill in the response fields based on your protobuf definition
-			Blocks: []*v1alpha1.Block{
+			Cells: []*parserv1.Cell{
 				{
-					Contents: "Generated text based on: " + string(b),
+					Value: "Generated text based on: " + string(b),
 				},
 			},
 
 			NotebookUri: notebookUri,
 			InsertAt:    selectedCell + 1,
 		}
-		log.Info("Sending response", "notebook", response.GetNotebookUri(), "insertAt", response.GetInsertAt(), "numBlocks", len(response.GetBlocks()))
+		log.Info("Sending response", "notebook", response.GetNotebookUri(), "insertAt", response.GetInsertAt(), "numBlocks", len(response.GetCells()))
 		if err := stream.Send(response); err != nil {
 			return err
 		}
@@ -261,9 +262,9 @@ func (a *Agent) Simple(ctx context.Context, req *connect.Request[v1alpha1.Stream
 	// This is where you'd implement your AI logic
 	response := &v1alpha1.StreamGenerateResponse{
 		// Fill in the response fields based on your protobuf definition
-		Blocks: []*v1alpha1.Block{
+		Cells: []*parserv1.Cell{
 			{
-				Contents: "Generated text based on: " + string(b),
+				Value: "Generated text based on: " + string(b),
 			},
 		},
 	}
