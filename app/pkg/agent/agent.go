@@ -4,6 +4,8 @@ import (
 	"connectrpc.com/connect"
 	"context"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"io"
 	"strings"
@@ -169,17 +171,11 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 	log.Info("Agent.StreamGenerate")
 	notebookUri := ""
 	var selectedCell int32
+	reqCount := 0
+
 	for {
 		req, err := stream.Receive()
 
-		if req.GetFullContext() != nil {
-			log.Info("Received full context", "context", req.GetFullContext())
-			if req.GetFullContext().GetNotebookUri() != "" {
-				notebookUri = req.GetFullContext().GetNotebookUri()
-			}
-
-			selectedCell = req.GetFullContext().GetSelected()
-		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				// The client has closed the stream
@@ -194,6 +190,34 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 			// Some other error occurred
 			log.Error(err, "Error receiving from stream")
 			return err
+		}
+		reqCount++
+
+		isValidErr := func() error {
+			if reqCount == 1 {
+				if req.GetFullContext() == nil {
+					return status.Errorf(codes.InvalidArgument, "First request must have a full context")
+				}
+				log.Info("Received full context", "context", req.GetFullContext())
+				if req.GetFullContext().GetNotebookUri() == "" {
+					return status.Errorf(codes.InvalidArgument, "First request must have a notebookUri")
+				}
+				if req.GetFullContext().GetSelected() < 0 {
+					return status.Errorf(codes.InvalidArgument, "First request must have a selected cell")
+				}
+				notebookUri = req.GetFullContext().GetNotebookUri()
+				selectedCell = req.GetFullContext().GetSelected()
+			} else {
+				if req.GetUpdate() == nil {
+					return status.Errorf(codes.InvalidArgument, "Every request except the first one must have an update")
+				}
+			}
+			return nil
+		}()
+
+		if isValidErr != nil {
+			log.Info("Request is invalid", "err", isValidErr)
+			return isValidErr
 		}
 
 		b, err := protojson.Marshal(req)

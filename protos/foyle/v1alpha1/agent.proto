@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/struct.proto";
 import "foyle/v1alpha1/doc.proto";
+import "runme/parser/v1/parser.proto";
 
 option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
 
@@ -74,7 +75,10 @@ message StreamGenerateRequest {
 }
 
 message FullContext {
-  Doc doc = 1;
+  // TODO(jeremy): Get rid of this field
+  Doc doc = 4;
+
+  runme.parser.v1.Notebook = 1;
   // TODO(jeremy): Should we move selected and notebook_uri out of the full_context and into the StreamGenerateRequest?
   int32 selected = 2;
   string notebook_uri = 3;
@@ -90,8 +94,8 @@ message Finish {
   bool accepted = 1;
 }
 
-message StreamGenerateResponse {
-  repeated Block blocks = 1;
+message StreamGenerateResponse {  
+  repeated runme.parser.v1.Cell cells = 1;
 
   // Each response should include the information to identify the notebook and cell where it should be inserted.
   // TODO(jeremy): Should we implement some type of optimistic locking so we can check if the notebook has modified
