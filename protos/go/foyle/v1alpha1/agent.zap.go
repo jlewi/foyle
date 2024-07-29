@@ -8,6 +8,7 @@ import (
 	math "math"
 	proto "github.com/golang/protobuf/proto"
 	_ "google.golang.org/protobuf/types/known/structpb"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 )
@@ -104,6 +105,128 @@ func (m *ExecuteResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEnc
 		}
 		return nil
 	}))
+
+	return nil
+}
+
+func (m *StreamGenerateRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "full_context" // field full_context = 1
+	if ov, ok := m.GetRequest().(*StreamGenerateRequest_FullContext); ok {
+		_ = ov
+		if ov.FullContext != nil {
+			var vv interface{} = ov.FullContext
+			if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+				enc.AddObject(keyName, marshaler)
+			}
+		}
+	}
+
+	keyName = "update" // field update = 2
+	if ov, ok := m.GetRequest().(*StreamGenerateRequest_Update); ok {
+		_ = ov
+		if ov.Update != nil {
+			var vv interface{} = ov.Update
+			if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+				enc.AddObject(keyName, marshaler)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (m *FullContext) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "notebook" // field notebook = 1
+	if m.Notebook != nil {
+		var vv interface{} = m.Notebook
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
+
+	keyName = "selected" // field selected = 2
+	enc.AddInt32(keyName, m.Selected)
+
+	keyName = "notebook_uri" // field notebook_uri = 3
+	enc.AddString(keyName, m.NotebookUri)
+
+	return nil
+}
+
+func (m *UpdateContext) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "cell" // field cell = 1
+	if m.Cell != nil {
+		var vv interface{} = m.Cell
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
+
+	return nil
+}
+
+func (m *Finish) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "accepted" // field accepted = 1
+	enc.AddBool(keyName, m.Accepted)
+
+	return nil
+}
+
+func (m *StreamGenerateResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "cells" // field cells = 1
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Cells {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	keyName = "notebook_uri" // field notebook_uri = 3
+	enc.AddString(keyName, m.NotebookUri)
+
+	keyName = "insert_at" // field insert_at = 4
+	enc.AddInt32(keyName, m.InsertAt)
 
 	return nil
 }

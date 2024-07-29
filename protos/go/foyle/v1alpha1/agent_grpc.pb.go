@@ -193,3 +193,162 @@ var ExecuteService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "foyle/v1alpha1/agent.proto",
 }
+
+// AIServiceClient is the client API for AIService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type AIServiceClient interface {
+	// StreamGenerate is a bidirectional streaming RPC for generating completions
+	StreamGenerate(ctx context.Context, opts ...grpc.CallOption) (AIService_StreamGenerateClient, error)
+	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
+	Simple(ctx context.Context, in *StreamGenerateRequest, opts ...grpc.CallOption) (*StreamGenerateResponse, error)
+}
+
+type aIServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAIServiceClient(cc grpc.ClientConnInterface) AIServiceClient {
+	return &aIServiceClient{cc}
+}
+
+func (c *aIServiceClient) StreamGenerate(ctx context.Context, opts ...grpc.CallOption) (AIService_StreamGenerateClient, error) {
+	stream, err := c.cc.NewStream(ctx, &AIService_ServiceDesc.Streams[0], "/AIService/StreamGenerate", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &aIServiceStreamGenerateClient{stream}
+	return x, nil
+}
+
+type AIService_StreamGenerateClient interface {
+	Send(*StreamGenerateRequest) error
+	Recv() (*StreamGenerateResponse, error)
+	grpc.ClientStream
+}
+
+type aIServiceStreamGenerateClient struct {
+	grpc.ClientStream
+}
+
+func (x *aIServiceStreamGenerateClient) Send(m *StreamGenerateRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *aIServiceStreamGenerateClient) Recv() (*StreamGenerateResponse, error) {
+	m := new(StreamGenerateResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *aIServiceClient) Simple(ctx context.Context, in *StreamGenerateRequest, opts ...grpc.CallOption) (*StreamGenerateResponse, error) {
+	out := new(StreamGenerateResponse)
+	err := c.cc.Invoke(ctx, "/AIService/Simple", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AIServiceServer is the server API for AIService service.
+// All implementations must embed UnimplementedAIServiceServer
+// for forward compatibility
+type AIServiceServer interface {
+	// StreamGenerate is a bidirectional streaming RPC for generating completions
+	StreamGenerate(AIService_StreamGenerateServer) error
+	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
+	Simple(context.Context, *StreamGenerateRequest) (*StreamGenerateResponse, error)
+	mustEmbedUnimplementedAIServiceServer()
+}
+
+// UnimplementedAIServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedAIServiceServer struct {
+}
+
+func (UnimplementedAIServiceServer) StreamGenerate(AIService_StreamGenerateServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamGenerate not implemented")
+}
+func (UnimplementedAIServiceServer) Simple(context.Context, *StreamGenerateRequest) (*StreamGenerateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Simple not implemented")
+}
+func (UnimplementedAIServiceServer) mustEmbedUnimplementedAIServiceServer() {}
+
+// UnsafeAIServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AIServiceServer will
+// result in compilation errors.
+type UnsafeAIServiceServer interface {
+	mustEmbedUnimplementedAIServiceServer()
+}
+
+func RegisterAIServiceServer(s grpc.ServiceRegistrar, srv AIServiceServer) {
+	s.RegisterService(&AIService_ServiceDesc, srv)
+}
+
+func _AIService_StreamGenerate_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(AIServiceServer).StreamGenerate(&aIServiceStreamGenerateServer{stream})
+}
+
+type AIService_StreamGenerateServer interface {
+	Send(*StreamGenerateResponse) error
+	Recv() (*StreamGenerateRequest, error)
+	grpc.ServerStream
+}
+
+type aIServiceStreamGenerateServer struct {
+	grpc.ServerStream
+}
+
+func (x *aIServiceStreamGenerateServer) Send(m *StreamGenerateResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *aIServiceStreamGenerateServer) Recv() (*StreamGenerateRequest, error) {
+	m := new(StreamGenerateRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func _AIService_Simple_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StreamGenerateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).Simple(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/AIService/Simple",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).Simple(ctx, req.(*StreamGenerateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AIService_ServiceDesc is the grpc.ServiceDesc for AIService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AIService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "AIService",
+	HandlerType: (*AIServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Simple",
+			Handler:    _AIService_Simple_Handler,
+		},
+	},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamGenerate",
+			Handler:       _AIService_StreamGenerate_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
+	Metadata: "foyle/v1alpha1/agent.proto",
+}
