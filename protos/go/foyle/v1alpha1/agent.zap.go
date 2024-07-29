@@ -8,6 +8,7 @@ import (
 	math "math"
 	proto "github.com/golang/protobuf/proto"
 	_ "google.golang.org/protobuf/types/known/structpb"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 )
@@ -149,9 +150,9 @@ func (m *FullContext) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder
 		return nil
 	}
 
-	keyName = "doc" // field doc = 1
-	if m.Doc != nil {
-		var vv interface{} = m.Doc
+	keyName = "notebook" // field notebook = 1
+	if m.Notebook != nil {
+		var vv interface{} = m.Notebook
 		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
 			enc.AddObject(keyName, marshaler)
 		}
@@ -166,7 +167,7 @@ func (m *FullContext) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder
 	return nil
 }
 
-func (m *BlockUpdate) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+func (m *UpdateContext) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
 	var keyName string
 	_ = keyName
 
@@ -174,11 +175,13 @@ func (m *BlockUpdate) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder
 		return nil
 	}
 
-	keyName = "block_id" // field block_id = 1
-	enc.AddString(keyName, m.BlockId)
-
-	keyName = "block_content" // field block_content = 2
-	enc.AddString(keyName, m.BlockContent)
+	keyName = "cell" // field cell = 1
+	if m.Cell != nil {
+		var vv interface{} = m.Cell
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
 
 	return nil
 }
@@ -205,9 +208,9 @@ func (m *StreamGenerateResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Ob
 		return nil
 	}
 
-	keyName = "blocks" // field blocks = 1
+	keyName = "cells" // field cells = 1
 	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
-		for _, rv := range m.Blocks {
+		for _, rv := range m.Cells {
 			_ = rv
 			if rv != nil {
 				var vv interface{} = rv

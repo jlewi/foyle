@@ -70,23 +70,19 @@ service AIService {
 message StreamGenerateRequest {
   oneof request {
     FullContext full_context = 1;
-    BlockUpdate update = 2;
+    UpdateContext update = 2;
   }
 }
 
 message FullContext {
-  // TODO(jeremy): Get rid of this field
-  Doc doc = 4;
-
-  runme.parser.v1.Notebook = 1;
+  runme.parser.v1.Notebook notebook = 1;
   // TODO(jeremy): Should we move selected and notebook_uri out of the full_context and into the StreamGenerateRequest?
   int32 selected = 2;
   string notebook_uri = 3;
 }
 
-message BlockUpdate {
-  string block_id = 1;
-  string block_content = 2;
+message UpdateContext {
+  runme.parser.v1.Cell cell = 1;
 }
 
 message Finish {
