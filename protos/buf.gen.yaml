@@ -1,6 +1,15 @@
-version: v1
+version: v2
+managed:
+  enabled: true
+  disable:
+  - module: buf.build/googleapis/googleapis
+  # - module: buf.build/stateful/runme
+  # override:
+  # - path: runme
+  #   file_option: runme/parser/v1
+
 plugins:
-  - name: go
+  - local: protoc-gen-go
     out: go/
     opt:
       # The paths option can either be source_relative or import.
@@ -8,15 +17,15 @@ plugins:
       # the option go_package in the proto file. If its source_relative
       # then its pased on the path relative to the location of the buf.yaml file.
       - paths=source_relative
-  - name: go-grpc
+  - local: protoc-gen-go-grpc
     out: go/
     opt:
       - paths=source_relative
-  - plugin: grpc-gateway
+  - local: protoc-gen-grpc-gateway
     out: go/
     opt:
       - paths=source_relative
-  - plugin: es
+  - local: protoc-gen-es
     opt:
       - target=ts
       # see
@@ -24,29 +33,29 @@ plugins:
       # By default buf generates imports with js extensions which doesn't work with our vscode extension
       # because our vscode extension is relying on transpilation from typescript to js.
       - import_extension=none
-    #out: ../frontend/foyle/src/gen
+    out: ../frontend/foyle/src/gen
     # nb: THis is a hack as a way of getting the generated client into the vscode-runme directory
     # Normally the generated code is pulled into vscode-runme by creating a buf package from the generated code
-    out: /Users/jlewi/git_vscode-runme/src/extension/ai
-    # Generate connect typescript client
+    #out: /Users/jlewi/git_vscode-runme/src/extension/ai    
+  # Generate connect typescript client
   # TODO(jeremy): We aren't actually using this I did it because I wanted to look at the generated clients for
   # a streaming service.
-  - plugin: connect-es
+  - local: protoc-gen-connect-es
     opt:
       - target=ts
       # see
       # https://github.com/bufbuild/protobuf-es/tree/main/packages/protoc-gen-es#import_extensionjs
       # By default buf generates imports with js extensions which doesn't work with our vscode extension
       # because our vscode extension is relying on transpilation from typescript to js.
-      - import_extension=none
-    #out: ../frontend/foyle/src/gen
+      - import_extension=none    
+    out: ../frontend/foyle/src/gen
     # nb: THis is a hack as a way of getting the generated client into the vscode-runme directory
     # Normally the generated code is pulled into vscode-runme by creating a buf package from the generated code
-    out: /Users/jlewi/git_vscode-runme/src/extension/ai
+    #out: /Users/jlewi/git_vscode-runme/src/extension/ai
 
-  - name: zap-marshaler
+  - local: protoc-gen-zap-marshaler
     out: go/
     opt: paths=source_relative
-  - plugin: connect-go
+  - local: protoc-gen-connect-go
     out: go/
     opt: paths=source_relative
