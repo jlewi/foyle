@@ -3,6 +3,7 @@ package agent
 import (
 	"connectrpc.com/connect"
 	"context"
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -175,6 +176,7 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 	var selectedCell int32
 	reqCount := 0
 
+	var doc *v1alpha1.Doc
 	for {
 		req, err := stream.Receive()
 
@@ -207,12 +209,30 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 				if req.GetFullContext().GetSelected() < 0 {
 					return status.Errorf(codes.InvalidArgument, "First request must have a selected cell")
 				}
+
+				doc, err = converters.NotebookToDoc(req.GetFullContext().GetNotebook())
+				if err != nil {
+					log.Error(err, "Failed to convert notebook to doc")
+					return status.Errorf(codes.InvalidArgument, "Failed to convert notebook to doc")
+				}
 				notebookUri = req.GetFullContext().GetNotebookUri()
 				selectedCell = req.GetFullContext().GetSelected()
+
+				if int(selectedCell) >= len(doc.Blocks) {
+					log.Error(errors.New("Invalid request"), "Selected cell is out of bounds", "selectedCell", selectedCell, "numCells", len(doc.Blocks))
+					return status.Errorf(codes.InvalidArgument, "Selected cell is out of bounds: index %d; number of cells %d", selectedCell, len(doc.Blocks))
+				}
 			} else {
 				if req.GetUpdate() == nil {
 					return status.Errorf(codes.InvalidArgument, "Every request except the first one must have an update")
 				}
+
+				block, err := converters.CellToBlock(req.GetUpdate().GetCell())
+				if err != nil {
+					log.Error(err, "Failed to convert cell to block")
+					return status.Errorf(codes.InvalidArgument, "Failed to convert cell to block")
+				}
+				doc.Blocks[selectedCell] = block
 			}
 			return nil
 		}()
@@ -222,23 +242,24 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 			return isValidErr
 		}
 
-		b, err := protojson.Marshal(req)
-		if err != nil {
-			log.Error(err, "Failed to marshal request")
-			return err
+		generateRequest := &v1alpha1.GenerateRequest{
+			Doc: doc,
 		}
 
-		// TODO(jeremy): Get rid of this its only for debugging.
-		log.Info("Received request", "request", string(b))
-		// Process the request and generate a response
-		// This is where you'd implement your AI logic
-		response := &v1alpha1.StreamGenerateResponse{
-			Cells: []*parserv1.Cell{
-				{
-					Value: "Generated text based on: " + string(b),
-				},
-			},
+		generateResponse, err := a.Generate(ctx, generateRequest)
+		if err != nil {
+			log.Error(err, "Failed to generate completions")
+			return status.Errorf(codes.Internal, "Failed to generate completions; %v", err)
+		}
 
+		cells, err := converters.BlocksToCells(generateResponse.GetBlocks())
+		if err != nil {
+			log.Error(err, "Failed to convert blocks to cells")
+			return status.Errorf(codes.Internal, "Failed to convert blocks to cells; %v", err)
+		}
+
+		response := &v1alpha1.StreamGenerateResponse{
+			Cells:       cells,
 			NotebookUri: notebookUri,
 			InsertAt:    selectedCell + 1,
 		}
