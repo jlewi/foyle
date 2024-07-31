@@ -1,7 +1,6 @@
 package application
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"github.com/pkg/errors"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
 	"io"
@@ -110,6 +110,7 @@ func initApp() (*App, error) {
 	app.Config.Server.GRPCPort = 9070
 
 	app.Config.Logging.LogDir = "/tmp/foyle/logs"
+	app.Config.Logging.Level = "debug"
 	app.Config.Learner.ExampleDirs = []string{"/tmp/foyle/examples"}
 
 	if err := app.SetupLogging(true); err != nil {
@@ -162,35 +163,44 @@ func runClient(baseURL string) error {
 
 	ctx := context.Background()
 
-	// Start by generating a simple request to test the connection
-	simplReq := &v1alpha1.StreamGenerateRequest{
-		Request: &v1alpha1.StreamGenerateRequest_Update{
-			Update: &v1alpha1.BlockUpdate{
-				BlockId:      "1234",
-				BlockContent: "initial simple request",
-			},
-		},
-	}
-	_, err := client.Simple(ctx, connect.NewRequest(simplReq))
-	if err != nil {
-		log.Error(err, "Failed to send simple request")
-		return err
-	}
-
 	stream := client.StreamGenerate(ctx)
 
 	// Send requests
 	requests := []string{"Hello", "How are you?", "Goodbye"}
-	for _, prompt := range requests {
+	for i, prompt := range requests {
 
-		req := &v1alpha1.StreamGenerateRequest{
-			Request: &v1alpha1.StreamGenerateRequest_Update{
-				Update: &v1alpha1.BlockUpdate{
-					BlockId:      "1234",
-					BlockContent: prompt,
+		var req *v1alpha1.StreamGenerateRequest
+
+		if i == 0 {
+			req = &v1alpha1.StreamGenerateRequest{
+				Request: &v1alpha1.StreamGenerateRequest_FullContext{
+					FullContext: &v1alpha1.FullContext{
+						Notebook: &parserv1.Notebook{
+							Cells: []*parserv1.Cell{
+								{
+									Kind:  parserv1.CellKind_CELL_KIND_MARKUP,
+									Value: prompt,
+								},
+							},
+						},
+						NotebookUri: "file://foo.md",
+						Selected:    0,
+					},
 				},
-			},
+			}
+		} else {
+			req = &v1alpha1.StreamGenerateRequest{
+				Request: &v1alpha1.StreamGenerateRequest_Update{
+					Update: &v1alpha1.UpdateContext{
+						Cell: &parserv1.Cell{
+							Kind:  parserv1.CellKind_CELL_KIND_MARKUP,
+							Value: prompt,
+						},
+					},
+				},
+			}
 		}
+
 		err := stream.Send(req)
 
 		if err != nil {
@@ -199,13 +209,11 @@ func runClient(baseURL string) error {
 		fmt.Printf("Sent request: %s\n", prompt)
 	}
 
-	// Signal that we're done sending
-	if err := stream.CloseRequest(); err != nil {
-		log.Error(err, "Failed to close request stream: %v")
-	}
-
 	// Receive responses
-	for {
+	// We should get at least 2 responses.
+	// The first response should be fore the initial request
+	// And then we should do a second generation for all the updates
+	for i := 0; i < 2; i++ {
 		response, err := stream.Receive()
 		if errors.Is(err, io.EOF) {
 			fmt.Println("Stream closed")
@@ -213,8 +221,16 @@ func runClient(baseURL string) error {
 		}
 		if err != nil {
 			log.Error(err, "Failed to receive response")
+			return err
 		}
 		log.Info("Received response", "response", response)
 	}
+
+	// Signal that we're done sending.
+	// This will cause the server to abort with EOF
+	if err := stream.CloseRequest(); err != nil {
+		log.Error(err, "Failed to close request stream: %v")
+	}
+
 	return nil
 }
