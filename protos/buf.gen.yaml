@@ -33,6 +33,8 @@ plugins:
       # By default buf generates imports with js extensions which doesn't work with our vscode extension
       # because our vscode extension is relying on transpilation from typescript to js.
       - import_extension=none
+      # See: https://github.com/bufbuild/protobuf-es/issues/947#issuecomment-2257889255
+      - rewrite_imports=./runme/**/*_pb.js:@buf/stateful_runme.bufbuild_es
     #out: ../frontend/foyle/src/gen
     # nb: THis is a hack as a way of getting the generated client into the vscode-runme directory
     # Normally the generated code is pulled into vscode-runme by creating a buf package from the generated code
@@ -47,7 +49,9 @@ plugins:
       # https://github.com/bufbuild/protobuf-es/tree/main/packages/protoc-gen-es#import_extensionjs
       # By default buf generates imports with js extensions which doesn't work with our vscode extension
       # because our vscode extension is relying on transpilation from typescript to js.
-      - import_extension=none    
+      - import_extension=none
+      # See: https://github.com/bufbuild/protobuf-es/issues/947#issuecomment-2257889255
+      - rewrite_imports=./runme/**/*_pb.js:@buf/stateful_runme.bufbuild_es
     #out: ../frontend/foyle/src/gen
     # nb: THis is a hack as a way of getting the generated client into the vscode-runme directory
     # Normally the generated code is pulled into vscode-runme by creating a buf package from the generated code
