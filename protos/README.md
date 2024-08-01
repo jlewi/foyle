@@ -43,7 +43,7 @@ npm install  -g @bufbuild/protoc-gen-connect-es
 
 * That ran and seems to have put the plugin in `/Users/jlewi/.nvm/versions/node/v18.19.0/bin/protoc-gen-connect-es`
 * It looks like `protoc-gen-es` is in /opt/homebrew/bin/protoc-gen-es
-  * How did that happen?
+   * How did that happen?
 
 ## Typescript Protos
 
@@ -90,4 +90,28 @@ Ensure the plugin is in your path; otherwise buf won't be able to find it.
 
 We should look into [connect-rpc](https://connectrpc.com/). That might simplify things
 
-# To Install the connect typescript plugin
+# Buf Schema Registry
+
+Refer to the [docs](https://buf.build/docs/bsr/module/publish#module-and-repository-setup)
+
+1. Login if you haven't already
+
+```bash {"id":"01J463MR2W87MNYGHKV6XANBM7"}
+buf registry login
+```
+
+```bash {"id":"01J464214VYQ224BYDJZEQFAGQ"}
+buf dep update
+buf build
+buf push
+
+```
+
+# Developing The VSCode Extension
+
+There are two ways I think we can iterate on the vscode extension when making changes to the proto
+
+1. Publish to the [BSR using labels](https://buf.build/docs/bsr/module/publish#pushing-from-a-local-workspace)
+   * I think we can use labels to create the equivalent of a development branch of the SDK
+1. We can update `buf.gen.yaml` to output to a local path inside the vscode extension directory
+    * See [buf.gen.yaml](https://github.com/jlewi/foyle/blob/9663fb81a36ab63876c33873cf4726dc8ef80092/protos/buf.gen.yaml#L28)
