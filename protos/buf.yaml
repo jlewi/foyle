@@ -2,6 +2,9 @@ version: v2
 deps:
   - buf.build/googleapis/googleapis
   - buf.build/stateful/runme
+modules:
+  - path: .
+    name: buf.build/jlewi/foyle
 lint:
   use:
     - DEFAULT

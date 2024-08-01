@@ -92,8 +92,26 @@ We should look into [connect-rpc](https://connectrpc.com/). That might simplify 
 
 # Buf Schema Registry
 
-1. Login
+Refer to the [docs](https://buf.build/docs/bsr/module/publish#module-and-repository-setup)
+
+1. Login if you haven't already
 
 ```bash {"id":"01J463MR2W87MNYGHKV6XANBM7"}
 buf registry login
 ```
+
+```bash {"id":"01J464214VYQ224BYDJZEQFAGQ"}
+buf dep update
+buf build
+buf push
+
+```
+
+# Developing The VSCode Extension
+
+There are two ways I think we can iterate on the vscode extension when making changes to the proto
+
+1. Publish to the [BSR using labels](https://buf.build/docs/bsr/module/publish#pushing-from-a-local-workspace)
+   * I think we can use labels to create the equivalent of a development branch of the SDK
+1. We can update `buf.gen.yaml` to output to a local path inside the vscode extension directory
+    * See [buf.gen.yaml](https://github.com/jlewi/foyle/blob/9663fb81a36ab63876c33873cf4726dc8ef80092/protos/buf.gen.yaml#L28)
