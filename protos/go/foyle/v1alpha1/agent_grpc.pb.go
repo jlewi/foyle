@@ -201,7 +201,7 @@ type AIServiceClient interface {
 	// StreamGenerate is a bidirectional streaming RPC for generating completions
 	StreamGenerate(ctx context.Context, opts ...grpc.CallOption) (AIService_StreamGenerateClient, error)
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
-	Simple(ctx context.Context, in *StreamGenerateRequest, opts ...grpc.CallOption) (*StreamGenerateResponse, error)
+	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 }
 
 type aIServiceClient struct {
@@ -243,9 +243,9 @@ func (x *aIServiceStreamGenerateClient) Recv() (*StreamGenerateResponse, error) 
 	return m, nil
 }
 
-func (c *aIServiceClient) Simple(ctx context.Context, in *StreamGenerateRequest, opts ...grpc.CallOption) (*StreamGenerateResponse, error) {
-	out := new(StreamGenerateResponse)
-	err := c.cc.Invoke(ctx, "/AIService/Simple", in, out, opts...)
+func (c *aIServiceClient) Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, "/AIService/Status", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +259,7 @@ type AIServiceServer interface {
 	// StreamGenerate is a bidirectional streaming RPC for generating completions
 	StreamGenerate(AIService_StreamGenerateServer) error
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
-	Simple(context.Context, *StreamGenerateRequest) (*StreamGenerateResponse, error)
+	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	mustEmbedUnimplementedAIServiceServer()
 }
 
@@ -270,8 +270,8 @@ type UnimplementedAIServiceServer struct {
 func (UnimplementedAIServiceServer) StreamGenerate(AIService_StreamGenerateServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamGenerate not implemented")
 }
-func (UnimplementedAIServiceServer) Simple(context.Context, *StreamGenerateRequest) (*StreamGenerateResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Simple not implemented")
+func (UnimplementedAIServiceServer) Status(context.Context, *StatusRequest) (*StatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
 }
 func (UnimplementedAIServiceServer) mustEmbedUnimplementedAIServiceServer() {}
 
@@ -312,20 +312,20 @@ func (x *aIServiceStreamGenerateServer) Recv() (*StreamGenerateRequest, error) {
 	return m, nil
 }
 
-func _AIService_Simple_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StreamGenerateRequest)
+func _AIService_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StatusRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AIServiceServer).Simple(ctx, in)
+		return srv.(AIServiceServer).Status(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/AIService/Simple",
+		FullMethod: "/AIService/Status",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AIServiceServer).Simple(ctx, req.(*StreamGenerateRequest))
+		return srv.(AIServiceServer).Status(ctx, req.(*StatusRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -338,8 +338,8 @@ var AIService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*AIServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Simple",
-			Handler:    _AIService_Simple_Handler,
+			MethodName: "Status",
+			Handler:    _AIService_Status_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

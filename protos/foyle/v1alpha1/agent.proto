@@ -61,7 +61,7 @@ service AIService {
   rpc StreamGenerate (stream StreamGenerateRequest) returns (stream StreamGenerateResponse) {}
 
   // N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
-  rpc Simple(StreamGenerateRequest) returns (StreamGenerateResponse) {}
+  rpc Status(StatusRequest) returns (StatusResponse) {}
 }
 
 // TODO(jeremy): We should probably be using RunMe Notebook and Cell protos
@@ -102,3 +102,15 @@ message StreamGenerateResponse {
   // The cell index at which to insert at
   int32 insert_at = 4;
 }
+
+  enum AIServiceStatus {
+    UNKNOWN = 0;
+    OK = 1;
+    NOT_OK = 2;    
+  }
+  
+  message StatusRequest{}
+  message StatusResponse {
+    AIServiceStatus status = 1;
+  }
+  

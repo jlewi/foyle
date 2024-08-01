@@ -45,8 +45,8 @@ const (
 	// AIServiceStreamGenerateProcedure is the fully-qualified name of the AIService's StreamGenerate
 	// RPC.
 	AIServiceStreamGenerateProcedure = "/AIService/StreamGenerate"
-	// AIServiceSimpleProcedure is the fully-qualified name of the AIService's Simple RPC.
-	AIServiceSimpleProcedure = "/AIService/Simple"
+	// AIServiceStatusProcedure is the fully-qualified name of the AIService's Status RPC.
+	AIServiceStatusProcedure = "/AIService/Status"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -57,7 +57,7 @@ var (
 	executeServiceExecuteMethodDescriptor   = executeServiceServiceDescriptor.Methods().ByName("Execute")
 	aIServiceServiceDescriptor              = v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("AIService")
 	aIServiceStreamGenerateMethodDescriptor = aIServiceServiceDescriptor.Methods().ByName("StreamGenerate")
-	aIServiceSimpleMethodDescriptor         = aIServiceServiceDescriptor.Methods().ByName("Simple")
+	aIServiceStatusMethodDescriptor         = aIServiceServiceDescriptor.Methods().ByName("Status")
 )
 
 // GenerateServiceClient is a client for the GenerateService service.
@@ -205,7 +205,7 @@ type AIServiceClient interface {
 	// StreamGenerate is a bidirectional streaming RPC for generating completions
 	StreamGenerate(context.Context) *connect.BidiStreamForClient[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
-	Simple(context.Context, *connect.Request[v1alpha1.StreamGenerateRequest]) (*connect.Response[v1alpha1.StreamGenerateResponse], error)
+	Status(context.Context, *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error)
 }
 
 // NewAIServiceClient constructs a client for the AIService service. By default, it uses the Connect
@@ -224,10 +224,10 @@ func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(aIServiceStreamGenerateMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
-		simple: connect.NewClient[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse](
+		status: connect.NewClient[v1alpha1.StatusRequest, v1alpha1.StatusResponse](
 			httpClient,
-			baseURL+AIServiceSimpleProcedure,
-			connect.WithSchema(aIServiceSimpleMethodDescriptor),
+			baseURL+AIServiceStatusProcedure,
+			connect.WithSchema(aIServiceStatusMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -236,7 +236,7 @@ func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 // aIServiceClient implements AIServiceClient.
 type aIServiceClient struct {
 	streamGenerate *connect.Client[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]
-	simple         *connect.Client[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]
+	status         *connect.Client[v1alpha1.StatusRequest, v1alpha1.StatusResponse]
 }
 
 // StreamGenerate calls AIService.StreamGenerate.
@@ -244,9 +244,9 @@ func (c *aIServiceClient) StreamGenerate(ctx context.Context) *connect.BidiStrea
 	return c.streamGenerate.CallBidiStream(ctx)
 }
 
-// Simple calls AIService.Simple.
-func (c *aIServiceClient) Simple(ctx context.Context, req *connect.Request[v1alpha1.StreamGenerateRequest]) (*connect.Response[v1alpha1.StreamGenerateResponse], error) {
-	return c.simple.CallUnary(ctx, req)
+// Status calls AIService.Status.
+func (c *aIServiceClient) Status(ctx context.Context, req *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error) {
+	return c.status.CallUnary(ctx, req)
 }
 
 // AIServiceHandler is an implementation of the AIService service.
@@ -254,7 +254,7 @@ type AIServiceHandler interface {
 	// StreamGenerate is a bidirectional streaming RPC for generating completions
 	StreamGenerate(context.Context, *connect.BidiStream[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]) error
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
-	Simple(context.Context, *connect.Request[v1alpha1.StreamGenerateRequest]) (*connect.Response[v1alpha1.StreamGenerateResponse], error)
+	Status(context.Context, *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error)
 }
 
 // NewAIServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -269,18 +269,18 @@ func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(aIServiceStreamGenerateMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
-	aIServiceSimpleHandler := connect.NewUnaryHandler(
-		AIServiceSimpleProcedure,
-		svc.Simple,
-		connect.WithSchema(aIServiceSimpleMethodDescriptor),
+	aIServiceStatusHandler := connect.NewUnaryHandler(
+		AIServiceStatusProcedure,
+		svc.Status,
+		connect.WithSchema(aIServiceStatusMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/AIService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AIServiceStreamGenerateProcedure:
 			aIServiceStreamGenerateHandler.ServeHTTP(w, r)
-		case AIServiceSimpleProcedure:
-			aIServiceSimpleHandler.ServeHTTP(w, r)
+		case AIServiceStatusProcedure:
+			aIServiceStatusHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -294,6 +294,6 @@ func (UnimplementedAIServiceHandler) StreamGenerate(context.Context, *connect.Bi
 	return connect.NewError(connect.CodeUnimplemented, errors.New("AIService.StreamGenerate is not implemented"))
 }
 
-func (UnimplementedAIServiceHandler) Simple(context.Context, *connect.Request[v1alpha1.StreamGenerateRequest]) (*connect.Response[v1alpha1.StreamGenerateResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("AIService.Simple is not implemented"))
+func (UnimplementedAIServiceHandler) Status(context.Context, *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("AIService.Status is not implemented"))
 }

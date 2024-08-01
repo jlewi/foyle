@@ -230,3 +230,28 @@ func (m *StreamGenerateResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Ob
 
 	return nil
 }
+
+func (m *StatusRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	return nil
+}
+
+func (m *StatusResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "status" // field status = 1
+	enc.AddString(keyName, m.Status.String())
+
+	return nil
+}

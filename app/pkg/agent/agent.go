@@ -7,7 +7,6 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"strings"
@@ -29,8 +28,6 @@ import (
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
-
-	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 )
 
 const (
@@ -394,24 +391,12 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 	}
 }
 
-func (a *Agent) Simple(ctx context.Context, req *connect.Request[v1alpha1.StreamGenerateRequest]) (*connect.Response[v1alpha1.StreamGenerateResponse], error) {
+func (a *Agent) Status(ctx context.Context, req *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error) {
 	log := logs.FromContext(ctx)
 	log.Info("Agent.Simple")
 
-	b, err := protojson.Marshal(req.Msg)
-	if err != nil {
-		log.Error(err, "Failed to marshal request")
-		return nil, err
-	}
-	// Process the request and generate a response
-	// This is where you'd implement your AI logic
-	response := &v1alpha1.StreamGenerateResponse{
-		// Fill in the response fields based on your protobuf definition
-		Cells: []*parserv1.Cell{
-			{
-				Value: "Generated text based on: " + string(b),
-			},
-		},
+	response := &v1alpha1.StatusResponse{
+		Status: v1alpha1.AIServiceStatus_OK,
 	}
 	res := connect.NewResponse(response)
 	res.Header().Set("AIService-Version", "v1alpha1")
