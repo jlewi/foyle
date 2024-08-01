@@ -43,7 +43,7 @@ npm install  -g @bufbuild/protoc-gen-connect-es
 
 * That ran and seems to have put the plugin in `/Users/jlewi/.nvm/versions/node/v18.19.0/bin/protoc-gen-connect-es`
 * It looks like `protoc-gen-es` is in /opt/homebrew/bin/protoc-gen-es
-  * How did that happen?
+   * How did that happen?
 
 ## Typescript Protos
 
@@ -90,4 +90,10 @@ Ensure the plugin is in your path; otherwise buf won't be able to find it.
 
 We should look into [connect-rpc](https://connectrpc.com/). That might simplify things
 
-# To Install the connect typescript plugin
+# Buf Schema Registry
+
+1. Login
+
+```bash {"id":"01J463MR2W87MNYGHKV6XANBM7"}
+buf registry login
+```
