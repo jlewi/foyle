@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/struct.proto";
 import "foyle/v1alpha1/doc.proto";
+import "runme/parser/v1/parser.proto";
 
 option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
 
@@ -52,3 +53,64 @@ service ExecuteService {
     };
   }
 }
+
+// TODO(jeremy): This should move to https://github.com/stateful/runme/tree/main/pkg/api/proto/runme/ai/v1alpha1
+// This was to quickly hack so we could see what the generated client looks like for the connect protocol.
+service AIService {
+  // StreamGenerate is a bidirectional streaming RPC for generating completions
+  rpc StreamGenerate (stream StreamGenerateRequest) returns (stream StreamGenerateResponse) {}
+
+  // N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
+  rpc Status(StatusRequest) returns (StatusResponse) {}
+}
+
+// TODO(jeremy): We should probably be using RunMe Notebook and Cell protos
+// https://github.com/stateful/runme/blob/9658f77dde406abc775fd3f1eb249b5a06e20f4f/pkg/api/proto/runme/ai/v1alpha1/ai.proto#L9
+// Because the primary client will be RunMe and we will want to send vscode data structures rather than our own.
+message StreamGenerateRequest {
+  oneof request {
+    FullContext full_context = 1;
+    UpdateContext update = 2;
+  }
+}
+
+message FullContext {
+  runme.parser.v1.Notebook notebook = 1;
+  // TODO(jeremy): Should we move selected and notebook_uri out of the full_context and into the StreamGenerateRequest?
+  int32 selected = 2;
+  string notebook_uri = 3;
+}
+
+message UpdateContext {
+  runme.parser.v1.Cell cell = 1;
+}
+
+message Finish {
+  // Indicates whether the completion was accepted or rejected.
+  bool accepted = 1;
+}
+
+message StreamGenerateResponse {  
+  repeated runme.parser.v1.Cell cells = 1;
+
+  // Each response should include the information to identify the notebook and cell where it should be inserted.
+  // TODO(jeremy): Should we implement some type of optimistic locking so we can check if the notebook has modified
+  // in a way that would invalidate the request?
+
+  // The URI of the notebook to which the block belongs.
+  string notebook_uri = 3;
+  // The cell index at which to insert at
+  int32 insert_at = 4;
+}
+
+  enum AIServiceStatus {
+    UNKNOWN = 0;
+    OK = 1;
+    NOT_OK = 2;    
+  }
+  
+  message StatusRequest{}
+  message StatusResponse {
+    AIServiceStatus status = 1;
+  }
+  

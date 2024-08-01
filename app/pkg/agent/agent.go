@@ -2,7 +2,16 @@ package agent
 
 import (
 	"context"
+	"io"
 	"strings"
+	"sync"
+
+	"connectrpc.com/connect"
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/jlewi/foyle/app/pkg/llms"
 
@@ -38,6 +47,7 @@ const (
 // Agent is the agent.
 type Agent struct {
 	v1alpha1.UnimplementedGenerateServiceServer
+	v1alpha1connect.UnimplementedAIServiceHandler
 	completer llms.Completer
 	config    config.Config
 	db        *learn.InMemoryExampleDB
@@ -157,4 +167,239 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 	err := errors.Errorf("Failed to generate a chat completion after %d tries", maxTries)
 	log.Error(err, "Failed to generate a chat completion", "maxTries", maxTries)
 	return nil, err
+}
+
+func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]) error {
+	log := logs.FromContext(ctx)
+	log.Info("Agent.StreamGenerate")
+	notebookUri := ""
+	var selectedCell int32
+	reqCount := 0
+
+	// statusChannel is used by the two go routines (i.e the request handler and response handler) to signal
+	// to main routine that they have exited and therefore the request should be terminated.
+	statusChan := make(chan *status.Status, 2)
+
+	// Create a channel that will be used to signal to the receiver to generate a completion
+	// The maximum number of events inflight should be 1 but we use 20 just to get some buffer
+	trigger := make(chan bool, 20)
+
+	// lastDoc is the serialized version of the most recent document. It will be non empty if there is a version
+	// of the document awaiting processing.
+	var pendingDoc *v1alpha1.Doc
+	mu := &sync.Mutex{}
+
+	// Start a thread to asynchronously generate completions.
+	// We will generate one completion at a time. pendingDoc is used to enqueue a document to be processed.
+	// if pendingDoc is nil then there is no updated document waiting to be processed.
+	generateCtx, generateCancelFunc := context.WithCancel(ctx)
+	// Ensure cancelFunc is called when this function returns; ensures we terminate the go routine
+	defer generateCancelFunc()
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-trigger:
+				log.Info("Received trigger signal")
+				generateRequest := func() *v1alpha1.GenerateRequest {
+					mu.Lock()
+					defer mu.Unlock()
+					if pendingDoc == nil {
+						return nil
+					}
+
+					r := &v1alpha1.GenerateRequest{
+						Doc: pendingDoc,
+					}
+					pendingDoc = nil
+					return r
+				}()
+				if generateRequest == nil {
+					// There is no pending document to process
+					continue
+				}
+				generateResponse, err := a.Generate(ctx, generateRequest)
+				if err != nil {
+					log.Error(err, "Failed to generate completions")
+					// TODO(jeremy): Instead of terminating the request should we just try to recover on
+					// The next request?
+					statusChan <- status.Newf(codes.Internal, "Failed to generate completions; %v", err)
+					return
+				}
+
+				cells, err := converters.BlocksToCells(generateResponse.GetBlocks())
+				if err != nil {
+					log.Error(err, "Failed to convert blocks to cells")
+					// TODO(jeremy): Instead of terminating the request should we just try to recover on
+					// The next request?
+					statusChan <- status.Newf(codes.Internal, "Failed to convert blocks to cells; %v", err)
+					return
+				}
+
+				response := &v1alpha1.StreamGenerateResponse{
+					Cells:       cells,
+					NotebookUri: notebookUri,
+					InsertAt:    selectedCell + 1,
+				}
+				log.V(logs.Debug).Info("Sending response", zap.Object("response", response))
+				if err := stream.Send(response); err != nil {
+					log.Error(err, "Failed to send response")
+					statusChan <- status.Newf(codes.Internal, "failed to send response; %v", err)
+					return
+				}
+			case <-ctx.Done():
+				log.Info("Context cancelled; stopping completion generation")
+				statusChan <- status.New(codes.Canceled, "Stream context canceled")
+				return
+			}
+		}
+	}(generateCtx)
+
+	readeCtx, readCancelFunc := context.WithCancel(ctx)
+	// Ensure cancelFunc is called when this function returns; ensures we terminate the go routine
+	defer readCancelFunc()
+	go func(ctx context.Context) {
+		// Start  a thread to receive requests from the client
+		// Keep track of the doc
+		var doc *v1alpha1.Doc
+
+		resultChan := make(chan *v1alpha1.StreamGenerateRequest, 2)
+		errChan := make(chan error, 2)
+
+		for {
+
+			// N.B. This go function reads a single request and adds it to the channel.
+			// This way we can have a select statement to detect if the context gets cancelled before the read occurs.
+			go func() {
+				result, err := stream.Receive()
+				if err != nil {
+					errChan <- err
+				} else {
+					resultChan <- result
+				}
+			}()
+
+			var err error
+			var req *v1alpha1.StreamGenerateRequest
+			select {
+			case <-ctx.Done():
+				log.Info("Context cancelled; stop listening for requests")
+				return
+			case err = <-errChan:
+			case req = <-resultChan:
+			}
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					// The client has closed the stream
+					log.Info("Client closed the stream")
+					statusChan <- status.New(codes.OK, "Client closed the stream")
+					return
+				}
+				if errors.Is(err, context.Canceled) {
+					// The context was cancelled (e.g., client disconnected)
+					log.Info("Stream context cancelled")
+					statusChan <- status.New(codes.Canceled, "Stream context canceled")
+					return
+				}
+				// Some other error occurred
+				log.Error(err, "Error receiving from stream")
+				statusChan <- status.New(codes.Canceled, "Client closed the stream")
+				return
+			}
+			reqCount++
+
+			isValidErr := func() error {
+				if reqCount == 1 {
+					if req.GetFullContext() == nil {
+						return status.Errorf(codes.InvalidArgument, "First request must have a full context")
+					}
+					log.Info("Received full context", "context", req.GetFullContext())
+					if req.GetFullContext().GetNotebookUri() == "" {
+						return status.Errorf(codes.InvalidArgument, "First request must have a notebookUri")
+					}
+					if req.GetFullContext().GetSelected() < 0 {
+						return status.Errorf(codes.InvalidArgument, "First request must have a selected cell")
+					}
+
+					doc, err = converters.NotebookToDoc(req.GetFullContext().GetNotebook())
+					if err != nil {
+						log.Error(err, "Failed to convert notebook to doc")
+						return status.Errorf(codes.InvalidArgument, "Failed to convert notebook to doc")
+					}
+					notebookUri = req.GetFullContext().GetNotebookUri()
+					selectedCell = req.GetFullContext().GetSelected()
+
+					if int(selectedCell) >= len(doc.Blocks) {
+						log.Error(errors.New("Invalid request"), "Selected cell is out of bounds", "selectedCell", selectedCell, "numCells", len(doc.Blocks))
+						return status.Errorf(codes.InvalidArgument, "Selected cell is out of bounds: index %d; number of cells %d", selectedCell, len(doc.Blocks))
+					}
+				} else {
+					if req.GetUpdate() == nil {
+						return status.Errorf(codes.InvalidArgument, "Every request except the first one must have an update")
+					}
+
+					block, err := converters.CellToBlock(req.GetUpdate().GetCell())
+					if err != nil {
+						log.Error(err, "Failed to convert cell to block")
+						return status.Errorf(codes.InvalidArgument, "Failed to convert cell to block")
+					}
+					doc.Blocks[selectedCell] = block
+				}
+				return nil
+			}()
+
+			if isValidErr != nil {
+				log.Info("Request is invalid", "err", isValidErr)
+				statusChan <- status.Convert(isValidErr)
+				return
+			}
+
+			log.Info("Received request", zap.Object("request", req))
+			// Serialize the doc and make it available for processing
+			func() {
+				mu.Lock()
+				defer mu.Unlock()
+
+				// We only need to send a trigger if pendingDoc was nil.
+				// If its nonNil then we've already sent a trigger that hasn't been processed yet
+				sendTrigger := pendingDoc == nil
+
+				var ok bool
+				pendingDoc, ok = proto.Clone(doc).(*v1alpha1.Doc)
+				if !ok {
+					log.Info("Failed to clone doc")
+					statusChan <- status.New(codes.Internal, "Failed to clone doc")
+					return
+				}
+
+				// Signal the completion generator to generate a completion
+				if sendTrigger {
+					log.Info("Sending trigger signal")
+					trigger <- true
+				}
+			}()
+		}
+	}(readeCtx)
+
+	select {
+	// Terminate because the request got cancelled
+	case <-ctx.Done():
+		log.Info("Context cancelled; stopping streaming request", "err", ctx.Err())
+		// Cancel functions will be called when this function returns
+		return ctx.Err()
+	case s := <-statusChan:
+		return s.Err()
+
+	}
+}
+
+func (a *Agent) Status(ctx context.Context, req *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error) {
+	log := logs.FromContext(ctx)
+	log.Info("Agent.Simple")
+
+	response := &v1alpha1.StatusResponse{
+		Status: v1alpha1.AIServiceStatus_OK,
+	}
+	res := connect.NewResponse(response)
+	res.Header().Set("AIService-Version", "v1alpha1")
+	return res, nil
 }

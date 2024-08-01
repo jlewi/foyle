@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
+
 	"github.com/cockroachdb/pebble"
 
 	"github.com/jlewi/foyle/app/pkg/runme"
@@ -113,6 +116,10 @@ func (s *Server) createGinEngine() error {
 	router := gin.Default()
 
 	router.GET("/healthz", s.healthCheck)
+	router.NoRoute(func(c *gin.Context) {
+		log.Info("Request for not found path", "path", c.Request.URL.Path)
+		c.JSON(http.StatusNotFound, gin.H{"message": "Not found", "path": c.Request.URL.Path})
+	})
 
 	// Serve the static assets for vscode.
 	// There should be several directories located in ${ASSETS_DIR}/vscode
@@ -224,10 +231,9 @@ func (s *Server) createGinEngine() error {
 		router.Use(corsMiddleWare)
 	}
 
-	// N.B. don't include leading or trailing slashes in the prefix because the code below assumes there isn't any
-	apiPrefix := "api"
 	// Add REST handlers for blocklogs
 	// TODO(jeremy): We should probably standardize on connect-rpc
+	apiPrefix := s.config.APIPrefix()
 	router.GET(apiPrefix+"/blocklogs/:id", s.logsCrud.GetBlockLog)
 
 	// Set  up the connect-rpc handlers for the EvalServer
@@ -237,6 +243,11 @@ func (s *Server) createGinEngine() error {
 	// Refer to https://connectrpc.com/docs/go/routing#prefixing-routes. Note that grpc-go clients don't
 	// support prefixes.
 	router.Any(apiPrefix+"/"+path+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, handler)))
+
+	generatePath, generateHandler := v1alpha1connect.NewAIServiceHandler(s.agent)
+	log.Info("Setting up generate service", "path", apiPrefix+"/"+generatePath)
+	router.Any(apiPrefix+"/"+generatePath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, generateHandler)))
+
 	s.engine = router
 
 	// Setup the logs viewer
@@ -398,7 +409,12 @@ func (s *Server) Run() error {
 	hServer := &http.Server{
 		WriteTimeout: s.config.Server.HttpMaxWriteTimeout,
 		ReadTimeout:  s.config.Server.HttpMaxReadTimeout,
-		Handler:      s.engine,
+		// We need to wrap it in h2c to support HTTP/2 without TLS
+		Handler: h2c.NewHandler(s.engine, &http2.Server{}),
+	}
+	// Enable HTTP/2 support
+	if err := http2.ConfigureServer(hServer, &http2.Server{}); err != nil {
+		return errors.Wrapf(err, "failed to configure http2 server")
 	}
 
 	s.hServer = hServer
@@ -566,7 +582,7 @@ func (s *Server) healthCheck(ctx *gin.Context) {
 		"grpcConnectionState": connState.String(),
 	}
 	code := http.StatusOK
-	if connState != connectivity.Ready {
+	if connState != connectivity.Ready && connState != connectivity.Idle {
 		d["status"] = "unhealthy"
 		code = http.StatusServiceUnavailable
 	}
