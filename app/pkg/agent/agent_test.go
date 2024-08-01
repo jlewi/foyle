@@ -4,11 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/go-logr/zapr"
-	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
-	"github.com/pkg/errors"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 	"io"
 	"net"
 	"net/http"
@@ -16,6 +11,14 @@ import (
 	"os/signal"
 	"testing"
 	"time"
+
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+
+	"github.com/go-logr/zapr"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
+	"github.com/pkg/errors"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
 	"github.com/jlewi/foyle/app/pkg/learn"
 
@@ -211,9 +214,11 @@ func runClient(addr string) {
 
 		req := &v1alpha1.StreamGenerateRequest{
 			Request: &v1alpha1.StreamGenerateRequest_Update{
-				Update: &v1alpha1.BlockUpdate{
-					BlockId:      "1234",
-					BlockContent: prompt,
+				Update: &v1alpha1.UpdateContext{
+					Cell: &parserv1.Cell{
+						Kind:  parserv1.CellKind_CELL_KIND_MARKUP,
+						Value: prompt,
+					},
 				},
 			},
 		}

@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
-	"time"
 
 	"github.com/cockroachdb/pebble"
 
@@ -412,7 +413,9 @@ func (s *Server) Run() error {
 		Handler: h2c.NewHandler(s.engine, &http2.Server{}),
 	}
 	// Enable HTTP/2 support
-	http2.ConfigureServer(hServer, &http2.Server{})
+	if err := http2.ConfigureServer(hServer, &http2.Server{}); err != nil {
+		return errors.Wrapf(err, "failed to configure http2 server")
+	}
 
 	s.hServer = hServer
 

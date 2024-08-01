@@ -1,16 +1,17 @@
 package agent
 
 import (
-	"connectrpc.com/connect"
 	"context"
+	"io"
+	"strings"
+	"sync"
+
+	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"io"
-	"strings"
-	"sync"
 
 	"github.com/jlewi/foyle/app/pkg/llms"
 

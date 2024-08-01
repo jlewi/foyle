@@ -4,6 +4,15 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/jlewi/hydros/pkg/util"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
@@ -11,12 +20,6 @@ import (
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
-	"io"
-	"net"
-	"net/http"
-	"os"
-	"testing"
-	"time"
 )
 
 // Test_StreamGenerate is used during development to test that we can connect to the streaming service
@@ -31,12 +34,13 @@ func Test_StreamGenerate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error initializing app; %v", err)
 	}
-	defer app.Shutdown()
+	defer util.DeferIgnoreError(app.Shutdown)
 	go func() {
 		// N.B. We are running it in a subprocess so if you pause in a debugger the server won't be able to
 		// respond to the request. Not sure if that's a good thing or bad thing.
 		if err := app.Serve(); err != nil {
-			t.Fatalf("Error running server; %+v", err)
+			log := zapr.NewLogger(zap.L())
+			log.Error(err, "Error running server")
 		}
 	}()
 
@@ -73,8 +77,10 @@ func Test_RunServer(t *testing.T) {
 	if err := app.OpenDBs(); err != nil {
 		t.Fatalf("Error opening DBs; %v", err)
 	}
-	defer app.Shutdown()
-	app.Serve()
+	defer util.DeferIgnoreError(app.Shutdown)
+	if err := app.Serve(); err != nil {
+		t.Fatalf("Error running server; %v", err)
+	}
 }
 
 func Test_StreamGenerateClient(t *testing.T) {
@@ -86,7 +92,7 @@ func Test_StreamGenerateClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error initializing app; %v", err)
 	}
-	defer app.Shutdown()
+	defer util.DeferIgnoreError(app.Shutdown)
 
 	// This test only runs the client. It assumes the server is started in a different process.
 	// This is useful if you want to step through the client code and don't want to pause the server while
