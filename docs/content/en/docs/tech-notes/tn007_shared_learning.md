@@ -1,8 +1,11 @@
-# Continuous Learning
-
-* **Author**: Jeremy Lewi
-* **Last Updated**: 2024-06-19
-* **Status**: Being drafted
+---
+title: TN007 Shared Learning
+description: A solution for sharing learning between multiple users
+weight: 7
+author: "[Jeremy Lewi](https://lewi.us/about)"
+date: 2024-06-19
+status: published
+---
 
 ## Objective
 

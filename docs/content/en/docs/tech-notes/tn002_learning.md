@@ -1,8 +1,11 @@
-# Learning from human feedback
-
-* **Author**: Jeremy Lewi
-* **Last Updated**: 2024-04-23
-* **Status**: Publish
+---
+title: TN002 Learning from Human Feedback
+description: Allow Foyle to learn from human feedback.
+weight: 2
+author: "[Jeremy Lewi](https://lewi.us/about)"
+date: 2024-04-23
+status: published
+---
 
 ## Objective
 
