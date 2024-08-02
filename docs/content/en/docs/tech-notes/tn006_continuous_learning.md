@@ -1,8 +1,11 @@
-# Continuous Learning
-
-* **Author**: Jeremy Lewi
-* **Last Updated**: 2024-06-07
-* **Status**: Published
+---
+title: TN006 Continuous Learning
+description: Continuously learn from the traces and block logs
+weight: 6
+author: "[Jeremy Lewi](https://lewi.us/about)"
+date: 2024-06-07
+status: published
+---
 
 ## Objective
 

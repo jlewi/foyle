@@ -1,8 +1,11 @@
-# Automatically Inserting Suggested Cells
-
-* **Author**: Jeremy Lewi
-* **Last Updated**: 2024-06-30
-* **Status**: Published
+---
+title: TN008 Auto Insert Cells
+description: Automatically Inserting Suggested Cells
+weight: 8
+author: "[Jeremy Lewi](https://lewi.us/about)"
+date: 2024-06-30
+status: published
+---
 
 ## Objective
 

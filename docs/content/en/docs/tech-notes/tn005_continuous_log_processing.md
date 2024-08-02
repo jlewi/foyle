@@ -1,12 +1,15 @@
-# Continuous Log Processing
-
-* **Author**: Jeremy Lewi
-* **Last Updated**: 2024-05-31
-* **Status**: Published
+---
+title: TN005 Continuous Log Processing
+description: Continuously compute traces and block logs
+weight: 5
+author: "[Jeremy Lewi](https://lewi.us/about)"
+date: 2024-05-31
+status: published
+---
 
 ## Objective
 
-* Continuously compute traces and block logs
+Continuously compute traces and block logs
 
 ## TL;DR
 

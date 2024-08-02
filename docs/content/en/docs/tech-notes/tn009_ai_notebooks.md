@@ -1,8 +1,11 @@
-# Review AI in Notebooks
-
-* **Author**: Jeremy Lewi
-* **Last Updated**: 2024-07-05
-* **Status**: Published
+---
+title: TN009 Review AI in Notebooks
+description: Review AI in Notebooks
+weight: 9
+author: "[Jeremy Lewi](https://lewi.us/about)"
+date: 2024-07-05
+status: published
+---
 
 ## Objective
 
@@ -51,7 +54,7 @@ completer only autocompletes the current cell; it doesn't suggest new cells.
 
 ## Hex
 
-Hex magic lets you describe in natural language what you want to do and then it adds to the notebook to do that.
+Hex magic lets you describe in natural language what you want to do and then it adds the cells to the notebook to do that.
 For example, you can describe a graph you want and it will add an SQL cell to select the data
 [Demo Video](https://hex.tech/blog/magic-ai/).
 

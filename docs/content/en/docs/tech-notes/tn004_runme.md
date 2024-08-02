@@ -1,8 +1,11 @@
-# Integration With Runme.Dev
-
-* **Author**: Jeremy Lewi
-* **Last Updated**: 2024-05-07
-* **Status**: Published
+---
+title: TN004 Integration with Runme.Dev
+description: Integrate Foyle's AI capabilities with runme.dev.
+weight: 4
+author: "[Jeremy Lewi](https://lewi.us/about)"
+date: 2024-05-07
+status: published
+---
 
 ## Objective
 

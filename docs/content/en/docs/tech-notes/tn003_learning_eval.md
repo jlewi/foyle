@@ -1,14 +1,11 @@
 ---
-runme:
-  id: 01HWP5TGX8T7WR6FDJNH0T5MAY
-  version: v3
+title: TN003 Learning Evaluation
+description: Measure the efficacy of the learning system.
+weight: 3
+author: "[Jeremy Lewi](https://lewi.us/about)"
+date: 2024-04-27
+status: published
 ---
-
-# Learning Evaluation
-
-* **Author**: Jeremy Lewi
-* **Last Updated**: 2024-04-27
-* **Status**: Published
 
 ## Objective
 
@@ -17,7 +14,7 @@ Measure the efficacy of the learning system.
 ## TL;DR
 
 The key hypothesis of Foyle is that by using implicit human feedback, we can create an AI that automatically learns
-about your infrastructure. In [TN002_Learning](tn002_learning) and [PR#83](https://github.com/jlewi/foyle/pull/83)
+about your infrastructure. In [TN002_Learning](../tn002_learning/) and [PR#83](https://github.com/jlewi/foyle/pull/83)
 we implemented a very simple learning mechanism based on query dependent few shot prompting. The next step is to
 quantiatively evaluate the effectiveness of this system. We'd like to construct an evaluation data set that consists of
 queries whose answers depend on private knowledge of your infrastructure. We'd like to compare the performance of

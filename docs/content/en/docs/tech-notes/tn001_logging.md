@@ -1,7 +1,11 @@
-# Logging
+---
+title: TN001 Logging
+description: Design logging to support capturing human feedback.
+weight: 1
+author: "[Jeremy Lewi](https://lewi.us/about)"
+date: 2024-04-10
+---
 
-* **Author**: Jeremy Lewi
-* **Last Updated**: 2024-04-10
 * **Status**: Being Drafted
 
 ## Objective
@@ -13,16 +17,16 @@ Design logging to support capturing human feedback.
 One of the key goals of Foyle is to collect human feedback to improve the quality of the AI.
 The key interaction that we want to capture is as follows
 
-*. User asks the AI to generate one or more commands
-*. User edits those commands
-*. User executes those commands
+* User asks the AI to generate one or more commands
+* User edits those commands
+* User executes those commands
 
 In particular, we want to be able to link the commands that the AI generated to the commands that the user ultimately
 executes. We can do this as follows
 
-*. When the AI generates any blocks it attaches a unique block id to each block
-*. When the frontend makes a request to the backend, the request includes the block ids of the blocks
-*. The blockid can then be used as a join key to link what the AI produced with what a human ultimately executed
+* When the AI generates any blocks it attaches a unique block id to each block
+* When the frontend makes a request to the backend, the request includes the block ids of the blocks
+* The blockid can then be used as a join key to link what the AI produced with what a human ultimately executed
 
 ## Implementation
 
