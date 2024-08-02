@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"connectrpc.com/connect"
+
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
@@ -31,6 +33,7 @@ import (
 	"strings"
 	"syscall"
 
+	"connectrpc.com/otelconnect"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/zapr"
@@ -237,14 +240,18 @@ func (s *Server) createGinEngine() error {
 	router.GET(apiPrefix+"/blocklogs/:id", s.logsCrud.GetBlockLog)
 
 	// Set  up the connect-rpc handlers for the EvalServer
-	path, handler := v1alpha1connect.NewEvalServiceHandler(&eval.EvalServer{})
+	otelInterceptor, err := otelconnect.NewInterceptor()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to create otel interceptor")
+	}
+	path, handler := v1alpha1connect.NewEvalServiceHandler(&eval.EvalServer{}, connect.WithInterceptors(otelInterceptor))
 	log.Info("Setting up eval service", "path", path)
 	// Since we want to add the prefix apiPrefix we need to strip it before passing it to the connect-rpc handler
 	// Refer to https://connectrpc.com/docs/go/routing#prefixing-routes. Note that grpc-go clients don't
 	// support prefixes.
 	router.Any(apiPrefix+"/"+path+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, handler)))
 
-	generatePath, generateHandler := v1alpha1connect.NewAIServiceHandler(s.agent)
+	generatePath, generateHandler := v1alpha1connect.NewAIServiceHandler(s.agent, connect.WithInterceptors(otelInterceptor))
 	log.Info("Setting up generate service", "path", apiPrefix+"/"+generatePath)
 	router.Any(apiPrefix+"/"+generatePath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, generateHandler)))
 

@@ -170,7 +170,10 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 }
 
 func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]) error {
+	span := trace.SpanFromContext(ctx)
 	log := logs.FromContext(ctx)
+	traceId := span.SpanContext().TraceID()
+	log = log.WithValues("traceId", traceId, "evalMode", a.config.EvalMode())
 	log.Info("Agent.StreamGenerate")
 	notebookUri := ""
 	var selectedCell int32
@@ -393,7 +396,10 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 }
 
 func (a *Agent) Status(ctx context.Context, req *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error) {
+	span := trace.SpanFromContext(ctx)
 	log := logs.FromContext(ctx)
+	traceId := span.SpanContext().TraceID()
+	log = log.WithValues("traceId", traceId, "evalMode", a.config.EvalMode())
 	log.Info("Agent.Simple")
 
 	response := &v1alpha1.StatusResponse{

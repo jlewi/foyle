@@ -11,7 +11,7 @@ replace (
 )
 
 require (
-	connectrpc.com/connect v1.16.1
+	connectrpc.com/connect v1.16.2
 	github.com/Kunde21/markdownfmt/v3 v3.1.0
 	github.com/agnivade/levenshtein v1.1.1
 	github.com/cockroachdb/pebble v1.1.0
@@ -65,6 +65,7 @@ require (
 	cloud.google.com/go/longrunning v0.5.5 // indirect
 	cloud.google.com/go/secretmanager v1.11.5 // indirect
 	cloud.google.com/go/storage v1.38.0 // indirect
+	connectrpc.com/otelconnect v0.7.1 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
