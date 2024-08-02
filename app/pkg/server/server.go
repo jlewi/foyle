@@ -1,11 +1,12 @@
 package server
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"connectrpc.com/connect"
 
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
