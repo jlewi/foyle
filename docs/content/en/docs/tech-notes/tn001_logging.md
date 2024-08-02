@@ -4,9 +4,8 @@ description: Design logging to support capturing human feedback.
 weight: 1
 author: "[Jeremy Lewi](https://lewi.us/about)"
 date: 2024-04-10
+status: Published
 ---
-
-* **Status**: Being Drafted
 
 ## Objective
 
