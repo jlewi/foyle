@@ -65,15 +65,20 @@ to design our assertions so they can be run online and offline.
 We can use the following interface to define assertions
 
 ```go
-type Assertion interface {
-  Assert(ctx context.Context, doc *v1alpha1.Doc, examples []*v1alpha1.Example, answer []*v1alpha1.Block) (bool, error)
+type Assertion interface {  
+  Assert(ctx context.Context, doc *v1alpha1.Doc, examples []*v1alpha1.Example, answer []*v1alpha1.Block) (AssertResult, error)
   // Name returns the name of the assertion.
   Name() string
 }
+
+type AssertResult string
+AssertPassed AssertResult = "passed"
+AssertFailed AssertResult = "failed"
+AssertSkipped AssertResult = "skipped"
 ```
 
-The `Assert` method takes a document, examples, and the AI response and returns a boolean indicating whether the assertion passed.
-Context can be used to pass along the `traceId` of the actual request.
+The `Assert` method takes a document, examples, and the AI response and returns a triplet indicating whether the assertion passed
+or was skipped. Context can be used to pass along the `traceId` of the actual request.
 
 ### Online Evaluation
 
@@ -83,10 +88,10 @@ assertion will be added as an attribute to the trace. This will make it easy to 
 ## Batch Evaluation
 
 For quickly iterating on the AI, we need to be able to do offline, batch evaluation. Following
-the existing patterns for evaluation, we can define a new `EvalLevel1` resource to run the assertions.
+the existing patterns for evaluation, we can define a new `AssertJob` resource to run the assertions.
 
 ```yaml
-kind: EvalLevel1
+kind: AssertJob
 apiVersion: foyle.io/v1alpha1
 metadata:
   name: "learning"
@@ -144,6 +149,7 @@ Here are some initial assertions we can define
 * The response should contain one code cell
 * Use regexes to check if interactive metadata is set correctly [jlewi/foyle#157](https://github.com/jlewi/foyle/issues/157)
   * interactive should be false unless the command matches a regex for an interactive command e.g. "kubectl.*exec.*", "docker.*run.*" etc...
+* Ensure the AI doesn't generate any cells for empty input
 
 ## Reference
 

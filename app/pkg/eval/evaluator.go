@@ -44,6 +44,9 @@ type Evaluator struct {
 // The evaluator assumes that the analyzer is already running in the background and processing logs.
 // TODO(https://github.com/jlewi/foyle/issues/140): The evaluator may need to be updated now that we continuously
 // process logs in the background.
+//
+// TODO(jeremy): We should probably redo the Evaluator so that instead of setting up the Agent we just
+// communicate with the Agent via RPC.
 func NewEvaluator(cfg config.Config) (*Evaluator, error) {
 	parser, err := executor.NewBashishParser()
 
