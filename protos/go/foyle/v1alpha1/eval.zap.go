@@ -72,6 +72,40 @@ func (m *EvalResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 		}
 	}
 
+	keyName = "assertions" // field assertions = 10
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Assertions {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	return nil
+}
+
+func (m *Assertion) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "name" // field name = 1
+	enc.AddString(keyName, m.Name)
+
+	keyName = "result" // field result = 2
+	enc.AddString(keyName, m.Result.String())
+
+	keyName = "detail" // field detail = 3
+	enc.AddString(keyName, m.Detail)
+
 	return nil
 }
 

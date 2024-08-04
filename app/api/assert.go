@@ -29,7 +29,7 @@ type AssertJobSpec struct {
 	SheetName string `json:"sheetName" yaml:"sheetName"`
 }
 
-type EvalSource {
+type EvalSource struct {
 	MarkdownSource *MarkdownSource `json:"markdownSource,omitempty" yaml:"markdownSource,omitempty"`
 }
 

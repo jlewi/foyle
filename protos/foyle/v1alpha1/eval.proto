@@ -13,6 +13,13 @@ enum EvalResultStatus {
   ERROR = 2;
 }
 
+enum AssertResult {
+  UNKNOWN_AssertResult = 0;
+  PASSED = 1;
+  FAILED = 2;
+  SKIPPED = 3;
+}
+
 // EvalResult represents an evaluation result
 message EvalResult {
   // Example is the answer and expected result
@@ -37,6 +44,16 @@ message EvalResult {
 
   // Best matching RAG result
   RAGResult best_rag_result = 9;
+
+  repeated Assertion assertions = 10;
+}
+
+message Assertion {
+  // Name of the assertion
+  string name = 1;
+  AssertResult result = 2;
+  // Human readable detail of the assertion. If there was an error this should contain the error message.
+  string detail = 3;
 }
 
 message EvalResultListRequest {

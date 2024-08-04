@@ -87,7 +87,7 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	}
 
 	// List all the files
-	files, err := e.listEvalFiles(ctx, experiment.Spec.EvalDir)
+	files, err := listEvalFiles(ctx, experiment.Spec.EvalDir)
 	if err != nil {
 		return err
 	}
@@ -96,14 +96,14 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 
 	// Now iterate over the DB and figure out which files haven't  been loaded into the db.
 
-	unloadedFiles, err := e.findUnloadedFiles(ctx, db, files)
+	unloadedFiles, err := findUnloadedFiles(ctx, db, files)
 	if err != nil {
 		return err
 	}
 	log.Info("Found unloaded files", "numFiles", len(unloadedFiles))
 
 	// We need to load the evaluation data into the database.
-	if err := e.loadMarkdownFiles(ctx, db, unloadedFiles); err != nil {
+	if err := loadMarkdownFiles(ctx, db, unloadedFiles); err != nil {
 		return err
 	}
 
@@ -112,6 +112,8 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 		return err
 	}
 
+	// TODO(jeremy): We should get the traces via API because only one process can access the pebble DB at a time.
+	// And the agent needs access to the pebble DB traces.
 	tracesDB, err := pebble.Open(e.config.GetTracesDBDir(), &pebble.Options{})
 	if err != nil {
 		return err
@@ -169,6 +171,7 @@ func (e *Evaluator) setupAgent(ctx context.Context, agentConfig api.AgentConfig)
 	return agent, nil
 }
 
+// TODO(jeremy): We should use reconcilePredictions which uses the client to generate the predictions.
 func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, agent *agent.Agent) error {
 	olog := logs.FromContext(ctx)
 	iter, err := db.NewIterWithContext(ctx, nil)
@@ -221,7 +224,7 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, age
 			result.GenTraceId = resp.GetTraceId()
 
 			log.Info("Writing result to DB")
-			if err := e.updateResult(ctx, string(key), result, db); err != nil {
+			if err := updateResult(ctx, string(key), result, db); err != nil {
 				return errors.Wrapf(err, "Failed to write result to DB")
 			}
 		}
@@ -229,7 +232,7 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, age
 	return nil
 }
 
-func (e *Evaluator) updateResult(ctx context.Context, id string, result *v1alpha1.EvalResult, db *pebble.DB) error {
+func updateResult(ctx context.Context, id string, result *v1alpha1.EvalResult, db *pebble.DB) error {
 	b, err := proto.Marshal(result)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to marshal result")
@@ -272,7 +275,7 @@ func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error 
 
 		updateEvalResultDistance(ctx, e.parser, result)
 		log.Info("Updating distance", "distance", result.Distance)
-		if err := e.updateResult(ctx, string(key), result, db); err != nil {
+		if err := updateResult(ctx, string(key), result, db); err != nil {
 			log.Error(err, "Failed to update result")
 		}
 	}
@@ -343,7 +346,7 @@ func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, db *pebble.DB, t
 		if result.BestRagResult == nil {
 			continue
 		}
-		if err := e.updateResult(ctx, string(key), result, db); err != nil {
+		if err := updateResult(ctx, string(key), result, db); err != nil {
 			log.Error(err, "Failed to update result")
 		}
 	}
@@ -530,7 +533,7 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 	return nil
 }
 
-func (e *Evaluator) findUnloadedFiles(ctx context.Context, db *pebble.DB, files []string) ([]string, error) {
+func findUnloadedFiles(ctx context.Context, db *pebble.DB, files []string) ([]string, error) {
 	unprocessed := map[string]bool{}
 
 	iter, err := db.NewIterWithContext(ctx, nil)
@@ -574,7 +577,7 @@ func (e *Evaluator) findUnloadedFiles(ctx context.Context, db *pebble.DB, files 
 }
 
 // listEvalFiles returns a list of the all the markdown files in the eval directory.
-func (e *Evaluator) listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
+func listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
 	examples := make([]string, 0, 100)
 	err := filepath.Walk(evalDir, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
@@ -594,7 +597,7 @@ func (e *Evaluator) listEvalFiles(ctx context.Context, evalDir string) ([]string
 
 // loadMarkdownFiles loads a bunch of markdown files representing evaluation data and converts them into example
 // protos.
-func (e *Evaluator) loadMarkdownFiles(ctx context.Context, db *pebble.DB, files []string) error {
+func loadMarkdownFiles(ctx context.Context, db *pebble.DB, files []string) error {
 	oLog := logs.FromContext(ctx)
 
 	allErrors := &helpers.ListOfErrors{}

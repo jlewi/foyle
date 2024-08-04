@@ -22,6 +22,7 @@ const (
 )
 
 // Example represents an example to be used in few shot learning
+// It is also used to represent examples during evaluation.
 type Example struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
