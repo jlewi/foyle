@@ -25,8 +25,8 @@ type AssertRunner struct {
 	assertions []Assertion
 }
 
-func NewAssertRunner(config config.Config) *AssertRunner {
-	return &AssertRunner{config: config}
+func NewAssertRunner(config config.Config) (*AssertRunner, error) {
+	return &AssertRunner{config: config}, nil
 }
 
 func newHTTPClient() *http.Client {

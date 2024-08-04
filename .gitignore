@@ -13,3 +13,4 @@ dist/
 **/plugin
 **/cover.out
 **/*.wasm
+experiments/runs/**

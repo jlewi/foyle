@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"time"
 
 	"connectrpc.com/connect"
@@ -34,7 +35,6 @@ import (
 	"syscall"
 
 	"connectrpc.com/otelconnect"
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/zapr"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -124,10 +124,51 @@ func (s *Server) createGinEngine() error {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Not found", "path": c.Request.URL.Path})
 	})
 
+	// TODO(jeremy): We disabled setting up the vscode server because we weren't using it and it requires assets
+	// to be setup. Should we get rid of it? Provide a flag to enable it? I do think being able to run vscode
+	// in the browser so it is a feature I'd like to add back at some point; see
+	// https://github.com/stateful/runme/issues/616
+	if false {
+		if err := s.serveVSCode(router); err != nil {
+			return err
+		}
+	}
+
+	// Add REST handlers for blocklogs
+	// TODO(jeremy): We should probably standardize on connect-rpc
+	apiPrefix := s.config.APIPrefix()
+	router.GET(apiPrefix+"/blocklogs/:id", s.logsCrud.GetBlockLog)
+
+	// Set  up the connect-rpc handlers for the EvalServer
+	otelInterceptor, err := otelconnect.NewInterceptor()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to create otel interceptor")
+	}
+	path, handler := v1alpha1connect.NewEvalServiceHandler(&eval.EvalServer{}, connect.WithInterceptors(otelInterceptor))
+	log.Info("Setting up eval service", "path", path)
+	// Since we want to add the prefix apiPrefix we need to strip it before passing it to the connect-rpc handler
+	// Refer to https://connectrpc.com/docs/go/routing#prefixing-routes. Note that grpc-go clients don't
+	// support prefixes.
+	router.Any(apiPrefix+"/"+path+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, handler)))
+
+	generatePath, generateHandler := v1alpha1connect.NewAIServiceHandler(s.agent, connect.WithInterceptors(otelInterceptor))
+	log.Info("Setting up generate service", "path", apiPrefix+"/"+generatePath)
+	router.Any(apiPrefix+"/"+generatePath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, generateHandler)))
+
+	s.engine = router
+
+	// Setup the logs viewer
+	if err := s.setupViewerApp(router); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) serveVSCode(router *gin.Engine) error {
+	log := zapr.NewLogger(zap.L())
 	// Serve the static assets for vscode.
 	// There should be several directories located in ${ASSETS_DIR}/vscode
 	// The second argument to Static is the directory to act as the root for the static files.
-
 	vsCodeRPath := "/out"
 	extensionsMapping := staticMapping{
 		relativePath: extensionsRPath,
@@ -232,34 +273,6 @@ func (s *Server) createGinEngine() error {
 		}
 		corsMiddleWare := cors.New(corsConfig)
 		router.Use(corsMiddleWare)
-	}
-
-	// Add REST handlers for blocklogs
-	// TODO(jeremy): We should probably standardize on connect-rpc
-	apiPrefix := s.config.APIPrefix()
-	router.GET(apiPrefix+"/blocklogs/:id", s.logsCrud.GetBlockLog)
-
-	// Set  up the connect-rpc handlers for the EvalServer
-	otelInterceptor, err := otelconnect.NewInterceptor()
-	if err != nil {
-		return errors.Wrapf(err, "Failed to create otel interceptor")
-	}
-	path, handler := v1alpha1connect.NewEvalServiceHandler(&eval.EvalServer{}, connect.WithInterceptors(otelInterceptor))
-	log.Info("Setting up eval service", "path", path)
-	// Since we want to add the prefix apiPrefix we need to strip it before passing it to the connect-rpc handler
-	// Refer to https://connectrpc.com/docs/go/routing#prefixing-routes. Note that grpc-go clients don't
-	// support prefixes.
-	router.Any(apiPrefix+"/"+path+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, handler)))
-
-	generatePath, generateHandler := v1alpha1connect.NewAIServiceHandler(s.agent, connect.WithInterceptors(otelInterceptor))
-	log.Info("Setting up generate service", "path", apiPrefix+"/"+generatePath)
-	router.Any(apiPrefix+"/"+generatePath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, generateHandler)))
-
-	s.engine = router
-
-	// Setup the logs viewer
-	if err := s.setupViewerApp(router); err != nil {
-		return err
 	}
 	return nil
 }
