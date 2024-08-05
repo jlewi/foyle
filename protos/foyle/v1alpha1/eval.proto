@@ -13,6 +13,13 @@ enum EvalResultStatus {
   ERROR = 2;
 }
 
+enum AssertResult {
+  UNKNOWN_AssertResult = 0;
+  PASSED = 1;
+  FAILED = 2;
+  SKIPPED = 3;
+}
+
 // EvalResult represents an evaluation result
 message EvalResult {
   // Example is the answer and expected result
@@ -37,6 +44,16 @@ message EvalResult {
 
   // Best matching RAG result
   RAGResult best_rag_result = 9;
+
+  repeated Assertion assertions = 10;
+}
+
+message Assertion {
+  // Name of the assertion
+  string name = 1;
+  AssertResult result = 2;
+  // Human readable detail of the assertion. If there was an error this should contain the error message.
+  string detail = 3;
 }
 
 message EvalResultListRequest {
@@ -49,6 +66,33 @@ message EvalResultListResponse {
 }
 
 
+// AssertionRow represents a row in the assertion table.
+// It is intended for returning the results of assertions. In a way that makes it easy to view the assertions
+// in a table inside a RunMe notebook. So we need to flatten the data.
+message AssertionRow {
+  // id of the example
+  string id = 1;
+
+  string exampleFile = 2;
+
+  // Document markdown
+  string doc_md = 3;
+  string answer_md =4;
+
+  // TODO(jeremy): How can we avoid having to add each assertion here
+  AssertResult code_after_markdown = 5;
+}
+
+message AssertionTableRequest {
+  // The path of the database to fetch results for
+  string database = 1;
+}
+
+message AssertionTableResponse {
+  repeated AssertionRow rows = 1;
+}
+
 service EvalService {
   rpc List(EvalResultListRequest) returns (EvalResultListResponse) {}
+  rpc AssertionTable(AssertionTableRequest) returns (AssertionTableResponse) {}
 }

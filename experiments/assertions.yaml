@@ -1,0 +1,9 @@
+apiVersion: foyle.io/v1alpha1
+kind: AssertJob
+metadata:
+  name: assertions
+spec:
+  agentAddress: http://localhost:55080/api
+  sources:
+    - markdownSource:
+      path: /Users/jlewi/git_foyle/data/eval

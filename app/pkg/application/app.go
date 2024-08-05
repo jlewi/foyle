@@ -213,11 +213,19 @@ func (a *App) SetupRegistry() error {
 	}
 	a.Registry = &controllers.Registry{}
 
-	eval, err := eval.NewEvaluator(*a.Config)
+	evaluator, err := eval.NewEvaluator(*a.Config)
 	if err != nil {
 		return err
 	}
-	if err := a.Registry.Register(api.ExperimentGVK, eval); err != nil {
+	if err := a.Registry.Register(api.ExperimentGVK, evaluator); err != nil {
+		return err
+	}
+
+	assertor, err := eval.NewAssertRunner(*a.Config)
+	if err != nil {
+		return err
+	}
+	if err := a.Registry.Register(api.AssertJobGVK, assertor); err != nil {
 		return err
 	}
 	return nil

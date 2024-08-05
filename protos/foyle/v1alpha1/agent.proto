@@ -54,8 +54,9 @@ service ExecuteService {
   }
 }
 
-// TODO(jeremy): This should move to https://github.com/stateful/runme/tree/main/pkg/api/proto/runme/ai/v1alpha1
-// This was to quickly hack so we could see what the generated client looks like for the connect protocol.
+// TODO(jeremy): Should we rename this? Maybe NotebookAIService? I think it make sense to keep this
+// Separate from the GenerateService because the GenerateService is using the Foyle protos; where as this
+// uses the RunMe protos.
 service AIService {
   // StreamGenerate is a bidirectional streaming RPC for generating completions
   rpc StreamGenerate (stream StreamGenerateRequest) returns (stream StreamGenerateResponse) {}
