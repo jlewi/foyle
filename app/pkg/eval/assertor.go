@@ -3,6 +3,9 @@ package eval
 import (
 	"context"
 	"crypto/tls"
+	"net"
+	"net/http"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/config"
@@ -13,8 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/proto"
-	"net"
-	"net/http"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -116,9 +117,8 @@ func (r *AssertRunner) Reconcile(ctx context.Context, job api.AssertJob) error {
 	}
 
 	if err := reconcileAssertions(ctx, r.assertions, db); err != nil {
-
+		return err
 	}
-	// TODO(jeremy): Run the assertions
 	return nil
 }
 

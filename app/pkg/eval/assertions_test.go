@@ -2,8 +2,9 @@ package eval
 
 import (
 	"context"
-	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"testing"
+
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )
 
 type testCase struct {

@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"go.uber.org/zap"
