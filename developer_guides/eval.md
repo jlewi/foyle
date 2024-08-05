@@ -46,12 +46,31 @@ yq e ".learner.exampleDirs=[\"${RUNDIR}/training\"]" -i ${RUNDIR}/config.yaml
 yq e ".learner.logDirs=[]" -i ${RUNDIR}/config.yaml
 ```
 
+* configure the assertions
+
+```sh {"id":"01J4F896JP8FZ3N8BGVPZ7VHJ4"}
+cp -f ${REPOROOT}/experiments/assertions.yaml ${RUNDIR}/assertions.yaml
+yq e ".spec.agentAddress=http://localhost:55080/api" -i ${RUNDIR}/assertions.yaml
+yq e ".spec.dbDir=\"${RUNDIR}/evalDB\"" -i ${RUNDIR}/assertions.yaml
+
+```
+
 ### Run the agent
+
+* Start the agent containing the changes you want to evaluate
 
 ```sh {"id":"01J4DM107F0GJWJKFV4P77TAQY"}
 cd ${REPOROOT}/app
 export CONFIGFILE=${RUNDIR}/config.yaml
 go run github.com/jlewi/foyle/app serve --config=${CONFIGFILE}
+```
+
+### Run evaluation driver
+
+```sh {"id":"01J4F8KQ7N5DE3JQRX33T60BB0"}
+cd ${REPOROOT}/app
+export CONFIGFILE=${RUNDIR}/config.yaml
+go run github.com/jlewi/foyle/app apply --config=${CONFIGFILE} ${RUNDIR}/assertions.yaml
 ```
 
 ## Run baseline experiment

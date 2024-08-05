@@ -38,7 +38,7 @@ func reconcilePredictions(ctx context.Context, db *pebble.DB, client v1alpha1con
 		}
 
 		if len(result.GetActual()) > 0 {
-			log.Info("Skipping; already have answer", "path", result.ExampleFile)
+			log.V(logs.Debug).Info("not generating a completion; already have answer", "path", result.ExampleFile)
 			// We have the answer so we don't need to generate it.
 			continue
 		}
@@ -55,7 +55,15 @@ func reconcilePredictions(ctx context.Context, db *pebble.DB, client v1alpha1con
 				// We need to generate the answer.
 				return client.Generate(newCtx, req)
 			}()
+
 			if err != nil {
+				connectErr, ok := err.(*connect.Error)
+				if ok {
+					// If this is a permanent error we want to abort with an error
+					if connectErr.Code() == connect.CodeUnavailable || connectErr.Code() == connect.CodeUnimplemented {
+						return errors.Wrap(err, "Unable to connect to the agent.")
+					}
+				}
 				result.Error = err.Error()
 				result.Status = v1alpha1.EvalResultStatus_ERROR
 				continue

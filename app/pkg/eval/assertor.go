@@ -26,7 +26,12 @@ type AssertRunner struct {
 }
 
 func NewAssertRunner(config config.Config) (*AssertRunner, error) {
-	return &AssertRunner{config: config}, nil
+	runner := &AssertRunner{config: config}
+
+	// Load the assertions
+	runner.assertions = make([]Assertion, 0, 10)
+	runner.assertions = append(runner.assertions, &AssertCodeAfterMarkdown{})
+	return runner, nil
 }
 
 func newHTTPClient() *http.Client {
@@ -141,12 +146,6 @@ func reconcileAssertions(ctx context.Context, assertions []Assertion, db *pebble
 		result := &v1alpha1.EvalResult{}
 		if err := proto.Unmarshal(value, result); err != nil {
 			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
-		}
-
-		if len(result.GetAssertions()) == len(assertions) {
-			log.Info("Skipping; already have assertions", "path", result.ExampleFile)
-			// We have the answer so we don't need to generate it.
-			continue
 		}
 
 		actual := make(map[string]bool)

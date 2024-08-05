@@ -151,9 +151,13 @@ func (s *Server) createGinEngine() error {
 	// support prefixes.
 	router.Any(apiPrefix+"/"+path+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, handler)))
 
-	generatePath, generateHandler := v1alpha1connect.NewAIServiceHandler(s.agent, connect.WithInterceptors(otelInterceptor))
+	generatePath, generateHandler := v1alpha1connect.NewGenerateServiceHandler(s, connect.WithInterceptors(otelInterceptor))
 	log.Info("Setting up generate service", "path", apiPrefix+"/"+generatePath)
 	router.Any(apiPrefix+"/"+generatePath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, generateHandler)))
+
+	aiSvcPath, aiSvcHandler := v1alpha1connect.NewAIServiceHandler(s.agent, connect.WithInterceptors(otelInterceptor))
+	log.Info("Setting up AI service", "path", apiPrefix+"/"+aiSvcPath)
+	router.Any(apiPrefix+"/"+aiSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, aiSvcHandler)))
 
 	s.engine = router
 
@@ -607,4 +611,14 @@ func (s *Server) healthCheck(ctx *gin.Context) {
 		code = http.StatusServiceUnavailable
 	}
 	ctx.JSON(code, d)
+}
+
+// Generate a completion request.
+// TODO(https://github.com/jlewi/foyle/issues/173). We should move this function into the Agent structure.
+// Its only here on the server because Agent already has a Generate method for the GRPC protocol. We can get
+// rid of that method once we get rid of GRPC and GRPCGateway and just use connect.
+func (s *Server) Generate(ctx context.Context, req *connect.Request[v1alpha1.GenerateRequest]) (*connect.Response[v1alpha1.GenerateResponse], error) {
+	resp, err := s.agent.Generate(ctx, req.Msg)
+	cResp := connect.NewResponse(resp)
+	return cResp, err
 }
