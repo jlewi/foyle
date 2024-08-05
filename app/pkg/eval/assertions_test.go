@@ -92,7 +92,7 @@ func TestAssertOneCodeCell(t *testing.T) {
 			answer:   []*v1alpha1.Block{},
 			expected: &v1alpha1.Assertion{
 				Name:   "AssertCodeAfterMarkdown",
-				Result: v1alpha1.AssertResult_FAILED,
+				Result: v1alpha1.AssertResult_SKIPPED,
 			},
 		},
 		{
