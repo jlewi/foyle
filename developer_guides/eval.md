@@ -90,3 +90,10 @@ foyle apply ~/git_foyle/experiments/norag.yaml
 ```sh {"id":"01HZ38QWPZ565XH11CCKYCF1M7"}
 foyle apply ~/git_foyle/experiments/rag.yaml
 ```
+
+### Adding Level 1 Evals
+
+1. Define the Assertion in [eval/assertions.go](../app/pkg/eval/assertions.go)
+2. Update [Assertor in assertor.go](../app/pkg/eval/assertor.go) to include the new assertion
+3. Update [AssertRow proto](../protos/eval/eval.proto) to include the new assertion
+4. Update [toAssertionRow](../app/pkg/eval/service.go) to include the new assertion in `AssertRow`

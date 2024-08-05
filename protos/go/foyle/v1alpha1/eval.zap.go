@@ -171,6 +171,12 @@ func (m *AssertionRow) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncode
 	keyName = "code_after_markdown" // field code_after_markdown = 5
 	enc.AddString(keyName, m.CodeAfterMarkdown.String())
 
+	keyName = "one_code_cell" // field one_code_cell = 6
+	enc.AddString(keyName, m.OneCodeCell.String())
+
+	keyName = "ends_with_code_cell" // field ends_with_code_cell = 7
+	enc.AddString(keyName, m.EndsWithCodeCell.String())
+
 	return nil
 }
 

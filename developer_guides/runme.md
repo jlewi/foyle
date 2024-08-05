@@ -43,7 +43,7 @@ Now we can install the extension using the vscode binary
    * It also seemed like when I didn't bump the version I might have actually been using an old version of the extension
 
 ```bash {"id":"01HYZVG8KZKYSTFS4R1RJZDS7P"}
-/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --force --install-extension ~/git_vscode-runme/runme-3.5.9.vsix
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --force --install-extension ~/git_vscode-runme/runme-extension.vsix
 ```
 
 ```sh {"id":"01HY264KZTS4J9NHJASJT1GYJ7"}
@@ -58,10 +58,6 @@ Lets try installing and reinstalling it
 ```bash {"id":"01HY74YTEZDZVJYPMB0VMCE84S"}
 /Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --uninstall-extension stateful.runme
 
-```
-
-```bash {"id":"01HY75KYKE3SFAM5EXMDAVJDTQ"}
-echo "hello world"sdfds
 ```
 
 ## Debugging the Runme Extension in vscode

@@ -81,6 +81,8 @@ message AssertionRow {
 
   // TODO(jeremy): How can we avoid having to add each assertion here
   AssertResult code_after_markdown = 5;
+  AssertResult one_code_cell = 6;
+  AssertResult ends_with_code_cell = 7;
 }
 
 message AssertionTableRequest {
