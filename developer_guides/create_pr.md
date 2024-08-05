@@ -2,6 +2,7 @@
 
 * This is a recipe for creating PR descriptions using AI.
 * Its a work in progress
+* Current version is way to verbose - ends up describing low level changes in too much detail
 
 1. Find the mergepoint with the main branch
 
