@@ -75,10 +75,6 @@ go run github.com/jlewi/foyle/app apply --config=${CONFIGFILE} ${RUNDIR}/asserti
 
 ### Analyze the results
 
-```sh {"id":"01J4HJY2M13P3X60N9WG9BCSTV"}
-ls -la ${RUNDIR}
-```
-
 ```sh {"id":"01J4HN72G5EY98MYPCZG7V02WZ","interactive":"false","mimeType":"application/json"}
 curl -s -H "Content-Type: application/json" http://localhost:55080/api/EvalService/AssertionTable -d "{\"database\":\"${RUNDIR}/evalDB\"}" | jq .rows
 ```
