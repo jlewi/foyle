@@ -152,6 +152,8 @@ func toAssertionRow(result *v1alpha1.EvalResult) (*v1alpha1.AssertionRow, error)
 			row.CodeAfterMarkdown = a.GetResult()
 		case OneCodeCellName:
 			row.OneCodeCell = a.GetResult()
+		case EndsWithCodeCellName:
+			row.EndsWithCodeCell = a.GetResult()
 		default:
 			log.Info("Unknown assertion", "name", a.Name)
 		}
