@@ -32,6 +32,7 @@ func NewAssertRunner(config config.Config) (*AssertRunner, error) {
 	// Load the assertions
 	runner.assertions = make([]Assertion, 0, 10)
 	runner.assertions = append(runner.assertions, &AssertCodeAfterMarkdown{})
+	runner.assertions = append(runner.assertions, &AssertOneCodeCell{})
 	return runner, nil
 }
 
