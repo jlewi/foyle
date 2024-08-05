@@ -147,3 +147,68 @@ func (m *EvalResultListResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Ob
 
 	return nil
 }
+
+func (m *AssertionRow) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "id" // field id = 1
+	enc.AddString(keyName, m.Id)
+
+	keyName = "exampleFile" // field exampleFile = 2
+	enc.AddString(keyName, m.ExampleFile)
+
+	keyName = "doc_md" // field doc_md = 3
+	enc.AddString(keyName, m.DocMd)
+
+	keyName = "answer_md" // field answer_md = 4
+	enc.AddString(keyName, m.AnswerMd)
+
+	keyName = "code_after_markdown" // field code_after_markdown = 5
+	enc.AddString(keyName, m.CodeAfterMarkdown.String())
+
+	return nil
+}
+
+func (m *AssertionTableRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "database" // field database = 1
+	enc.AddString(keyName, m.Database)
+
+	return nil
+}
+
+func (m *AssertionTableResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "rows" // field rows = 1
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Rows {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	return nil
+}

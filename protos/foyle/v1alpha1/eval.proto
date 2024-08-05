@@ -66,6 +66,33 @@ message EvalResultListResponse {
 }
 
 
+// AssertionRow represents a row in the assertion table.
+// It is intended for returning the results of assertions. In a way that makes it easy to view the assertions
+// in a table inside a RunMe notebook. So we need to flatten the data.
+message AssertionRow {
+  // id of the example
+  string id = 1;
+
+  string exampleFile = 2;
+
+  // Document markdown
+  string doc_md = 3;
+  string answer_md =4;
+
+  // TODO(jeremy): How can we avoid having to add each assertion here
+  AssertResult code_after_markdown = 5;
+}
+
+message AssertionTableRequest {
+  // The path of the database to fetch results for
+  string database = 1;
+}
+
+message AssertionTableResponse {
+  repeated AssertionRow rows = 1;
+}
+
 service EvalService {
   rpc List(EvalResultListRequest) returns (EvalResultListResponse) {}
+  rpc AssertionTable(AssertionTableRequest) returns (AssertionTableResponse) {}
 }

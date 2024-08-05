@@ -73,6 +73,16 @@ export CONFIGFILE=${RUNDIR}/config.yaml
 go run github.com/jlewi/foyle/app apply --config=${CONFIGFILE} ${RUNDIR}/assertions.yaml
 ```
 
+### Analyze the results
+
+```sh {"id":"01J4HJY2M13P3X60N9WG9BCSTV"}
+ls -la ${RUNDIR}
+```
+
+```sh {"id":"01J4HN72G5EY98MYPCZG7V02WZ","interactive":"false","mimeType":"application/json"}
+curl -s -H "Content-Type: application/json" http://localhost:55080/api/EvalService/AssertionTable -d "{\"database\":\"${RUNDIR}/evalDB\"}" | jq .rows
+```
+
 ## Run baseline experiment
 
 ```sh {"id":"01HZ38BC6WJF5RB9ZYTXBJE38M"}

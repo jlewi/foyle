@@ -5,6 +5,10 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )
 
+const (
+	CodeAfterMarkdownName = "AssertCodeAfterMarkdown"
+)
+
 // AssertCodeAfterMarkdown is an assertion that checks that if the prompt ends in a markdown cell then the response
 // starts with a code cell.
 type AssertCodeAfterMarkdown struct {
@@ -43,5 +47,5 @@ func (a *AssertCodeAfterMarkdown) Assert(ctx context.Context, doc *v1alpha1.Doc,
 }
 
 func (a *AssertCodeAfterMarkdown) Name() string {
-	return "AssertCodeAfterMarkdown"
+	return CodeAfterMarkdownName
 }

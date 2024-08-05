@@ -23,6 +23,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EvalServiceClient interface {
 	List(ctx context.Context, in *EvalResultListRequest, opts ...grpc.CallOption) (*EvalResultListResponse, error)
+	AssertionTable(ctx context.Context, in *AssertionTableRequest, opts ...grpc.CallOption) (*AssertionTableResponse, error)
 }
 
 type evalServiceClient struct {
@@ -42,11 +43,21 @@ func (c *evalServiceClient) List(ctx context.Context, in *EvalResultListRequest,
 	return out, nil
 }
 
+func (c *evalServiceClient) AssertionTable(ctx context.Context, in *AssertionTableRequest, opts ...grpc.CallOption) (*AssertionTableResponse, error) {
+	out := new(AssertionTableResponse)
+	err := c.cc.Invoke(ctx, "/EvalService/AssertionTable", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EvalServiceServer is the server API for EvalService service.
 // All implementations must embed UnimplementedEvalServiceServer
 // for forward compatibility
 type EvalServiceServer interface {
 	List(context.Context, *EvalResultListRequest) (*EvalResultListResponse, error)
+	AssertionTable(context.Context, *AssertionTableRequest) (*AssertionTableResponse, error)
 	mustEmbedUnimplementedEvalServiceServer()
 }
 
@@ -56,6 +67,9 @@ type UnimplementedEvalServiceServer struct {
 
 func (UnimplementedEvalServiceServer) List(context.Context, *EvalResultListRequest) (*EvalResultListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
+}
+func (UnimplementedEvalServiceServer) AssertionTable(context.Context, *AssertionTableRequest) (*AssertionTableResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AssertionTable not implemented")
 }
 func (UnimplementedEvalServiceServer) mustEmbedUnimplementedEvalServiceServer() {}
 
@@ -88,6 +102,24 @@ func _EvalService_List_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EvalService_AssertionTable_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssertionTableRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvalServiceServer).AssertionTable(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/EvalService/AssertionTable",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvalServiceServer).AssertionTable(ctx, req.(*AssertionTableRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EvalService_ServiceDesc is the grpc.ServiceDesc for EvalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -98,6 +130,10 @@ var EvalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "List",
 			Handler:    _EvalService_List_Handler,
+		},
+		{
+			MethodName: "AssertionTable",
+			Handler:    _EvalService_AssertionTable_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
