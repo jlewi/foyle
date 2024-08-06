@@ -1,6 +1,8 @@
 package anthropic
 
 import (
+	"strings"
+
 	"github.com/go-logr/zapr"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/jlewi/foyle/app/pkg/config"
@@ -8,7 +10,6 @@ import (
 	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"strings"
 )
 
 // NewClient helper function to create a new OpenAI client from  a config

@@ -17,6 +17,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/pkg/agent"
+	"github.com/jlewi/foyle/app/pkg/anthropic"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
 	"github.com/jlewi/foyle/app/pkg/learn"
 	"github.com/jlewi/foyle/app/pkg/oai"
@@ -382,6 +383,16 @@ func (a *App) setupLLM() error {
 	a.vectorizer = oai.NewVectorizer(client)
 
 	switch a.Config.Agent.ModelProvider {
+	case api.ModelProviderAnthropic:
+		client, err := anthropic.NewClient(*a.Config)
+		if err != nil {
+			return err
+		}
+		completer, err := anthropic.NewCompleter(*a.Config, client)
+		if err != nil {
+			return err
+		}
+		a.completer = completer
 	case api.ModelProviderReplicate:
 		chatClient, err := replicate.NewChatClient(*a.Config)
 		if err != nil {
@@ -393,7 +404,6 @@ func (a *App) setupLLM() error {
 		}
 
 		a.completer = completer
-
 	case api.ModelProviderOpenAI:
 		fallthrough
 	default:

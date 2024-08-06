@@ -2,6 +2,8 @@ package anthropic
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/llms"
@@ -10,7 +12,6 @@ import (
 	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
-	"net/http"
 )
 
 const (

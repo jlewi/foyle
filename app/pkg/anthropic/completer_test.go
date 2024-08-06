@@ -2,11 +2,12 @@ package anthropic
 
 import (
 	"context"
+	"os"
+	"testing"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/liushuangls/go-anthropic/v2"
-	"os"
-	"testing"
 )
 
 func TestAnthropicCompleter(t *testing.T) {
@@ -14,7 +15,10 @@ func TestAnthropicCompleter(t *testing.T) {
 		t.Skipf("TestAnthropicCompleter is a manual test that is skipped in CICD")
 	}
 
-	config.InitViper(nil)
+	if err := config.InitViper(nil); err != nil {
+		t.Fatalf("Failed to initialize Viper: %v", err)
+	}
+
 	cfg := config.GetConfig()
 	cfg.Agent.Model = anthropic.ModelClaude3Dot5Sonnet20240620
 	client, err := NewClient(*cfg)
