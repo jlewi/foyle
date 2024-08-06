@@ -59,6 +59,7 @@ type Config struct {
 	Learner *LearnerConfig `json:"learner,omitempty" yaml:"learner,omitempty"`
 
 	Replicate *ReplicateConfig `json:"replicate,omitempty" yaml:"replicate,omitempty"`
+	Anthropic *AnthropicConfig `json:"anthropic,omitempty" yaml:"anthropic,omitempty"`
 }
 
 type LearnerConfig struct {
@@ -103,6 +104,11 @@ type OpenAIConfig struct {
 
 	// BaseURL is the baseURL for the API.
 	BaseURL string `json:"baseURL" yaml:"baseURL"`
+}
+
+type AnthropicConfig struct {
+	// APIKeyFile is the path to the file containing the API key
+	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
 }
 
 type ReplicateConfig struct {
