@@ -388,6 +388,13 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 		return err
 	}
 
+	if trace == nil {
+		// trace will be nil if the entries associated with the trace correspond to a type of trace that we currently
+		// don't log in the traces DB. For example, right now we don't produce a trace for the streaming request
+		log.V(logs.Debug).Info("Entries for trace are currently skipped", traceField, tid)
+		return nil
+	}
+
 	if err := dbutil.SetProto(a.tracesDB, tid, trace); err != nil {
 		return err
 	}
@@ -710,6 +717,11 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (*logs
 
 		if strings.HasSuffix(function, "runner.(*runnerService).Execute") {
 			return combineRunMeTrace(ctx, entries)
+		}
+
+		if strings.HasSuffix(function, "agent.(*Agent).StreamGenerate") {
+			// For now we do nothing with StreamGenerate traces.
+			return nil, nil
 		}
 	}
 
