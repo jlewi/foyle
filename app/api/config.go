@@ -4,6 +4,7 @@ type ModelProvider string
 
 const (
 	ModelProviderReplicate ModelProvider = "replicate"
+	ModelProviderAnthropic ModelProvider = "anthropic"
 	ModelProviderOpenAI    ModelProvider = "openai"
 	ModelProviderDefault   ModelProvider = "openai"
 )
