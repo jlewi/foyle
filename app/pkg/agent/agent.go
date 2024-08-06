@@ -393,10 +393,11 @@ func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.
 	traceId := span.SpanContext().TraceID()
 	tp := tracer()
 	// We need to generate a new ctx with a new trace ID because we want one trace per completion
-	generateCtx, generateSpan := tp.Start(ctx, "StreamAgentGenerate")
+	// We need to use withNewRoot because we want to make it a new trace and not rooted at the current one
+	generateCtx, generateSpan := tp.Start(ctx, "StreamAgentGenerate", trace.WithNewRoot(), trace.WithAttributes(attribute.String("streamTraceID", traceId.String())))
 	generateTraceId := generateSpan.SpanContext().TraceID()
-	generateSpan.SetAttributes(attribute.String("streamTraceID", traceId.String()))
-	log = log.WithValues("traceId", generateTraceId)
+	log = log.WithValues("traceId", generateTraceId, "streamTraceId", traceId.String())
+	generateCtx = logr.NewContext(generateCtx, log)
 	defer generateSpan.End()
 
 	generateResponse, err := a.Generate(generateCtx, generateRequest)
