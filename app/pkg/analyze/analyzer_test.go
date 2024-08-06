@@ -196,19 +196,20 @@ func Test_BuildBlockLog(t *testing.T) {
 
 	// We shuffle ExecTraceIds to make sure we properly set block log based on the later trace
 	execTraceIds := shuffle([]string{execTrace1.GetId(), execTrace2.GetId()})
+
 	cases := []testCase{
 		{
 			name: "basic",
 			block: &logspb.BlockLog{
-				Id:         bid1,
-				GenTraceId: genTrace.Id,
-
+				Id:           bid1,
+				GenTraceId:   genTrace.Id,
 				ExecTraceIds: execTraceIds,
 			},
 			expected: &logspb.BlockLog{
-				Id:             bid1,
-				GenTraceId:     genTrace.Id,
-				ExecTraceIds:   execTraceIds,
+				Id:         bid1,
+				GenTraceId: genTrace.Id,
+				// ExecTraceIds should be sorted by the timestamp
+				ExecTraceIds:   []string{execTrace1.GetId(), execTrace2.GetId()},
 				Doc:            genTrace.GetGenerate().Request.Doc,
 				GeneratedBlock: genTrace.GetGenerate().Response.Blocks[0],
 				ExecutedBlock:  execTrace2.GetExecute().Request.Block,
