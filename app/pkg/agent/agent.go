@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
@@ -209,7 +211,8 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					if pendingDoc == nil {
 						return nil
 					}
-
+					// This should be safe because each time we update pendingDoc we update it to point to
+					// a new doc object. So the other thread won't be modifying the doc pendingDoc points to
 					r := &v1alpha1.GenerateRequest{
 						Doc: pendingDoc,
 					}
@@ -220,35 +223,24 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					// There is no pending document to process
 					continue
 				}
-				generateResponse, err := a.Generate(ctx, generateRequest)
+
+				response, err := a.createCompletion(ctx, generateRequest, notebookUri, selectedCell)
+
 				if err != nil {
-					log.Error(err, "Failed to generate completions")
+					log.Error(err, "createCompletion failed")
 					// TODO(jeremy): Instead of terminating the request should we just try to recover on
 					// The next request?
-					statusChan <- status.Newf(codes.Internal, "Failed to generate completions; %v", err)
+					statusChan <- status.Newf(codes.Internal, err.Error())
 					return
 				}
 
-				cells, err := converters.BlocksToCells(generateResponse.GetBlocks())
-				if err != nil {
-					log.Error(err, "Failed to convert blocks to cells")
-					// TODO(jeremy): Instead of terminating the request should we just try to recover on
-					// The next request?
-					statusChan <- status.Newf(codes.Internal, "Failed to convert blocks to cells; %v", err)
-					return
-				}
-
-				response := &v1alpha1.StreamGenerateResponse{
-					Cells:       cells,
-					NotebookUri: notebookUri,
-					InsertAt:    selectedCell + 1,
-				}
 				log.V(logs.Debug).Info("Sending response", zap.Object("response", response))
 				if err := stream.Send(response); err != nil {
 					log.Error(err, "Failed to send response")
 					statusChan <- status.Newf(codes.Internal, "failed to send response; %v", err)
 					return
 				}
+
 			case <-ctx.Done():
 				log.Info("Context cancelled; stopping completion generation")
 				statusChan <- status.New(codes.Canceled, "Stream context canceled")
@@ -393,6 +385,39 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 		return s.Err()
 
 	}
+}
+
+// createCompletion is a helper function to create a single completion as part of a stream.
+func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.GenerateRequest, notebookUri string, selectedCell int32) (*v1alpha1.StreamGenerateResponse, error) {
+	span := trace.SpanFromContext(ctx)
+	log := logs.FromContext(ctx)
+	traceId := span.SpanContext().TraceID()
+	tp := tracer()
+	// We need to generate a new ctx with a new trace ID because we want one trace per completion
+	// We need to use withNewRoot because we want to make it a new trace and not rooted at the current one
+	generateCtx, generateSpan := tp.Start(ctx, "StreamAgentGenerate", trace.WithNewRoot(), trace.WithAttributes(attribute.String("streamTraceID", traceId.String())))
+	generateTraceId := generateSpan.SpanContext().TraceID()
+	log = log.WithValues("traceId", generateTraceId, "streamTraceId", traceId.String())
+	generateCtx = logr.NewContext(generateCtx, log)
+	defer generateSpan.End()
+
+	generateResponse, err := a.Generate(generateCtx, generateRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	cells, err := converters.BlocksToCells(generateResponse.GetBlocks())
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to convert blocks to cells")
+	}
+
+	response := &v1alpha1.StreamGenerateResponse{
+		Cells:       cells,
+		NotebookUri: notebookUri,
+		InsertAt:    selectedCell + 1,
+	}
+
+	return response, nil
 }
 
 func (a *Agent) Status(ctx context.Context, req *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error) {

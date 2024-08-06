@@ -608,6 +608,8 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 		block.ExecTraceIds = append(block.ExecTraceIds, eid)
 	}
 
+	eidToTime := make(map[string]time.Time)
+
 	var lastTrace *logspb.Trace
 	// Get the last execution trace
 	for _, tid := range block.GetExecTraceIds() {
@@ -622,6 +624,9 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 				log.Error(errors.New("Invalid execution trace for traceId"), "Error getting execute trace", "execTraceId", tid)
 				return
 			}
+
+			eidToTime[tid] = trace.StartTime.AsTime()
+
 			if lastTrace == nil {
 				lastTrace = trace
 				return
@@ -632,6 +637,17 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 			}
 		}()
 	}
+
+	// Sort execTrace ids based on their time. This is so the ordering is stable for the unittest.
+	// It should also be convenient for manual analysis since we usually care about the last exec trace.
+	sort.Slice(block.ExecTraceIds, func(i, j int) bool {
+		left := block.ExecTraceIds[i]
+		right := block.ExecTraceIds[j]
+		leftTime := eidToTime[left]
+		rightTime := eidToTime[right]
+		return leftTime.Before(rightTime)
+	})
+
 	if lastTrace != nil {
 		if err := updateBlockForExecution(block, lastTrace); err != nil {
 			return err
