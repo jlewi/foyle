@@ -2,10 +2,11 @@ package agent
 
 import (
 	"context"
-	"go.opentelemetry.io/otel/attribute"
 	"io"
 	"strings"
 	"sync"
+
+	"go.opentelemetry.io/otel/attribute"
 
 	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
