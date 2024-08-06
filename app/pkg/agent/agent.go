@@ -296,7 +296,13 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					return
 				}
 				// Some other error occurred
-				log.Error(err, "Error receiving from stream")
+				connectErr, ok := err.(*connect.Error)
+				if ok && connectErr.Code() == connect.CodeDeadlineExceeded {
+					// Streaming connections are expected to timeout because of the http timeout
+					log.V(logs.Debug).Info("Streaming connection closed, deadline exceeded")
+				} else {
+					log.Error(err, "Error receiving from stream")
+				}
 				statusChan <- status.New(codes.Canceled, "Client closed the stream")
 				return
 			}
