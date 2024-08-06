@@ -24,6 +24,14 @@ func readLinesFromOffset(ctx context.Context, path string, offset int64) ([]stri
 
 	var lines []string
 	scanner := bufio.NewScanner(f)
+	// Allocate an initial buffer of 5MB
+	initialBuffer := make([]byte, 0, 5*1024*1024)
+	// Allow up to a maximum size of 64 MB. If the token size is larger than this we will get an error.
+	// Our lines should be O(size of our markdown files) because a log entry could contain an entire markdown file.
+	// Most of our file are less than 1 MB. Empirically I observed that the longest line length in some file was
+	// 772685 characters
+	maxBuffer := 64 * 1024 * 1024
+	scanner.Buffer(initialBuffer, maxBuffer)
 	scanner.Split(ScanLinesNoPartial)
 	for scanner.Scan() {
 		line := scanner.Text()

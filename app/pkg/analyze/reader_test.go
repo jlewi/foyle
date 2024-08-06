@@ -5,6 +5,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jlewi/monogo/helpers"
+
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -84,5 +86,38 @@ func Test_readFromOffset(t *testing.T) {
 	}
 	if d := cmp.Diff(lastLine, []string{"line 5"}); d != "" {
 		t.Errorf("unexpected lines:\n%v", d)
+	}
+}
+
+func Test_readReallyLongLines(t *testing.T) {
+	f, err := os.CreateTemp("", "readReallyLongLines.log")
+	if err != nil {
+		t.Fatal(err)
+
+	}
+
+	maxLength := 2 * 1000 * 1000
+	data, err := helpers.RandString(maxLength)
+	if err != nil {
+		t.Fatalf("Failed to generate random string: %v", err)
+	}
+
+	if _, err := f.WriteString(data + "\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	filePath := f.Name()
+
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	lines, _, err := readLinesFromOffset(context.Background(), filePath, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if lines[0] != data {
+		t.Fatalf("Read line doesn't match written line")
 	}
 }
