@@ -104,14 +104,14 @@ message StreamGenerateResponse {
   int32 insert_at = 4;
 }
 
-  enum AIServiceStatus {
-    UNKNOWN = 0;
-    OK = 1;
-    NOT_OK = 2;    
-  }
-  
-  message StatusRequest{}
-  message StatusResponse {
-    AIServiceStatus status = 1;
-  }
+enum AIServiceStatus {
+  UNKNOWN = 0;
+  OK = 1;
+  NOT_OK = 2;
+}
+
+message StatusRequest{}
+message StatusResponse {
+  AIServiceStatus status = 1;
+}
   

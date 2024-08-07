@@ -62,3 +62,17 @@ message LogEntries {
   repeated string lines = 1;
   string resource_version = 2;
 }
+
+// LogsService is for accessing traces and logs.
+service LogsService {
+  // N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
+  rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) {}
+}
+
+message GetTraceRequest {
+  string id = 1;
+}
+
+message GetTraceResponse {
+  Trace trace = 1;
+}

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
+
 	"github.com/gin-contrib/cors"
 
 	"connectrpc.com/connect"
@@ -74,7 +76,7 @@ type Server struct {
 }
 
 // NewServer creates a new server
-func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent) (*Server, error) {
+func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent, tracesDB *pebble.DB) (*Server, error) {
 	e, err := executor.NewExecutor(config)
 	if err != nil {
 		return nil, err
@@ -88,7 +90,7 @@ func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent) (*
 		return nil, err
 	}
 
-	logsCrud, err := analyze.NewCrudHandler(config, blocksDB)
+	logsCrud, err := analyze.NewCrudHandler(config, blocksDB, tracesDB)
 	if err != nil {
 		return nil, err
 	}
@@ -159,6 +161,10 @@ func (s *Server) createGinEngine() error {
 	aiSvcPath, aiSvcHandler := v1alpha1connect.NewAIServiceHandler(s.agent, connect.WithInterceptors(otelInterceptor))
 	log.Info("Setting up AI service", "path", apiPrefix+"/"+aiSvcPath)
 	router.Any(apiPrefix+"/"+aiSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, aiSvcHandler)))
+
+	logsSvcPath, logsSvcHandler := logspbconnect.NewLogsServiceHandler(s.logsCrud, connect.WithInterceptors(otelInterceptor))
+	log.Info("Setting up logs service", "path", apiPrefix+"/"+logsSvcPath)
+	router.Any(apiPrefix+"/"+logsSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, logsSvcHandler)))
 
 	s.engine = router
 
