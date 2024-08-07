@@ -511,6 +511,100 @@ func (x *LogEntries) GetResourceVersion() string {
 	return ""
 }
 
+type GetTraceRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+}
+
+func (x *GetTraceRequest) Reset() {
+	*x = GetTraceRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_foyle_logs_traces_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetTraceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTraceRequest) ProtoMessage() {}
+
+func (x *GetTraceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_foyle_logs_traces_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTraceRequest.ProtoReflect.Descriptor instead.
+func (*GetTraceRequest) Descriptor() ([]byte, []int) {
+	return file_foyle_logs_traces_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetTraceRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetTraceResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Trace *Trace `protobuf:"bytes,1,opt,name=trace,proto3" json:"trace,omitempty"`
+}
+
+func (x *GetTraceResponse) Reset() {
+	*x = GetTraceResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_foyle_logs_traces_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetTraceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTraceResponse) ProtoMessage() {}
+
+func (x *GetTraceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_foyle_logs_traces_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTraceResponse.ProtoReflect.Descriptor instead.
+func (*GetTraceResponse) Descriptor() ([]byte, []int) {
+	return file_foyle_logs_traces_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetTraceResponse) GetTrace() *Trace {
+	if x != nil {
+		return x.Trace
+	}
+	return nil
+}
+
 var File_foyle_logs_traces_proto protoreflect.FileDescriptor
 
 var file_foyle_logs_traces_proto_rawDesc = []byte{
@@ -585,17 +679,28 @@ var file_foyle_logs_traces_proto_rawDesc = []byte{
 	0x05, 0x6c, 0x69, 0x6e, 0x65, 0x73, 0x12, 0x29, 0x0a, 0x10, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72,
 	0x63, 0x65, 0x5f, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
 	0x52, 0x0f, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f,
-	0x6e, 0x42, 0x9a, 0x01, 0x0a, 0x0e, 0x63, 0x6f, 0x6d, 0x2e, 0x66, 0x6f, 0x79, 0x6c, 0x65, 0x2e,
-	0x6c, 0x6f, 0x67, 0x73, 0x42, 0x0b, 0x54, 0x72, 0x61, 0x63, 0x65, 0x73, 0x50, 0x72, 0x6f, 0x74,
-	0x6f, 0x50, 0x01, 0x5a, 0x32, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
-	0x6a, 0x6c, 0x65, 0x77, 0x69, 0x2f, 0x66, 0x6f, 0x79, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x73, 0x2f, 0x67, 0x6f, 0x2f, 0x66, 0x6f, 0x79, 0x6c, 0x65, 0x2f, 0x6c, 0x6f, 0x67, 0x73,
-	0x3b, 0x6c, 0x6f, 0x67, 0x73, 0x70, 0x62, 0xa2, 0x02, 0x03, 0x46, 0x4c, 0x58, 0xaa, 0x02, 0x0a,
-	0x46, 0x6f, 0x79, 0x6c, 0x65, 0x2e, 0x4c, 0x6f, 0x67, 0x73, 0xca, 0x02, 0x0a, 0x46, 0x6f, 0x79,
-	0x6c, 0x65, 0x5c, 0x4c, 0x6f, 0x67, 0x73, 0xe2, 0x02, 0x16, 0x46, 0x6f, 0x79, 0x6c, 0x65, 0x5c,
-	0x4c, 0x6f, 0x67, 0x73, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61,
-	0xea, 0x02, 0x0b, 0x46, 0x6f, 0x79, 0x6c, 0x65, 0x3a, 0x3a, 0x4c, 0x6f, 0x67, 0x73, 0x62, 0x06,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x6e, 0x22, 0x21, 0x0a, 0x0f, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x63, 0x65, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x02, 0x69, 0x64, 0x22, 0x3b, 0x0a, 0x10, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x63, 0x65,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x27, 0x0a, 0x05, 0x74, 0x72, 0x61, 0x63,
+	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x66, 0x6f, 0x79, 0x6c, 0x65, 0x2e,
+	0x6c, 0x6f, 0x67, 0x73, 0x2e, 0x54, 0x72, 0x61, 0x63, 0x65, 0x52, 0x05, 0x74, 0x72, 0x61, 0x63,
+	0x65, 0x32, 0x56, 0x0a, 0x0b, 0x4c, 0x6f, 0x67, 0x73, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65,
+	0x12, 0x47, 0x0a, 0x08, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x63, 0x65, 0x12, 0x1b, 0x2e, 0x66,
+	0x6f, 0x79, 0x6c, 0x65, 0x2e, 0x6c, 0x6f, 0x67, 0x73, 0x2e, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61,
+	0x63, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1c, 0x2e, 0x66, 0x6f, 0x79, 0x6c,
+	0x65, 0x2e, 0x6c, 0x6f, 0x67, 0x73, 0x2e, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x63, 0x65, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x42, 0x9a, 0x01, 0x0a, 0x0e, 0x63, 0x6f,
+	0x6d, 0x2e, 0x66, 0x6f, 0x79, 0x6c, 0x65, 0x2e, 0x6c, 0x6f, 0x67, 0x73, 0x42, 0x0b, 0x54, 0x72,
+	0x61, 0x63, 0x65, 0x73, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x32, 0x67, 0x69, 0x74,
+	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6a, 0x6c, 0x65, 0x77, 0x69, 0x2f, 0x66, 0x6f,
+	0x79, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2f, 0x67, 0x6f, 0x2f, 0x66, 0x6f,
+	0x79, 0x6c, 0x65, 0x2f, 0x6c, 0x6f, 0x67, 0x73, 0x3b, 0x6c, 0x6f, 0x67, 0x73, 0x70, 0x62, 0xa2,
+	0x02, 0x03, 0x46, 0x4c, 0x58, 0xaa, 0x02, 0x0a, 0x46, 0x6f, 0x79, 0x6c, 0x65, 0x2e, 0x4c, 0x6f,
+	0x67, 0x73, 0xca, 0x02, 0x0a, 0x46, 0x6f, 0x79, 0x6c, 0x65, 0x5c, 0x4c, 0x6f, 0x67, 0x73, 0xe2,
+	0x02, 0x16, 0x46, 0x6f, 0x79, 0x6c, 0x65, 0x5c, 0x4c, 0x6f, 0x67, 0x73, 0x5c, 0x47, 0x50, 0x42,
+	0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02, 0x0b, 0x46, 0x6f, 0x79, 0x6c, 0x65,
+	0x3a, 0x3a, 0x4c, 0x6f, 0x67, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -610,7 +715,7 @@ func file_foyle_logs_traces_proto_rawDescGZIP() []byte {
 	return file_foyle_logs_traces_proto_rawDescData
 }
 
-var file_foyle_logs_traces_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_foyle_logs_traces_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_foyle_logs_traces_proto_goTypes = []interface{}{
 	(*Trace)(nil),                     // 0: foyle.logs.Trace
 	(*Span)(nil),                      // 1: foyle.logs.Span
@@ -619,35 +724,40 @@ var file_foyle_logs_traces_proto_goTypes = []interface{}{
 	(*ExecuteTrace)(nil),              // 4: foyle.logs.ExecuteTrace
 	(*RunMeTrace)(nil),                // 5: foyle.logs.RunMeTrace
 	(*LogEntries)(nil),                // 6: foyle.logs.LogEntries
-	(*timestamppb.Timestamp)(nil),     // 7: google.protobuf.Timestamp
-	(*v1alpha1.RAGResult)(nil),        // 8: RAGResult
-	(*v1alpha1.GenerateRequest)(nil),  // 9: GenerateRequest
-	(*v1alpha1.GenerateResponse)(nil), // 10: GenerateResponse
-	(*v1alpha1.ExecuteRequest)(nil),   // 11: ExecuteRequest
-	(*v1alpha1.ExecuteResponse)(nil),  // 12: ExecuteResponse
-	(*v1.ExecuteRequest)(nil),         // 13: runme.runner.v1.ExecuteRequest
-	(*v1.ExecuteResponse)(nil),        // 14: runme.runner.v1.ExecuteResponse
+	(*GetTraceRequest)(nil),           // 7: foyle.logs.GetTraceRequest
+	(*GetTraceResponse)(nil),          // 8: foyle.logs.GetTraceResponse
+	(*timestamppb.Timestamp)(nil),     // 9: google.protobuf.Timestamp
+	(*v1alpha1.RAGResult)(nil),        // 10: RAGResult
+	(*v1alpha1.GenerateRequest)(nil),  // 11: GenerateRequest
+	(*v1alpha1.GenerateResponse)(nil), // 12: GenerateResponse
+	(*v1alpha1.ExecuteRequest)(nil),   // 13: ExecuteRequest
+	(*v1alpha1.ExecuteResponse)(nil),  // 14: ExecuteResponse
+	(*v1.ExecuteRequest)(nil),         // 15: runme.runner.v1.ExecuteRequest
+	(*v1.ExecuteResponse)(nil),        // 16: runme.runner.v1.ExecuteResponse
 }
 var file_foyle_logs_traces_proto_depIdxs = []int32{
-	7,  // 0: foyle.logs.Trace.start_time:type_name -> google.protobuf.Timestamp
-	7,  // 1: foyle.logs.Trace.end_time:type_name -> google.protobuf.Timestamp
+	9,  // 0: foyle.logs.Trace.start_time:type_name -> google.protobuf.Timestamp
+	9,  // 1: foyle.logs.Trace.end_time:type_name -> google.protobuf.Timestamp
 	3,  // 2: foyle.logs.Trace.generate:type_name -> foyle.logs.GenerateTrace
 	4,  // 3: foyle.logs.Trace.execute:type_name -> foyle.logs.ExecuteTrace
 	5,  // 4: foyle.logs.Trace.run_me:type_name -> foyle.logs.RunMeTrace
 	1,  // 5: foyle.logs.Trace.spans:type_name -> foyle.logs.Span
 	2,  // 6: foyle.logs.Span.rag:type_name -> foyle.logs.RAGSpan
-	8,  // 7: foyle.logs.RAGSpan.results:type_name -> RAGResult
-	9,  // 8: foyle.logs.GenerateTrace.request:type_name -> GenerateRequest
-	10, // 9: foyle.logs.GenerateTrace.response:type_name -> GenerateResponse
-	11, // 10: foyle.logs.ExecuteTrace.request:type_name -> ExecuteRequest
-	12, // 11: foyle.logs.ExecuteTrace.response:type_name -> ExecuteResponse
-	13, // 12: foyle.logs.RunMeTrace.request:type_name -> runme.runner.v1.ExecuteRequest
-	14, // 13: foyle.logs.RunMeTrace.response:type_name -> runme.runner.v1.ExecuteResponse
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	10, // 7: foyle.logs.RAGSpan.results:type_name -> RAGResult
+	11, // 8: foyle.logs.GenerateTrace.request:type_name -> GenerateRequest
+	12, // 9: foyle.logs.GenerateTrace.response:type_name -> GenerateResponse
+	13, // 10: foyle.logs.ExecuteTrace.request:type_name -> ExecuteRequest
+	14, // 11: foyle.logs.ExecuteTrace.response:type_name -> ExecuteResponse
+	15, // 12: foyle.logs.RunMeTrace.request:type_name -> runme.runner.v1.ExecuteRequest
+	16, // 13: foyle.logs.RunMeTrace.response:type_name -> runme.runner.v1.ExecuteResponse
+	0,  // 14: foyle.logs.GetTraceResponse.trace:type_name -> foyle.logs.Trace
+	7,  // 15: foyle.logs.LogsService.GetTrace:input_type -> foyle.logs.GetTraceRequest
+	8,  // 16: foyle.logs.LogsService.GetTrace:output_type -> foyle.logs.GetTraceResponse
+	16, // [16:17] is the sub-list for method output_type
+	15, // [15:16] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_foyle_logs_traces_proto_init() }
@@ -740,6 +850,30 @@ func file_foyle_logs_traces_proto_init() {
 				return nil
 			}
 		}
+		file_foyle_logs_traces_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetTraceRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_foyle_logs_traces_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetTraceResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_foyle_logs_traces_proto_msgTypes[0].OneofWrappers = []interface{}{
 		(*Trace_Generate)(nil),
@@ -755,9 +889,9 @@ func file_foyle_logs_traces_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_foyle_logs_traces_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
-			NumServices:   0,
+			NumServices:   1,
 		},
 		GoTypes:           file_foyle_logs_traces_proto_goTypes,
 		DependencyIndexes: file_foyle_logs_traces_proto_depIdxs,

@@ -1,8 +1,11 @@
 package analyze
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+
+	"connectrpc.com/connect"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/gin-gonic/gin"
@@ -19,13 +22,31 @@ import (
 type CrudHandler struct {
 	cfg      config.Config
 	blocksDB *pebble.DB
+	tracesDB *pebble.DB
 }
 
-func NewCrudHandler(cfg config.Config, blocksDB *pebble.DB) (*CrudHandler, error) {
+func NewCrudHandler(cfg config.Config, blocksDB *pebble.DB, tracesDB *pebble.DB) (*CrudHandler, error) {
 	return &CrudHandler{
 		cfg:      cfg,
 		blocksDB: blocksDB,
+		tracesDB: tracesDB,
 	}, nil
+}
+
+func (h *CrudHandler) GetTrace(ctx context.Context, request *connect.Request[logspb.GetTraceRequest]) (*connect.Response[logspb.GetTraceResponse], error) {
+	getReq := request.Msg
+	if getReq.GetId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("No traceID provided"))
+	}
+
+	trace := &logspb.Trace{}
+	err := dbutil.GetProto(h.tracesDB, getReq.GetId(), trace)
+	if err != nil {
+		// Assume its a not found error.
+		return nil, connect.NewError(connect.CodeNotFound, errors.Wrapf(err, "Failed to get trace with id %s", getReq.GetId()))
+	}
+
+	return connect.NewResponse(&logspb.GetTraceResponse{Trace: trace}), nil
 }
 
 func (h *CrudHandler) GetBlockLog(c *gin.Context) {
