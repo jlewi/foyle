@@ -14,7 +14,11 @@ import (
 //go:embed request.html.tmpl
 var requestTemplateRaw string
 
+//go:embed response.html.tmpl
+var responseTemplateRaw string
+
 var requestTemplate *template.Template
+var responseTemplate *template.Template
 
 type TemplateData struct {
 	Model       string
@@ -64,12 +68,62 @@ func renderAnthropicRequest(request *anthropic.MessagesRequest) string {
 	return buf.String()
 }
 
+type ResponseTemplateData struct {
+	ID           string
+	Type         string
+	Role         string
+	Messages     []Message
+	Model        string
+	StopReason   string
+	StopSequence string
+	InputTokens  int
+	OutputTokens int
+}
+
+// renderAnthropicResponse returns a string containing the HTML representation of the response
+func renderAnthropicResponse(resp *anthropic.MessagesResponse) string {
+	log := zapr.NewLogger(zap.L())
+	data := &ResponseTemplateData{
+		ID:           resp.ID,
+		Type:         string(resp.Type),
+		Role:         resp.Role,
+		Model:        resp.Model,
+		StopReason:   string(resp.StopReason),
+		StopSequence: resp.StopSequence,
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
+		Messages:     make([]Message, 0, len(resp.Content)),
+	}
+
+	for _, message := range resp.Content {
+		var buf bytes.Buffer
+		if err := goldmark.Convert([]byte(message.GetText()), &buf); err != nil {
+			log.Error(err, "Failed to convert markdown to HTML")
+			buf.WriteString(fmt.Sprintf("Failed to convert markdown to HTML: error %+v", err))
+		}
+		data.Messages = append(data.Messages, Message{
+			Content: template.HTML(buf.String()),
+		})
+	}
+	var buf bytes.Buffer
+	if err := responseTemplate.Execute(&buf, data); err != nil {
+		log.Error(err, "Failed to execute response template")
+		return fmt.Sprintf("Failed to execute response template: error %+v", err)
+	}
+	return buf.String()
+}
+
 func init() {
 	// Register the template functions for the request template
 	// This is necessary to be able to render the request template
 	// with the data we pass to it
 	var err error
 	requestTemplate, err = template.New("request").Parse(requestTemplateRaw)
+	if err != nil {
+		panic(err)
+	}
+
+	responseTemplate, err = template.New("response").Parse(responseTemplateRaw)
 	if err != nil {
 		panic(err)
 	}

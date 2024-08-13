@@ -57,3 +57,52 @@ func TestRenderAnthropicRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderAnthropicResponse(t *testing.T) {
+	type testCase struct {
+		name string
+		resp *anthropic.MessagesResponse
+	}
+
+	tests := []testCase{
+		{
+			name: "basic",
+			resp: &anthropic.MessagesResponse{
+				Model: "test",
+				ID:    "test-id",
+				Role:  "assistant",
+				Usage: anthropic.MessagesUsage{
+					InputTokens:  103,
+					OutputTokens: 105,
+				},
+				StopReason:   anthropic.MessagesStopReasonStopSequence,
+				StopSequence: "stop",
+				Content: []anthropic.MessageContent{
+					{
+						Text: proto.String("This is the response message"),
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := renderAnthropicResponse(test.resp)
+			if result == "" {
+				t.Errorf("Result should not be empty")
+			}
+
+			if os.Getenv("OPEN_IN_BROWSER") != "" {
+				name := fmt.Sprintf("/tmp/%s.request.html", test.name)
+				if err := os.WriteFile(name, []byte(result), 0644); err != nil {
+					t.Errorf("Failed to write file %s: %v", name, err)
+				} else {
+					browser.OpenURL("file://" + name)
+				}
+			}
+
+			t.Logf("Result HTML:\n%s", result)
+		})
+	}
+}

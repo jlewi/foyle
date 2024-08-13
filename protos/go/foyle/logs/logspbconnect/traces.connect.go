@@ -35,23 +35,23 @@ const (
 const (
 	// LogsServiceGetTraceProcedure is the fully-qualified name of the LogsService's GetTrace RPC.
 	LogsServiceGetTraceProcedure = "/foyle.logs.LogsService/GetTrace"
-	// LogsServiceGetPromptProcedure is the fully-qualified name of the LogsService's GetPrompt RPC.
-	LogsServiceGetPromptProcedure = "/foyle.logs.LogsService/GetPrompt"
+	// LogsServiceGetLLMLogsProcedure is the fully-qualified name of the LogsService's GetLLMLogs RPC.
+	LogsServiceGetLLMLogsProcedure = "/foyle.logs.LogsService/GetLLMLogs"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	logsServiceServiceDescriptor         = logs.File_foyle_logs_traces_proto.Services().ByName("LogsService")
-	logsServiceGetTraceMethodDescriptor  = logsServiceServiceDescriptor.Methods().ByName("GetTrace")
-	logsServiceGetPromptMethodDescriptor = logsServiceServiceDescriptor.Methods().ByName("GetPrompt")
+	logsServiceServiceDescriptor          = logs.File_foyle_logs_traces_proto.Services().ByName("LogsService")
+	logsServiceGetTraceMethodDescriptor   = logsServiceServiceDescriptor.Methods().ByName("GetTrace")
+	logsServiceGetLLMLogsMethodDescriptor = logsServiceServiceDescriptor.Methods().ByName("GetLLMLogs")
 )
 
 // LogsServiceClient is a client for the foyle.logs.LogsService service.
 type LogsServiceClient interface {
 	GetTrace(context.Context, *connect.Request[logs.GetTraceRequest]) (*connect.Response[logs.GetTraceResponse], error)
-	// GetPrompt returns the actual prompt to the model.
-	// This processes the logs
-	GetPrompt(context.Context, *connect.Request[logs.GetPromptRequest]) (*connect.Response[logs.GetPromptResponse], error)
+	// GetLLMLogs returns the logs associated with an LLM call.
+	// These will include the rendered prompt and response
+	GetLLMLogs(context.Context, *connect.Request[logs.GetLLMLogsRequest]) (*connect.Response[logs.GetLLMLogsResponse], error)
 }
 
 // NewLogsServiceClient constructs a client for the foyle.logs.LogsService service. By default, it
@@ -70,10 +70,10 @@ func NewLogsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(logsServiceGetTraceMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
-		getPrompt: connect.NewClient[logs.GetPromptRequest, logs.GetPromptResponse](
+		getLLMLogs: connect.NewClient[logs.GetLLMLogsRequest, logs.GetLLMLogsResponse](
 			httpClient,
-			baseURL+LogsServiceGetPromptProcedure,
-			connect.WithSchema(logsServiceGetPromptMethodDescriptor),
+			baseURL+LogsServiceGetLLMLogsProcedure,
+			connect.WithSchema(logsServiceGetLLMLogsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -81,8 +81,8 @@ func NewLogsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // logsServiceClient implements LogsServiceClient.
 type logsServiceClient struct {
-	getTrace  *connect.Client[logs.GetTraceRequest, logs.GetTraceResponse]
-	getPrompt *connect.Client[logs.GetPromptRequest, logs.GetPromptResponse]
+	getTrace   *connect.Client[logs.GetTraceRequest, logs.GetTraceResponse]
+	getLLMLogs *connect.Client[logs.GetLLMLogsRequest, logs.GetLLMLogsResponse]
 }
 
 // GetTrace calls foyle.logs.LogsService.GetTrace.
@@ -90,17 +90,17 @@ func (c *logsServiceClient) GetTrace(ctx context.Context, req *connect.Request[l
 	return c.getTrace.CallUnary(ctx, req)
 }
 
-// GetPrompt calls foyle.logs.LogsService.GetPrompt.
-func (c *logsServiceClient) GetPrompt(ctx context.Context, req *connect.Request[logs.GetPromptRequest]) (*connect.Response[logs.GetPromptResponse], error) {
-	return c.getPrompt.CallUnary(ctx, req)
+// GetLLMLogs calls foyle.logs.LogsService.GetLLMLogs.
+func (c *logsServiceClient) GetLLMLogs(ctx context.Context, req *connect.Request[logs.GetLLMLogsRequest]) (*connect.Response[logs.GetLLMLogsResponse], error) {
+	return c.getLLMLogs.CallUnary(ctx, req)
 }
 
 // LogsServiceHandler is an implementation of the foyle.logs.LogsService service.
 type LogsServiceHandler interface {
 	GetTrace(context.Context, *connect.Request[logs.GetTraceRequest]) (*connect.Response[logs.GetTraceResponse], error)
-	// GetPrompt returns the actual prompt to the model.
-	// This processes the logs
-	GetPrompt(context.Context, *connect.Request[logs.GetPromptRequest]) (*connect.Response[logs.GetPromptResponse], error)
+	// GetLLMLogs returns the logs associated with an LLM call.
+	// These will include the rendered prompt and response
+	GetLLMLogs(context.Context, *connect.Request[logs.GetLLMLogsRequest]) (*connect.Response[logs.GetLLMLogsResponse], error)
 }
 
 // NewLogsServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -115,18 +115,18 @@ func NewLogsServiceHandler(svc LogsServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(logsServiceGetTraceMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
-	logsServiceGetPromptHandler := connect.NewUnaryHandler(
-		LogsServiceGetPromptProcedure,
-		svc.GetPrompt,
-		connect.WithSchema(logsServiceGetPromptMethodDescriptor),
+	logsServiceGetLLMLogsHandler := connect.NewUnaryHandler(
+		LogsServiceGetLLMLogsProcedure,
+		svc.GetLLMLogs,
+		connect.WithSchema(logsServiceGetLLMLogsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/foyle.logs.LogsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case LogsServiceGetTraceProcedure:
 			logsServiceGetTraceHandler.ServeHTTP(w, r)
-		case LogsServiceGetPromptProcedure:
-			logsServiceGetPromptHandler.ServeHTTP(w, r)
+		case LogsServiceGetLLMLogsProcedure:
+			logsServiceGetLLMLogsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -140,6 +140,6 @@ func (UnimplementedLogsServiceHandler) GetTrace(context.Context, *connect.Reques
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("foyle.logs.LogsService.GetTrace is not implemented"))
 }
 
-func (UnimplementedLogsServiceHandler) GetPrompt(context.Context, *connect.Request[logs.GetPromptRequest]) (*connect.Response[logs.GetPromptResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("foyle.logs.LogsService.GetPrompt is not implemented"))
+func (UnimplementedLogsServiceHandler) GetLLMLogs(context.Context, *connect.Request[logs.GetLLMLogsRequest]) (*connect.Response[logs.GetLLMLogsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("foyle.logs.LogsService.GetLLMLogs is not implemented"))
 }

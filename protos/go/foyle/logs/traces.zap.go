@@ -284,7 +284,7 @@ func (m *GetTraceResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEn
 	return nil
 }
 
-func (m *GetPromptRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+func (m *GetLLMLogsRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
 	var keyName string
 	_ = keyName
 
@@ -301,7 +301,7 @@ func (m *GetPromptRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEn
 	return nil
 }
 
-func (m *GetPromptResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+func (m *GetLLMLogsResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
 	var keyName string
 	_ = keyName
 
@@ -309,8 +309,11 @@ func (m *GetPromptResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectE
 		return nil
 	}
 
-	keyName = "html" // field html = 1
-	enc.AddString(keyName, m.Html)
+	keyName = "request_html" // field request_html = 1
+	enc.AddString(keyName, m.RequestHtml)
+
+	keyName = "response_html" // field response_html = 2
+	enc.AddString(keyName, m.ResponseHtml)
 
 	return nil
 }

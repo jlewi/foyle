@@ -67,9 +67,9 @@ message LogEntries {
 service LogsService {
   rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) {}
 
-  // GetPrompt returns the actual prompt to the model.
-  // This processes the logs
-  rpc GetPrompt(GetPromptRequest) returns (GetPromptResponse) {}
+  // GetLLMLogs returns the logs associated with an LLM call.
+  // These will include the rendered prompt and response
+  rpc GetLLMLogs(GetLLMLogsRequest) returns (GetLLMLogsResponse) {}
 }
 
 message GetTraceRequest {
@@ -80,14 +80,17 @@ message GetTraceResponse {
   Trace trace = 1;
 }
 
-message GetPromptRequest {
+message GetLLMLogsRequest {
   // Trace ID is the id of the trace
   string trace_id = 1;
   // log_file is the path to the logs to analyze to get the trace
+  // TODO(jeremy): Should we make this a glob?
   string log_file = 2;
 }
 
-message GetPromptResponse {
-  // html is the html representation of the prompt
-  string html = 1;
+message GetLLMLogsResponse {
+  // request_html is the html representation of the prompt
+  string request_html = 1;
+  // response_html is the html representation of the response
+  string response_html = 2;
 }

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestReadAnthropicRequest(t *testing.T) {
+func TestReadAnthropicLog(t *testing.T) {
 	type testCase struct {
 		name    string
 		logFile string
@@ -28,12 +28,18 @@ func TestReadAnthropicRequest(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fullPath := filepath.Join(cwd, "test_data", c.logFile)
-			result, err := readAnthropicRequest(context.Background(), c.traceId, fullPath)
+			result, err := readAnthropicLog(context.Background(), c.traceId, fullPath)
 			if err != nil {
 				t.Errorf("Failed to read Anthropic request: %v", err)
 			}
 			if result == nil {
 				t.Errorf("Request should not be nil")
+			}
+			if result.Request == nil {
+				t.Errorf("Request should not be nil")
+			}
+			if result.Response == nil {
+				t.Errorf("Response should not be nil")
 			}
 		})
 	}

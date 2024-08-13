@@ -23,9 +23,9 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LogsServiceClient interface {
 	GetTrace(ctx context.Context, in *GetTraceRequest, opts ...grpc.CallOption) (*GetTraceResponse, error)
-	// GetPrompt returns the actual prompt to the model.
-	// This processes the logs
-	GetPrompt(ctx context.Context, in *GetPromptRequest, opts ...grpc.CallOption) (*GetPromptResponse, error)
+	// GetLLMLogs returns the logs associated with an LLM call.
+	// These will include the rendered prompt and response
+	GetLLMLogs(ctx context.Context, in *GetLLMLogsRequest, opts ...grpc.CallOption) (*GetLLMLogsResponse, error)
 }
 
 type logsServiceClient struct {
@@ -45,9 +45,9 @@ func (c *logsServiceClient) GetTrace(ctx context.Context, in *GetTraceRequest, o
 	return out, nil
 }
 
-func (c *logsServiceClient) GetPrompt(ctx context.Context, in *GetPromptRequest, opts ...grpc.CallOption) (*GetPromptResponse, error) {
-	out := new(GetPromptResponse)
-	err := c.cc.Invoke(ctx, "/foyle.logs.LogsService/GetPrompt", in, out, opts...)
+func (c *logsServiceClient) GetLLMLogs(ctx context.Context, in *GetLLMLogsRequest, opts ...grpc.CallOption) (*GetLLMLogsResponse, error) {
+	out := new(GetLLMLogsResponse)
+	err := c.cc.Invoke(ctx, "/foyle.logs.LogsService/GetLLMLogs", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -59,9 +59,9 @@ func (c *logsServiceClient) GetPrompt(ctx context.Context, in *GetPromptRequest,
 // for forward compatibility
 type LogsServiceServer interface {
 	GetTrace(context.Context, *GetTraceRequest) (*GetTraceResponse, error)
-	// GetPrompt returns the actual prompt to the model.
-	// This processes the logs
-	GetPrompt(context.Context, *GetPromptRequest) (*GetPromptResponse, error)
+	// GetLLMLogs returns the logs associated with an LLM call.
+	// These will include the rendered prompt and response
+	GetLLMLogs(context.Context, *GetLLMLogsRequest) (*GetLLMLogsResponse, error)
 	mustEmbedUnimplementedLogsServiceServer()
 }
 
@@ -72,8 +72,8 @@ type UnimplementedLogsServiceServer struct {
 func (UnimplementedLogsServiceServer) GetTrace(context.Context, *GetTraceRequest) (*GetTraceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTrace not implemented")
 }
-func (UnimplementedLogsServiceServer) GetPrompt(context.Context, *GetPromptRequest) (*GetPromptResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetPrompt not implemented")
+func (UnimplementedLogsServiceServer) GetLLMLogs(context.Context, *GetLLMLogsRequest) (*GetLLMLogsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLLMLogs not implemented")
 }
 func (UnimplementedLogsServiceServer) mustEmbedUnimplementedLogsServiceServer() {}
 
@@ -106,20 +106,20 @@ func _LogsService_GetTrace_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _LogsService_GetPrompt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetPromptRequest)
+func _LogsService_GetLLMLogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLLMLogsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(LogsServiceServer).GetPrompt(ctx, in)
+		return srv.(LogsServiceServer).GetLLMLogs(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/foyle.logs.LogsService/GetPrompt",
+		FullMethod: "/foyle.logs.LogsService/GetLLMLogs",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(LogsServiceServer).GetPrompt(ctx, req.(*GetPromptRequest))
+		return srv.(LogsServiceServer).GetLLMLogs(ctx, req.(*GetLLMLogsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -136,8 +136,8 @@ var LogsService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _LogsService_GetTrace_Handler,
 		},
 		{
-			MethodName: "GetPrompt",
-			Handler:    _LogsService_GetPrompt_Handler,
+			MethodName: "GetLLMLogs",
+			Handler:    _LogsService_GetLLMLogs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
