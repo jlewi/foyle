@@ -35,18 +35,23 @@ const (
 const (
 	// LogsServiceGetTraceProcedure is the fully-qualified name of the LogsService's GetTrace RPC.
 	LogsServiceGetTraceProcedure = "/foyle.logs.LogsService/GetTrace"
+	// LogsServiceGetPromptProcedure is the fully-qualified name of the LogsService's GetPrompt RPC.
+	LogsServiceGetPromptProcedure = "/foyle.logs.LogsService/GetPrompt"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	logsServiceServiceDescriptor        = logs.File_foyle_logs_traces_proto.Services().ByName("LogsService")
-	logsServiceGetTraceMethodDescriptor = logsServiceServiceDescriptor.Methods().ByName("GetTrace")
+	logsServiceServiceDescriptor         = logs.File_foyle_logs_traces_proto.Services().ByName("LogsService")
+	logsServiceGetTraceMethodDescriptor  = logsServiceServiceDescriptor.Methods().ByName("GetTrace")
+	logsServiceGetPromptMethodDescriptor = logsServiceServiceDescriptor.Methods().ByName("GetPrompt")
 )
 
 // LogsServiceClient is a client for the foyle.logs.LogsService service.
 type LogsServiceClient interface {
-	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	GetTrace(context.Context, *connect.Request[logs.GetTraceRequest]) (*connect.Response[logs.GetTraceResponse], error)
+	// GetPrompt returns the actual prompt to the model.
+	// This processes the logs
+	GetPrompt(context.Context, *connect.Request[logs.GetPromptRequest]) (*connect.Response[logs.GetPromptResponse], error)
 }
 
 // NewLogsServiceClient constructs a client for the foyle.logs.LogsService service. By default, it
@@ -65,12 +70,19 @@ func NewLogsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(logsServiceGetTraceMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getPrompt: connect.NewClient[logs.GetPromptRequest, logs.GetPromptResponse](
+			httpClient,
+			baseURL+LogsServiceGetPromptProcedure,
+			connect.WithSchema(logsServiceGetPromptMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // logsServiceClient implements LogsServiceClient.
 type logsServiceClient struct {
-	getTrace *connect.Client[logs.GetTraceRequest, logs.GetTraceResponse]
+	getTrace  *connect.Client[logs.GetTraceRequest, logs.GetTraceResponse]
+	getPrompt *connect.Client[logs.GetPromptRequest, logs.GetPromptResponse]
 }
 
 // GetTrace calls foyle.logs.LogsService.GetTrace.
@@ -78,10 +90,17 @@ func (c *logsServiceClient) GetTrace(ctx context.Context, req *connect.Request[l
 	return c.getTrace.CallUnary(ctx, req)
 }
 
+// GetPrompt calls foyle.logs.LogsService.GetPrompt.
+func (c *logsServiceClient) GetPrompt(ctx context.Context, req *connect.Request[logs.GetPromptRequest]) (*connect.Response[logs.GetPromptResponse], error) {
+	return c.getPrompt.CallUnary(ctx, req)
+}
+
 // LogsServiceHandler is an implementation of the foyle.logs.LogsService service.
 type LogsServiceHandler interface {
-	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	GetTrace(context.Context, *connect.Request[logs.GetTraceRequest]) (*connect.Response[logs.GetTraceResponse], error)
+	// GetPrompt returns the actual prompt to the model.
+	// This processes the logs
+	GetPrompt(context.Context, *connect.Request[logs.GetPromptRequest]) (*connect.Response[logs.GetPromptResponse], error)
 }
 
 // NewLogsServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -96,10 +115,18 @@ func NewLogsServiceHandler(svc LogsServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(logsServiceGetTraceMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	logsServiceGetPromptHandler := connect.NewUnaryHandler(
+		LogsServiceGetPromptProcedure,
+		svc.GetPrompt,
+		connect.WithSchema(logsServiceGetPromptMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/foyle.logs.LogsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case LogsServiceGetTraceProcedure:
 			logsServiceGetTraceHandler.ServeHTTP(w, r)
+		case LogsServiceGetPromptProcedure:
+			logsServiceGetPromptHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -111,4 +138,8 @@ type UnimplementedLogsServiceHandler struct{}
 
 func (UnimplementedLogsServiceHandler) GetTrace(context.Context, *connect.Request[logs.GetTraceRequest]) (*connect.Response[logs.GetTraceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("foyle.logs.LogsService.GetTrace is not implemented"))
+}
+
+func (UnimplementedLogsServiceHandler) GetPrompt(context.Context, *connect.Request[logs.GetPromptRequest]) (*connect.Response[logs.GetPromptResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("foyle.logs.LogsService.GetPrompt is not implemented"))
 }

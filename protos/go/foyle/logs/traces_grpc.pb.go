@@ -22,8 +22,10 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LogsServiceClient interface {
-	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	GetTrace(ctx context.Context, in *GetTraceRequest, opts ...grpc.CallOption) (*GetTraceResponse, error)
+	// GetPrompt returns the actual prompt to the model.
+	// This processes the logs
+	GetPrompt(ctx context.Context, in *GetPromptRequest, opts ...grpc.CallOption) (*GetPromptResponse, error)
 }
 
 type logsServiceClient struct {
@@ -43,12 +45,23 @@ func (c *logsServiceClient) GetTrace(ctx context.Context, in *GetTraceRequest, o
 	return out, nil
 }
 
+func (c *logsServiceClient) GetPrompt(ctx context.Context, in *GetPromptRequest, opts ...grpc.CallOption) (*GetPromptResponse, error) {
+	out := new(GetPromptResponse)
+	err := c.cc.Invoke(ctx, "/foyle.logs.LogsService/GetPrompt", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // LogsServiceServer is the server API for LogsService service.
 // All implementations must embed UnimplementedLogsServiceServer
 // for forward compatibility
 type LogsServiceServer interface {
-	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	GetTrace(context.Context, *GetTraceRequest) (*GetTraceResponse, error)
+	// GetPrompt returns the actual prompt to the model.
+	// This processes the logs
+	GetPrompt(context.Context, *GetPromptRequest) (*GetPromptResponse, error)
 	mustEmbedUnimplementedLogsServiceServer()
 }
 
@@ -58,6 +71,9 @@ type UnimplementedLogsServiceServer struct {
 
 func (UnimplementedLogsServiceServer) GetTrace(context.Context, *GetTraceRequest) (*GetTraceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTrace not implemented")
+}
+func (UnimplementedLogsServiceServer) GetPrompt(context.Context, *GetPromptRequest) (*GetPromptResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPrompt not implemented")
 }
 func (UnimplementedLogsServiceServer) mustEmbedUnimplementedLogsServiceServer() {}
 
@@ -90,6 +106,24 @@ func _LogsService_GetTrace_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LogsService_GetPrompt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPromptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LogsServiceServer).GetPrompt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/foyle.logs.LogsService/GetPrompt",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LogsServiceServer).GetPrompt(ctx, req.(*GetPromptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // LogsService_ServiceDesc is the grpc.ServiceDesc for LogsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -100,6 +134,10 @@ var LogsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTrace",
 			Handler:    _LogsService_GetTrace_Handler,
+		},
+		{
+			MethodName: "GetPrompt",
+			Handler:    _LogsService_GetPrompt_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

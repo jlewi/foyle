@@ -1,11 +1,10 @@
 package analyze
 
 import (
+	"connectrpc.com/connect"
 	"context"
 	"fmt"
 	"net/http"
-
-	"connectrpc.com/connect"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/gin-gonic/gin"
@@ -47,6 +46,29 @@ func (h *CrudHandler) GetTrace(ctx context.Context, request *connect.Request[log
 	}
 
 	return connect.NewResponse(&logspb.GetTraceResponse{Trace: trace}), nil
+}
+
+func (h *CrudHandler) GetPrompt(ctx context.Context, request *connect.Request[logspb.GetPromptRequest]) (*connect.Response[logspb.GetPromptResponse], error) {
+	getReq := request.Msg
+	if getReq.GetTraceId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("No traceID provided"))
+	}
+
+	if getReq.GetLogFile() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("No LogFile provided"))
+	}
+
+	req, err := readAnthropicRequest(ctx, getReq.GetTraceId(), getReq.GetLogFile())
+	if err != nil {
+		// Assume its a not found error.
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to get prompt for trace id %s; logFile: %s", getReq.GetTraceId(), getReq.GetLogFile()))
+	}
+
+	htmlResp := renderAnthropicRequest(req)
+
+	return connect.NewResponse(&logspb.GetPromptResponse{
+		Html: htmlResp,
+	}), nil
 }
 
 func (h *CrudHandler) GetBlockLog(c *gin.Context) {

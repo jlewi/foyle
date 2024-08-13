@@ -40,12 +40,7 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 
 	messages := []anthropic.Message{
 		{Role: anthropic.RoleUser,
-			// TODO(jeremy): We put the systemprompt and message as two separate content blocks. This was
-			// just the most direct result of porting the OpenAI code. We might want to tweak that.
 			Content: []anthropic.MessageContent{
-				{Type: anthropic.MessagesContentTypeText,
-					Text: proto.String(systemPrompt),
-				},
 				{Type: anthropic.MessagesContentTypeText,
 					Text: proto.String(message),
 				},
@@ -58,6 +53,7 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 		Messages:    messages,
 		MaxTokens:   2000,
 		Temperature: proto.Float32(temperature),
+		System:      systemPrompt,
 	}
 
 	log.Info("Anthropic:CreateMessages", "request", request)

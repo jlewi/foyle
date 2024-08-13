@@ -65,8 +65,11 @@ message LogEntries {
 
 // LogsService is for accessing traces and logs.
 service LogsService {
-  // N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
   rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) {}
+
+  // GetPrompt returns the actual prompt to the model.
+  // This processes the logs
+  rpc GetPrompt(GetPromptRequest) returns (GetPromptResponse) {}
 }
 
 message GetTraceRequest {
@@ -75,4 +78,16 @@ message GetTraceRequest {
 
 message GetTraceResponse {
   Trace trace = 1;
+}
+
+message GetPromptRequest {
+  // Trace ID is the id of the trace
+  string trace_id = 1;
+  // log_file is the path to the logs to analyze to get the trace
+  string log_file = 2;
+}
+
+message GetPromptResponse {
+  // html is the html representation of the prompt
+  string html = 1;
 }
