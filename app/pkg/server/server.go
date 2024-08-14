@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jlewi/foyle/app/pkg/docs"
 	"time"
 
 	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
@@ -165,6 +166,14 @@ func (s *Server) createGinEngine() error {
 	logsSvcPath, logsSvcHandler := logspbconnect.NewLogsServiceHandler(s.logsCrud, connect.WithInterceptors(otelInterceptor))
 	log.Info("Setting up logs service", "path", apiPrefix+"/"+logsSvcPath)
 	router.Any(apiPrefix+"/"+logsSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, logsSvcHandler)))
+
+	cSvc, err := docs.NewConvertersService()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to create ConvertersService")
+	}
+	cvtSvcPath, cvtSvcHandler := logspbconnect.NewConversionServiceHandler(cSvc, connect.WithInterceptors(otelInterceptor))
+	log.Info("Setting up conversion service", "path", apiPrefix+"/"+cvtSvcPath)
+	router.Any(apiPrefix+"/"+cvtSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, cvtSvcHandler)))
 
 	s.engine = router
 

@@ -3,8 +3,11 @@ package eval
 import (
 	"context"
 	"crypto/tls"
+	"github.com/jlewi/foyle/app/pkg/dbutil"
+	"github.com/jlewi/foyle/app/pkg/docs"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/api"
@@ -178,5 +181,68 @@ func reconcileAssertions(ctx context.Context, assertions []Assertion, db *pebble
 			return err
 		}
 	}
+	return nil
+}
+
+// loadMarkdownFiles loads a bunch of markdown files into example protos.
+// Unlike loadMarkdownAnswerFiles this function doesn't load any answers.
+func loadMarkdownFiles(ctx context.Context, db *pebble.DB, files []string) error {
+	oLog := logs.FromContext(ctx)
+
+	allErrors := &helpers.ListOfErrors{}
+	for _, path := range files {
+		log := oLog.WithValues("path", path)
+		log.Info("Processing file")
+
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			log.Error(err, "Failed to read file")
+			allErrors.AddCause(err)
+			// Keep going
+			continue
+		}
+
+		doc := &v1alpha1.Doc{}
+
+		blocks, err := docs.MarkdownToBlocks(string(contents))
+		if err != nil {
+			log.Error(err, "Failed to convert markdown to blocks")
+			allErrors.AddCause(err)
+			// Keep going
+			continue
+		}
+
+		doc.Blocks = blocks
+
+		if len(doc.GetBlocks()) < 2 {
+			log.Info("Skipping doc; too few blocks; at least two are required")
+			continue
+		}
+
+		// We generate a stable ID for the example by hashing the contents of the document.
+		example := &v1alpha1.Example{
+			Query: doc,
+		}
+		example.Id = HashExample(example)
+
+		result := &v1alpha1.EvalResult{
+			Example:     example,
+			ExampleFile: path,
+			// initialize distance to a negative value so we can tell when it hasn't been computed
+			Distance: uninitializedDistance,
+		}
+
+		if err := dbutil.SetProto(db, example.GetId(), result); err != nil {
+			log.Error(err, "Failed to write result to DB")
+			allErrors.AddCause(err)
+			// Keep going
+			continue
+		}
+	}
+
+	if len(allErrors.Causes) > 0 {
+		return allErrors
+	}
+
 	return nil
 }
