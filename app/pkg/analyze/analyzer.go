@@ -751,24 +751,24 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb
 			}
 		}
 
-		if gTrace.Request == nil {
+		if gTrace.Request == nil && strings.HasSuffix(e.Function(), "agent.(*Agent).Generate") {
 			raw := e.Request()
 			if raw != nil {
 				request := &v1alpha1.GenerateRequest{}
 				if err := protojson.Unmarshal([]byte(raw), request); err != nil {
-					return nil, err
+					return nil, errors.Wrapf(err, "Failed to unmarshal GenerateRequest for trace %s", trace)
 				}
 
 				gTrace.Request = request
 				trace.StartTime = timestamppb.New(e.Time())
 			}
 		}
-		if gTrace.Response == nil {
+		if gTrace.Response == nil && strings.HasSuffix(e.Function(), "agent.(*Agent).Generate") {
 			raw := e.Response()
 			if raw != nil {
 				v := &v1alpha1.GenerateResponse{}
 				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
-					return nil, err
+					return nil, errors.Wrapf(err, "Failed to unmarshal GenerateResponse for trace %s", trace.Id)
 				}
 				gTrace.Response = v
 				trace.EndTime = timestamppb.New(e.Time())

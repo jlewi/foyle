@@ -65,8 +65,11 @@ message LogEntries {
 
 // LogsService is for accessing traces and logs.
 service LogsService {
-  // N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
   rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) {}
+
+  // GetLLMLogs returns the logs associated with an LLM call.
+  // These will include the rendered prompt and response
+  rpc GetLLMLogs(GetLLMLogsRequest) returns (GetLLMLogsResponse) {}
 }
 
 message GetTraceRequest {
@@ -75,4 +78,19 @@ message GetTraceRequest {
 
 message GetTraceResponse {
   Trace trace = 1;
+}
+
+message GetLLMLogsRequest {
+  // Trace ID is the id of the trace
+  string trace_id = 1;
+  // log_file is the path to the logs to analyze to get the trace
+  // TODO(jeremy): Should we make this a glob?
+  string log_file = 2;
+}
+
+message GetLLMLogsResponse {
+  // request_html is the html representation of the prompt
+  string request_html = 1;
+  // response_html is the html representation of the response
+  string response_html = 2;
 }

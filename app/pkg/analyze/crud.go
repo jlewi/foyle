@@ -49,6 +49,29 @@ func (h *CrudHandler) GetTrace(ctx context.Context, request *connect.Request[log
 	return connect.NewResponse(&logspb.GetTraceResponse{Trace: trace}), nil
 }
 
+func (h *CrudHandler) GetLLMLogs(ctx context.Context, request *connect.Request[logspb.GetLLMLogsRequest]) (*connect.Response[logspb.GetLLMLogsResponse], error) {
+	getReq := request.Msg
+	if getReq.GetTraceId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("No traceID provided"))
+	}
+
+	if getReq.GetLogFile() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("No LogFile provided"))
+	}
+
+	log, err := readAnthropicLog(ctx, getReq.GetTraceId(), getReq.GetLogFile())
+	if err != nil {
+		// Assume its a not found error.
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to get prompt for trace id %s; logFile: %s", getReq.GetTraceId(), getReq.GetLogFile()))
+	}
+
+	resp := &logspb.GetLLMLogsResponse{}
+	resp.RequestHtml = renderAnthropicRequest(log.Request)
+	resp.ResponseHtml = renderAnthropicResponse(log.Response)
+
+	return connect.NewResponse(resp), nil
+}
+
 func (h *CrudHandler) GetBlockLog(c *gin.Context) {
 	log := zapr.NewLogger(zap.L())
 

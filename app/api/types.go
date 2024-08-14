@@ -115,18 +115,22 @@ func (L *LogEntry) EvalMode() (bool, bool) {
 }
 
 func (L *LogEntry) Response() []byte {
-	v, ok := (*L)["response"]
-	if !ok {
-		return nil
-	}
-	if v, ok := v.(map[string]interface{}); ok {
-		b, err := json.Marshal(v)
-		if err != nil {
-			log := zapr.NewLogger(zap.L())
-			log.Error(err, "Failed to marshal response")
-			return nil
+	// We use "response" in some places (e.g. Foyle APIs) but "resp" in others (e.g. in Completers) when logging
+	// LLM calls.
+	for _, field := range []string{"response", "resp"} {
+		v, ok := (*L)[field]
+		if !ok {
+			continue
 		}
-		return b
+		if v, ok := v.(map[string]interface{}); ok {
+			b, err := json.Marshal(v)
+			if err != nil {
+				log := zapr.NewLogger(zap.L())
+				log.Error(err, "Failed to marshal response")
+				return nil
+			}
+			return b
+		}
 	}
 	return nil
 }

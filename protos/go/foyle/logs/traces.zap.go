@@ -7,10 +7,10 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
-	_ "google.golang.org/protobuf/types/known/timestamppb"
-	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	_ "google.golang.org/protobuf/types/known/structpb"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
+	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
@@ -280,6 +280,40 @@ func (m *GetTraceResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEn
 			enc.AddObject(keyName, marshaler)
 		}
 	}
+
+	return nil
+}
+
+func (m *GetLLMLogsRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "trace_id" // field trace_id = 1
+	enc.AddString(keyName, m.TraceId)
+
+	keyName = "log_file" // field log_file = 2
+	enc.AddString(keyName, m.LogFile)
+
+	return nil
+}
+
+func (m *GetLLMLogsResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "request_html" // field request_html = 1
+	enc.AddString(keyName, m.RequestHtml)
+
+	keyName = "response_html" // field response_html = 2
+	enc.AddString(keyName, m.ResponseHtml)
 
 	return nil
 }

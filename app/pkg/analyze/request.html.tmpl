@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Request</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .message {
+            margin-bottom: 20px;
+        }
+        .role {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <table>
+        <tr>
+            <th>Parameter</th>
+            <th>Value</th>
+        </tr>
+        <tr>
+            <td>Model</td>
+            <td>{{.Model}}</td>
+        </tr>
+        <tr>
+            <td>Tokens</td>
+            <td>{{.Tokens}}</td>
+        </tr>
+        <tr>
+            <td>Temperature</td>
+            <td>{{.Temperature}}</td>
+        </tr>
+    </table>
+
+    {{range .Messages}}
+    <div class="message">
+        <h3 class="role">Role{{.Role}}</h3>
+        <div>{{.Content }}</div>
+    </div>
+    {{end}}
+</body>
+</html>
