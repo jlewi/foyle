@@ -33,13 +33,17 @@ func TestReadAnthropicLog(t *testing.T) {
 				t.Errorf("Failed to read Anthropic request: %v", err)
 			}
 			if result == nil {
-				t.Errorf("Request should not be nil")
+				t.Fatalf("Request should not be nil")
 			}
 			if result.Request == nil {
 				t.Errorf("Request should not be nil")
 			}
 			if result.Response == nil {
 				t.Errorf("Response should not be nil")
+			} else {
+				if result.Response.Model == "" {
+					t.Errorf("Model should not be empty")
+				}
 			}
 		})
 	}

@@ -2,11 +2,12 @@ package analyze
 
 import (
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/pkg/browser"
 	"google.golang.org/protobuf/proto"
-	"os"
-	"testing"
 )
 
 func TestRenderAnthropicRequest(t *testing.T) {
@@ -49,7 +50,9 @@ func TestRenderAnthropicRequest(t *testing.T) {
 				if err := os.WriteFile(name, []byte(result), 0644); err != nil {
 					t.Errorf("Failed to write file %s: %v", name, err)
 				} else {
-					browser.OpenURL("file://" + name)
+					if err := browser.OpenURL("file://" + name); err != nil {
+						t.Errorf("Failed to open browser: %v", err)
+					}
 				}
 			}
 
@@ -98,7 +101,9 @@ func TestRenderAnthropicResponse(t *testing.T) {
 				if err := os.WriteFile(name, []byte(result), 0644); err != nil {
 					t.Errorf("Failed to write file %s: %v", name, err)
 				} else {
-					browser.OpenURL("file://" + name)
+					if err := browser.OpenURL("file://" + name); err != nil {
+						t.Errorf("Failed to open browser: %v", err)
+					}
 				}
 			}
 

@@ -4,11 +4,12 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"html/template"
+
 	"github.com/go-logr/zapr"
 	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/yuin/goldmark"
 	"go.uber.org/zap"
-	"html/template"
 )
 
 //go:embed request.html.tmpl

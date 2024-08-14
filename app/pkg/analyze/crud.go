@@ -1,10 +1,11 @@
 package analyze
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"fmt"
 	"net/http"
+
+	"connectrpc.com/connect"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/gin-gonic/gin"

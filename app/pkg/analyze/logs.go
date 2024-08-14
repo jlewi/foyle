@@ -1,15 +1,17 @@
 package analyze
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"encoding/json"
+	"io"
+	"os"
+	"strings"
+
+	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/pkg/errors"
-	"io"
-	"os"
 )
 
 // AnthropicLog represents a log entry for an Anthropic request
@@ -53,24 +55,26 @@ func readAnthropicLog(ctx context.Context, traceId string, logFile string) (*Ant
 		if entry.TraceID() != traceId {
 			continue
 		}
+		if !strings.HasSuffix(entry.Function(), "anthropic.(*Completer).Complete") {
+			continue
+		}
 
-		if entry.Request() != nil {
-			// TODO(jeremy): We should check what the model provider is using the function argument and parse
-			if err := json.Unmarshal(entry.Request(), req); err != nil {
+		reqBytes := entry.Request()
+		if reqBytes != nil {
+			if err := json.Unmarshal(reqBytes, req); err != nil {
 				// TODO(jeremy): Should we include the error in the response?
 				log.Error(err, "Failed to unmarshal request")
-				continue
 			} else {
 				aLog.Request = req
 				req = &anthropic.MessagesRequest{}
 			}
 		}
 
-		if entry.Response() != nil {
-			if err := json.Unmarshal(entry.Response(), resp); err != nil {
+		respBytes := entry.Response()
+		if respBytes != nil {
+			if err := json.Unmarshal(respBytes, resp); err != nil {
 				// TODO(jeremy): Should we include the error in the response?
 				log.Error(err, "Failed to unmarshal response")
-				continue
 			} else {
 				aLog.Response = resp
 				resp = &anthropic.MessagesResponse{}
