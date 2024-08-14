@@ -103,7 +103,7 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	log.Info("Found unloaded files", "numFiles", len(unloadedFiles))
 
 	// We need to load the evaluation data into the database.
-	if err := loadMarkdownFiles(ctx, db, unloadedFiles); err != nil {
+	if err := loadMarkdownAnswerFiles(ctx, db, unloadedFiles); err != nil {
 		return err
 	}
 
@@ -596,8 +596,8 @@ func listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
 }
 
 // loadMarkdownFiles loads a bunch of markdown files representing evaluation data and converts them into example
-// protos.
-func loadMarkdownFiles(ctx context.Context, db *pebble.DB, files []string) error {
+// protos. The final block in the markdown file is treated as the answer.
+func loadMarkdownAnswerFiles(ctx context.Context, db *pebble.DB, files []string) error {
 	oLog := logs.FromContext(ctx)
 
 	allErrors := &helpers.ListOfErrors{}

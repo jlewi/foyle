@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+import "foyle/v1alpha1/agent.proto";
+import "foyle/v1alpha1/doc.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+package foyle.logs;
+
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/logs;logspb";
+
+// ConversionService is for converting between one representation and another.
+service ConversionService {
+  // ConvertDoc converts a doc representation of a notebook into markdown or HTML
+  rpc ConvertDoc(ConvertDocRequest) returns (ConvertDocResponse) {}
+}
+
+message ConvertDocRequest {
+  // The doc to convert
+  Doc doc = 1;
+
+  Format format = 2;
+
+  enum Format {
+    UNKNOWN = 0;
+    // Convert to markdown
+    MARKDOWN = 1;
+    // Convert to HTML
+    HTML = 2;
+  }
+}
+
+message ConvertDocResponse {
+  // The converted doc
+  string text = 1;
+}
