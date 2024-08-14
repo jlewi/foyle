@@ -2,8 +2,9 @@ package docs
 
 import (
 	"bytes"
-	"connectrpc.com/connect"
 	"context"
+
+	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/pkg/errors"

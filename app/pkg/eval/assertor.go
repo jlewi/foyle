@@ -3,11 +3,12 @@ package eval
 import (
 	"context"
 	"crypto/tls"
-	"github.com/jlewi/foyle/app/pkg/dbutil"
-	"github.com/jlewi/foyle/app/pkg/docs"
 	"net"
 	"net/http"
 	"os"
+
+	"github.com/jlewi/foyle/app/pkg/dbutil"
+	"github.com/jlewi/foyle/app/pkg/docs"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/api"

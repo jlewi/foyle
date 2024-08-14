@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jlewi/foyle/app/pkg/docs"
 	"time"
+
+	"github.com/jlewi/foyle/app/pkg/docs"
 
 	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
 
