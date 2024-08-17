@@ -20,9 +20,18 @@ jq -r ".recommendations[]" .vscode/extensions.json | xargs -n 1 /Applications/Vi
 
 * [VSCode Extension Packaging & Publishing](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
 * It looks like the package has a `bundle` command that will build the extension and package it into a `.vsix` file
+* Ensure the dependencies are up to date
+
+```sh {"id":"01J5ETSJCXRPW2Z7WZNNGWBT2A"}
+cd ~/git_vscode-runme
+npm install
+```
+
+* You need to run `npm run build` to build the latest version of the code before you bundle it.
 
 ```sh {"id":"01HY25HEG7CR7QCGJSERF3BB4K"}
 cd ~/git_vscode-runme
+npm run build
 npm run bundle
 ```
 
