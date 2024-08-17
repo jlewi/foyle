@@ -1,12 +1,17 @@
-Please continue writing this markdown document to deal with any tasks or issues listed
-in the document. The document is a markdown document. It will contain a description of the task
-or problem, I need your help with. It will then contain one or more code blocks containing commands
-to be executed to accomplish the task or obtain information needed to figure out the problem.
-If a command has already been executed the output of the command will be provided in a code block
-with the language `output`. Use the output to help you figure out the problem or complete the task.
-If you need me to execute a command please provide the command in a code block and I will execute it
-and then add the output to the document.
+Continue writing the markdown document by adding a code block with the commands a user should execute.
+Follow these rules
+
+* Set the language inside the code block to bash
+* Use the text at the end of the document to determine what commands to execute next
+* Use the existing text and code blocks in the document to learn phrases that are predictive of specific commands
+* Only respond with a single code block
+* You can put multiple commands into a code block
+* If the text at the end of the document doesn't clearly describe a command to execute simply respond with the </output> tag
+
 
 Here's the actual document containing the problem or task to be solved:
 
+<input>
 some document
+</input>
+<output>
