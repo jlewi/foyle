@@ -24,7 +24,8 @@ const _ = grpc.SupportPackageIsVersion7
 type LogsServiceClient interface {
 	GetTrace(ctx context.Context, in *GetTraceRequest, opts ...grpc.CallOption) (*GetTraceResponse, error)
 	// GetLLMLogs returns the logs associated with an LLM call.
-	// These will include the rendered prompt and response
+	// These will include the rendered prompt and response. Unlike GetTraceRequest this has the
+	// actual prompt and response of the LLM.
 	GetLLMLogs(ctx context.Context, in *GetLLMLogsRequest, opts ...grpc.CallOption) (*GetLLMLogsResponse, error)
 }
 
@@ -60,7 +61,8 @@ func (c *logsServiceClient) GetLLMLogs(ctx context.Context, in *GetLLMLogsReques
 type LogsServiceServer interface {
 	GetTrace(context.Context, *GetTraceRequest) (*GetTraceResponse, error)
 	// GetLLMLogs returns the logs associated with an LLM call.
-	// These will include the rendered prompt and response
+	// These will include the rendered prompt and response. Unlike GetTraceRequest this has the
+	// actual prompt and response of the LLM.
 	GetLLMLogs(context.Context, *GetLLMLogsRequest) (*GetLLMLogsResponse, error)
 	mustEmbedUnimplementedLogsServiceServer()
 }

@@ -200,6 +200,8 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 	var pendingDoc *v1alpha1.Doc
 	mu := &sync.Mutex{}
 
+	state := &streamState{}
+
 	// Start a thread to asynchronously generate completions.
 	// We will generate one completion at a time. pendingDoc is used to enqueue a document to be processed.
 	// if pendingDoc is nil then there is no updated document waiting to be processed.
@@ -211,6 +213,7 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 			select {
 			case <-trigger:
 				log.Info("Received trigger signal")
+				// TODO(jeremy): I should be this into streamState
 				generateRequest := func() *v1alpha1.GenerateRequest {
 					mu.Lock()
 					defer mu.Unlock()
@@ -230,7 +233,7 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					continue
 				}
 
-				response, err := a.createCompletion(ctx, generateRequest, notebookUri, selectedCell)
+				response, err := a.createCompletion(ctx, generateRequest, notebookUri, selectedCell, state.getContextID())
 
 				if err != nil {
 					log.Error(err, "createCompletion failed")
@@ -317,6 +320,9 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 			reqCount++
 
 			isValidErr := func() error {
+				if req.GetContextId() == "" {
+					return status.Errorf(codes.InvalidArgument, "ContextID is required")
+				}
 				if reqCount == 1 {
 					if req.GetFullContext() == nil {
 						return status.Errorf(codes.InvalidArgument, "First request must have a full context")
@@ -328,6 +334,9 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					if req.GetFullContext().GetSelected() < 0 {
 						return status.Errorf(codes.InvalidArgument, "First request must have a selected cell")
 					}
+
+					// Update the context id
+					state.setContextID(req.GetContextId())
 
 					doc, err = converters.NotebookToDoc(req.GetFullContext().GetNotebook())
 					if err != nil {
@@ -352,6 +361,10 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 						return status.Errorf(codes.InvalidArgument, "Failed to convert cell to block")
 					}
 					doc.Blocks[selectedCell] = block
+				}
+
+				if req.GetContextId() != state.getContextID() {
+					return status.Errorf(codes.InvalidArgument, "ContextId doesn't match current value; expected %s; got %s", state.getContextID(), req.GetContextId())
 				}
 				return nil
 			}()
@@ -402,16 +415,16 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 }
 
 // createCompletion is a helper function to create a single completion as part of a stream.
-func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.GenerateRequest, notebookUri string, selectedCell int32) (*v1alpha1.StreamGenerateResponse, error) {
+func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.GenerateRequest, notebookUri string, selectedCell int32, contextID string) (*v1alpha1.StreamGenerateResponse, error) {
 	span := trace.SpanFromContext(ctx)
 	log := logs.FromContext(ctx)
 	traceId := span.SpanContext().TraceID()
 	tp := tracer()
 	// We need to generate a new ctx with a new trace ID because we want one trace per completion
 	// We need to use withNewRoot because we want to make it a new trace and not rooted at the current one
-	generateCtx, generateSpan := tp.Start(ctx, "StreamAgentGenerate", trace.WithNewRoot(), trace.WithAttributes(attribute.String("streamTraceID", traceId.String())))
+	generateCtx, generateSpan := tp.Start(ctx, "StreamAgentGenerate", trace.WithNewRoot(), trace.WithAttributes(attribute.String("streamTraceID", traceId.String()), attribute.String("contextID", contextID)))
 	generateTraceId := generateSpan.SpanContext().TraceID()
-	log = log.WithValues("traceId", generateTraceId, "streamTraceId", traceId.String())
+	log = log.WithValues("traceId", generateTraceId, "streamTraceId", traceId.String(), "contextId", contextID)
 	generateCtx = logr.NewContext(generateCtx, log)
 	defer generateSpan.End()
 
@@ -466,4 +479,25 @@ func postProcessBlocks(blocks []*v1alpha1.Block) ([]*v1alpha1.Block, error) {
 		}
 	}
 	return results, nil
+}
+
+// streamState is a structure to keep track of the state for a stream and deal with concurrency
+// It provides thread safe access to shared state.
+type streamState struct {
+	contextID string
+	// contextID should only be written once when the first request is received but read many times.
+	// So in principle we could get away without locking it but we lock it anyway to avoid headaches down the line.
+	contextLock sync.RWMutex
+}
+
+func (s *streamState) setContextID(cid string) {
+	s.contextLock.Lock()
+	defer s.contextLock.Unlock()
+	s.contextID = cid
+}
+
+func (s *streamState) getContextID() string {
+	s.contextLock.RLock()
+	defer s.contextLock.RUnlock()
+	return s.contextID
 }

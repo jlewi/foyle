@@ -7,9 +7,9 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	_ "google.golang.org/protobuf/types/known/structpb"
-	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 )
 
@@ -139,6 +139,9 @@ func (m *StreamGenerateRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.Obj
 		}
 	}
 
+	keyName = "context_id" // field context_id = 3
+	enc.AddString(keyName, m.ContextId)
+
 	return nil
 }
 
@@ -227,6 +230,9 @@ func (m *StreamGenerateResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Ob
 
 	keyName = "insert_at" // field insert_at = 4
 	enc.AddInt32(keyName, m.InsertAt)
+
+	keyName = "context_id" // field context_id = 5
+	enc.AddString(keyName, m.ContextId)
 
 	return nil
 }
