@@ -442,6 +442,7 @@ func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.
 		Cells:       cells,
 		NotebookUri: notebookUri,
 		InsertAt:    selectedCell + 1,
+		ContextId:   contextID,
 	}
 
 	return response, nil
