@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/sashabaranov/go-openai"
 	"io"
 	"net"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"os/signal"
 	"testing"
 	"time"
+
+	"github.com/sashabaranov/go-openai"
 
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 
