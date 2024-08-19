@@ -50,7 +50,8 @@ var (
 type LogsServiceClient interface {
 	GetTrace(context.Context, *connect.Request[logs.GetTraceRequest]) (*connect.Response[logs.GetTraceResponse], error)
 	// GetLLMLogs returns the logs associated with an LLM call.
-	// These will include the rendered prompt and response
+	// These will include the rendered prompt and response. Unlike GetTraceRequest this has the
+	// actual prompt and response of the LLM.
 	GetLLMLogs(context.Context, *connect.Request[logs.GetLLMLogsRequest]) (*connect.Response[logs.GetLLMLogsResponse], error)
 }
 
@@ -99,7 +100,8 @@ func (c *logsServiceClient) GetLLMLogs(ctx context.Context, req *connect.Request
 type LogsServiceHandler interface {
 	GetTrace(context.Context, *connect.Request[logs.GetTraceRequest]) (*connect.Response[logs.GetTraceResponse], error)
 	// GetLLMLogs returns the logs associated with an LLM call.
-	// These will include the rendered prompt and response
+	// These will include the rendered prompt and response. Unlike GetTraceRequest this has the
+	// actual prompt and response of the LLM.
 	GetLLMLogs(context.Context, *connect.Request[logs.GetLLMLogsRequest]) (*connect.Response[logs.GetLLMLogsResponse], error)
 }
 

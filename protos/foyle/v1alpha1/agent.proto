@@ -73,6 +73,12 @@ message StreamGenerateRequest {
     FullContext full_context = 1;
     UpdateContext update = 2;
   }
+
+  // Context ID identifies the context of the completion request. This can be used to group requests together.
+  // that relate to the same context even if they are split across multiple requests.
+  // The context ID is also returned in the response.
+  // The client can use this to detect when the context has changed and the response is no longer valid.
+  string context_id = 3;
 }
 
 message FullContext {
@@ -102,6 +108,12 @@ message StreamGenerateResponse {
   string notebook_uri = 3;
   // The cell index at which to insert at
   int32 insert_at = 4;
+
+  // Context ID identifies the context of the completion request. This can be used to group requests together.
+  // that relate to the same context even if they are split across multiple requests.
+  // The context ID is also returned in the response.
+  // The client can use this to detect when the context has changed and the response is no longer valid.
+  string context_id = 5;
 }
 
 enum AIServiceStatus {

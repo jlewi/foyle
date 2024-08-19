@@ -68,7 +68,8 @@ service LogsService {
   rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) {}
 
   // GetLLMLogs returns the logs associated with an LLM call.
-  // These will include the rendered prompt and response
+  // These will include the rendered prompt and response. Unlike GetTraceRequest this has the
+  // actual prompt and response of the LLM.
   rpc GetLLMLogs(GetLLMLogsRequest) returns (GetLLMLogsResponse) {}
 }
 

@@ -113,5 +113,6 @@ There are two ways I think we can iterate on the vscode extension when making ch
 
 1. Publish to the [BSR using labels](https://buf.build/docs/bsr/module/publish#pushing-from-a-local-workspace)
    * I think we can use labels to create the equivalent of a development branch of the SDK
-1. We can update `buf.gen.yaml` to output to a local path inside the vscode extension directory
-    * See [buf.gen.yaml](https://github.com/jlewi/foyle/blob/9663fb81a36ab63876c33873cf4726dc8ef80092/protos/buf.gen.yaml#L28)
+
+2. We can update `buf.gen.yaml` to output to a local path inside the vscode extension directory
+   * See [buf.gen.yaml](https://github.com/jlewi/foyle/blob/9663fb81a36ab63876c33873cf4726dc8ef80092/protos/buf.gen.yaml#L28)
