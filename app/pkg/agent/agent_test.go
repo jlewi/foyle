@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/sashabaranov/go-openai"
 	"io"
 	"net"
 	"net/http"
@@ -101,6 +102,9 @@ func Test_Generate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating in memory DB; %v", err)
 	}
+
+	cfg.Agent.ModelProvider = api.ModelProviderOpenAI
+	cfg.Agent.Model = openai.GPT3Dot5Turbo0125
 
 	completer, err := oai.NewCompleter(*cfg, client)
 	if err != nil {
