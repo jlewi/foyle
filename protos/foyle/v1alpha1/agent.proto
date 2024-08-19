@@ -61,6 +61,9 @@ service AIService {
   // StreamGenerate is a bidirectional streaming RPC for generating completions
   rpc StreamGenerate (stream StreamGenerateRequest) returns (stream StreamGenerateResponse) {}
 
+  // GenerateCells uses the AI to generate cells to insert into the notebook.
+  rpc GenerateCells(GenerateCellsRequest) returns (GenerateCellsResponse) {}
+
   // N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
   rpc Status(StatusRequest) returns (StatusResponse) {}
 }
@@ -114,6 +117,14 @@ message StreamGenerateResponse {
   // The context ID is also returned in the response.
   // The client can use this to detect when the context has changed and the response is no longer valid.
   string context_id = 5;
+}
+
+message GenerateCellsRequest {
+  runme.parser.v1.Notebook notebook = 1;
+}
+
+message GenerateCellsResponse {
+  repeated runme.parser.v1.Cell cells = 1;
 }
 
 enum AIServiceStatus {

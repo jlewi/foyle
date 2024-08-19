@@ -200,6 +200,8 @@ var ExecuteService_ServiceDesc = grpc.ServiceDesc{
 type AIServiceClient interface {
 	// StreamGenerate is a bidirectional streaming RPC for generating completions
 	StreamGenerate(ctx context.Context, opts ...grpc.CallOption) (AIService_StreamGenerateClient, error)
+	// GenerateCells uses the AI to generate cells to insert into the notebook.
+	GenerateCells(ctx context.Context, in *GenerateCellsRequest, opts ...grpc.CallOption) (*GenerateCellsResponse, error)
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 }
@@ -243,6 +245,15 @@ func (x *aIServiceStreamGenerateClient) Recv() (*StreamGenerateResponse, error) 
 	return m, nil
 }
 
+func (c *aIServiceClient) GenerateCells(ctx context.Context, in *GenerateCellsRequest, opts ...grpc.CallOption) (*GenerateCellsResponse, error) {
+	out := new(GenerateCellsResponse)
+	err := c.cc.Invoke(ctx, "/AIService/GenerateCells", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *aIServiceClient) Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
 	out := new(StatusResponse)
 	err := c.cc.Invoke(ctx, "/AIService/Status", in, out, opts...)
@@ -258,6 +269,8 @@ func (c *aIServiceClient) Status(ctx context.Context, in *StatusRequest, opts ..
 type AIServiceServer interface {
 	// StreamGenerate is a bidirectional streaming RPC for generating completions
 	StreamGenerate(AIService_StreamGenerateServer) error
+	// GenerateCells uses the AI to generate cells to insert into the notebook.
+	GenerateCells(context.Context, *GenerateCellsRequest) (*GenerateCellsResponse, error)
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	mustEmbedUnimplementedAIServiceServer()
@@ -269,6 +282,9 @@ type UnimplementedAIServiceServer struct {
 
 func (UnimplementedAIServiceServer) StreamGenerate(AIService_StreamGenerateServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamGenerate not implemented")
+}
+func (UnimplementedAIServiceServer) GenerateCells(context.Context, *GenerateCellsRequest) (*GenerateCellsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GenerateCells not implemented")
 }
 func (UnimplementedAIServiceServer) Status(context.Context, *StatusRequest) (*StatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
@@ -312,6 +328,24 @@ func (x *aIServiceStreamGenerateServer) Recv() (*StreamGenerateRequest, error) {
 	return m, nil
 }
 
+func _AIService_GenerateCells_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateCellsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).GenerateCells(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/AIService/GenerateCells",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).GenerateCells(ctx, req.(*GenerateCellsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AIService_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StatusRequest)
 	if err := dec(in); err != nil {
@@ -337,6 +371,10 @@ var AIService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "AIService",
 	HandlerType: (*AIServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GenerateCells",
+			Handler:    _AIService_GenerateCells_Handler,
+		},
 		{
 			MethodName: "Status",
 			Handler:    _AIService_Status_Handler,

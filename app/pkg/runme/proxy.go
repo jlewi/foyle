@@ -14,6 +14,8 @@ import (
 )
 
 // Proxy is a proxy to the agent that converts the agent responses into the runme protocol.
+// TODO(https://github.com/jlewi/foyle/issues/173): We can get rid of this once runme has a release which
+// migrates to using the connect protocol.
 type Proxy struct {
 	agent *agent.Agent
 	aiv1alpha1.UnimplementedAIServiceServer
