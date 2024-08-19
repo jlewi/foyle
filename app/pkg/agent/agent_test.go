@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sashabaranov/go-openai"
+
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 
 	"github.com/go-logr/zapr"
@@ -101,6 +103,9 @@ func Test_Generate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating in memory DB; %v", err)
 	}
+
+	cfg.Agent.ModelProvider = api.ModelProviderOpenAI
+	cfg.Agent.Model = openai.GPT3Dot5Turbo0125
 
 	completer, err := oai.NewCompleter(*cfg, client)
 	if err != nil {
