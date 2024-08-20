@@ -2,7 +2,9 @@ package analyze
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/jlewi/foyle/app/pkg/logs"
 	"net/http"
 
 	"connectrpc.com/connect"
@@ -23,13 +25,21 @@ type CrudHandler struct {
 	cfg      config.Config
 	blocksDB *pebble.DB
 	tracesDB *pebble.DB
+	logFiles []string
 }
 
 func NewCrudHandler(cfg config.Config, blocksDB *pebble.DB, tracesDB *pebble.DB) (*CrudHandler, error) {
+	// Get a list of log files. We don't do log rotation so we only need to fetch this at start
+	logFiles, err := getLogFilesSorted(cfg.GetRawLogDir())
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to get log files")
+	}
+
 	return &CrudHandler{
 		cfg:      cfg,
 		blocksDB: blocksDB,
 		tracesDB: tracesDB,
+		logFiles: logFiles,
 	}, nil
 }
 
@@ -50,24 +60,58 @@ func (h *CrudHandler) GetTrace(ctx context.Context, request *connect.Request[log
 }
 
 func (h *CrudHandler) GetLLMLogs(ctx context.Context, request *connect.Request[logspb.GetLLMLogsRequest]) (*connect.Response[logspb.GetLLMLogsResponse], error) {
+	log := logs.FromContext(ctx)
 	getReq := request.Msg
 	if getReq.GetTraceId() == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("No traceID provided"))
 	}
 
-	if getReq.GetLogFile() == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("No LogFile provided"))
+	logsToSearch := h.logFiles
+	if getReq.GetLogFile() != "" {
+		logsToSearch = []string{getReq.GetLogFile()}
 	}
 
-	log, err := readAnthropicLog(ctx, getReq.GetTraceId(), getReq.GetLogFile())
-	if err != nil {
-		// Assume its a not found error.
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to get prompt for trace id %s; logFile: %s", getReq.GetTraceId(), getReq.GetLogFile()))
+	var logEntry *AnthropicLog
+	found := false
+	// Search through the logs until we find the entry
+	for _, logFile := range logsToSearch {
+		var err error
+		logEntry, err = readAnthropicLog(ctx, getReq.GetTraceId(), logFile)
+		if logEntry == nil {
+			continue
+		}
+		if logEntry.Request != nil || logEntry.Response != nil {
+			found = true
+			break
+		}
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to search logFile: %s", logFile))
+		}
+	}
+
+	if !found {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("No log entry found for traceID: %s in logFiles: %s", getReq.GetTraceId(), logsToSearch))
 	}
 
 	resp := &logspb.GetLLMLogsResponse{}
-	resp.RequestHtml = renderAnthropicRequest(log.Request)
-	resp.ResponseHtml = renderAnthropicResponse(log.Response)
+	resp.RequestHtml = renderAnthropicRequest(logEntry.Request)
+	resp.ResponseHtml = renderAnthropicResponse(logEntry.Response)
+
+	reqB, err := json.Marshal(logEntry.Request)
+	if err != nil {
+		log.Error(err, "Failed to marshal request")
+		resp.RequestJson = fmt.Sprintf("Failed to marshal request; error %+v", err)
+	} else {
+		resp.RequestJson = string(reqB)
+	}
+
+	resB, err := json.Marshal(logEntry.Response)
+	if err != nil {
+		log.Error(err, "Failed to marshal response")
+		resp.ResponseJson = fmt.Sprintf("Failed to marshal response; error %+v", err)
+	} else {
+		resp.ResponseJson = string(resB)
+	}
 
 	return connect.NewResponse(resp), nil
 }
@@ -88,7 +132,6 @@ func (h *CrudHandler) GetBlockLog(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to read block with id %s; error %+v", id, err)})
 			return
 		}
-
 	}
 
 	b, err := protojson.Marshal(bLog)

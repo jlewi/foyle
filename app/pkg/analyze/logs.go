@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -81,4 +83,27 @@ func readAnthropicLog(ctx context.Context, traceId string, logFile string) (*Ant
 			}
 		}
 	}
+}
+
+// getLogFilesSorted returns a list of log files in the directory sorted so that the most recent log file is first
+func getLogFilesSorted(logDir string) ([]string, error) {
+	files, err := os.ReadDir(logDir)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to read directory %s", logDir)
+	}
+
+	logFiles := make([]string, 0, len(files))
+	for _, file := range files {
+		if !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+		logFiles = append(logFiles, filepath.Join(logDir, file.Name()))
+	}
+
+	// Sort logFiles in descending order based on filename
+	sort.Slice(logFiles, func(i, j int) bool {
+		return logFiles[i] > logFiles[j]
+	})
+
+	return logFiles, nil
 }

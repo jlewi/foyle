@@ -251,6 +251,65 @@ func (m *LogEntries) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 	return nil
 }
 
+func (m *ListAutoCompletionsRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	return nil
+}
+
+func (m *ListAutoCompletionsResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "items" // field items = 1
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Items {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	return nil
+}
+
+func (m *AutcompletionLog) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "context_id" // field context_id = 1
+	enc.AddString(keyName, m.ContextId)
+
+	keyName = "trace_ids" // field trace_ids = 2
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.TraceIds {
+			_ = rv
+			aenc.AppendString(rv)
+		}
+		return nil
+	}))
+
+	return nil
+}
+
 func (m *GetTraceRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
 	var keyName string
 	_ = keyName
@@ -314,6 +373,12 @@ func (m *GetLLMLogsResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Object
 
 	keyName = "response_html" // field response_html = 2
 	enc.AddString(keyName, m.ResponseHtml)
+
+	keyName = "request_json" // field request_json = 3
+	enc.AddString(keyName, m.RequestJson)
+
+	keyName = "response_json" // field response_json = 4
+	enc.AddString(keyName, m.ResponseJson)
 
 	return nil
 }

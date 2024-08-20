@@ -67,10 +67,28 @@ message LogEntries {
 service LogsService {
   rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) {}
 
+  // ListAutoCompletions returns a list of auto completions. Each item in the completion is a
+  // distinct completion context.
+  // rpc ListAutoCompletions(ListAutoCompletionsRequest) returns (ListAutoCompletionsResponse) {}
+
   // GetLLMLogs returns the logs associated with an LLM call.
   // These will include the rendered prompt and response. Unlike GetTraceRequest this has the
   // actual prompt and response of the LLM.
   rpc GetLLMLogs(GetLLMLogsRequest) returns (GetLLMLogsResponse) {}
+}
+
+
+message ListAutoCompletionsRequest {
+}
+
+message ListAutoCompletionsResponse {
+  repeated AutcompletionLog items = 1;
+}
+
+message AutcompletionLog {
+  string context_id = 1;
+  repeated string trace_ids = 2;
+
 }
 
 message GetTraceRequest {
@@ -94,4 +112,7 @@ message GetLLMLogsResponse {
   string request_html = 1;
   // response_html is the html representation of the response
   string response_html = 2;
+
+  string request_json = 3;
+  string response_json = 4;
 }

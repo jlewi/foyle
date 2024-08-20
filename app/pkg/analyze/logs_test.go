@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -46,5 +47,49 @@ func TestReadAnthropicLog(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGetLogFilesSorted(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir, err := os.MkdirTemp("", "logtest")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir) // Clean up after the test
+
+	// Create test log files
+	testFiles := []string{
+		"foyle.logs.2024-08-19T15:44:42.json",
+		"foyle.logs.2024-08-16T16:43:16.json",
+		"foyle.logs.2024-08-14T10:46:47.json",
+		"not_a_log_file.txt",
+	}
+
+	for _, file := range testFiles {
+		_, err := os.Create(filepath.Join(tempDir, file))
+		if err != nil {
+			t.Fatalf("Failed to create test file %s: %v", file, err)
+		}
+	}
+
+	// Run the function
+	result, err := getLogFilesSorted(tempDir)
+
+	// Check for errors
+	if err != nil {
+		t.Fatalf("getLogFilesSorted returned an error: %v", err)
+	}
+
+	// Expected result (sorted in descending order)
+	expected := []string{
+		"foyle.logs.2024-08-19T15:44:42.json",
+		"foyle.logs.2024-08-16T16:43:16.json",
+		"foyle.logs.2024-08-14T10:46:47.json",
+	}
+
+	// Compare results
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("getLogFilesSorted returned %v, want %v", result, expected)
 	}
 }
