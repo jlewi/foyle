@@ -2,10 +2,11 @@ package agent
 
 import (
 	"context"
-	"google.golang.org/protobuf/encoding/protojson"
 	"io"
 	"strings"
 	"sync"
+
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"go.opentelemetry.io/otel/attribute"
 
