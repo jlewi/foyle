@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"google.golang.org/protobuf/encoding/protojson"
+
 	"go.opentelemetry.io/otel/attribute"
 
 	"connectrpc.com/connect"
@@ -412,6 +414,49 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 		return s.Err()
 
 	}
+}
+
+func (a *Agent) GenerateCells(ctx context.Context, req *connect.Request[v1alpha1.GenerateCellsRequest]) (*connect.Response[v1alpha1.GenerateCellsResponse], error) {
+	span := trace.SpanFromContext(ctx)
+	log := logs.FromContext(ctx)
+	// We don't update the logger in the context because that will happen in the agent.Generate method and we
+	// would end up duplicating the traceId key
+	log = log.WithValues("traceId", span.SpanContext().TraceID())
+
+	log.Info("Runme.Generate")
+
+	// Convert the request to the agent format
+	doc, err := converters.NotebookToDoc(req.Msg.Notebook)
+	if err != nil {
+		reqJson, jsonErr := protojson.Marshal(req.Msg)
+		if err != nil {
+			log.Error(jsonErr, "Failed to marshal request")
+		}
+		log.Error(err, "Failed to convert runme notebook to doc", "request", reqJson)
+		return nil, err
+	}
+	agentReq := &v1alpha1.GenerateRequest{
+		Doc: doc,
+	}
+
+	// Call the agent
+	agentResp, err := a.Generate(ctx, agentReq)
+	if err != nil {
+		log.Error(err, "Agent.Generate failed")
+		return nil, err
+	}
+
+	// Convert the agent response to the runme format
+	cells, err := converters.BlocksToCells(agentResp.GetBlocks())
+	if err != nil {
+		log.Error(err, "Failed to convert agent blocks to cells")
+		return nil, err
+	}
+	resp := &v1alpha1.GenerateCellsResponse{
+		Cells: cells,
+	}
+
+	return connect.NewResponse[v1alpha1.GenerateCellsResponse](resp), nil
 }
 
 // createCompletion is a helper function to create a single completion as part of a stream.

@@ -7,9 +7,9 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
-	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	_ "google.golang.org/protobuf/types/known/structpb"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 )
 
@@ -233,6 +233,50 @@ func (m *StreamGenerateResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Ob
 
 	keyName = "context_id" // field context_id = 5
 	enc.AddString(keyName, m.ContextId)
+
+	return nil
+}
+
+func (m *GenerateCellsRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "notebook" // field notebook = 1
+	if m.Notebook != nil {
+		var vv interface{} = m.Notebook
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
+
+	return nil
+}
+
+func (m *GenerateCellsResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "cells" // field cells = 1
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Cells {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
 
 	return nil
 }
