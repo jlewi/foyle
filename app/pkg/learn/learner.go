@@ -200,7 +200,7 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 			return nil
 		}()
 		if writeErr != nil {
-			writeErrors.AddCause(err)
+			writeErrors.AddCause(writeErr)
 			continue
 		}
 		// All post a single file because we don't need to read it multiple times
