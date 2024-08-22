@@ -118,6 +118,18 @@ func (db *InMemoryExampleDB) GetExamples(ctx context.Context, doc *v1alpha1.Doc,
 	return results, nil
 }
 
+func (db *InMemoryExampleDB) GetExample(ctx context.Context, id string) (*v1alpha1.Example, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	row, ok := db.idToRow[id]
+	if !ok {
+		return nil, errors.Errorf("Example with id %s not found", id)
+	}
+
+	return db.examples[row], nil
+}
+
 // Start starts the event loop to process enqueued examples
 func (db *InMemoryExampleDB) Start(ctx context.Context) error {
 	db.eventLoopDone.Add(1)

@@ -47,6 +47,8 @@ const (
 	AIServiceStreamGenerateProcedure = "/AIService/StreamGenerate"
 	// AIServiceGenerateCellsProcedure is the fully-qualified name of the AIService's GenerateCells RPC.
 	AIServiceGenerateCellsProcedure = "/AIService/GenerateCells"
+	// AIServiceGetExampleProcedure is the fully-qualified name of the AIService's GetExample RPC.
+	AIServiceGetExampleProcedure = "/AIService/GetExample"
 	// AIServiceStatusProcedure is the fully-qualified name of the AIService's Status RPC.
 	AIServiceStatusProcedure = "/AIService/Status"
 )
@@ -60,6 +62,7 @@ var (
 	aIServiceServiceDescriptor              = v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("AIService")
 	aIServiceStreamGenerateMethodDescriptor = aIServiceServiceDescriptor.Methods().ByName("StreamGenerate")
 	aIServiceGenerateCellsMethodDescriptor  = aIServiceServiceDescriptor.Methods().ByName("GenerateCells")
+	aIServiceGetExampleMethodDescriptor     = aIServiceServiceDescriptor.Methods().ByName("GetExample")
 	aIServiceStatusMethodDescriptor         = aIServiceServiceDescriptor.Methods().ByName("Status")
 )
 
@@ -209,6 +212,9 @@ type AIServiceClient interface {
 	StreamGenerate(context.Context) *connect.BidiStreamForClient[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]
 	// GenerateCells uses the AI to generate cells to insert into the notebook.
 	GenerateCells(context.Context, *connect.Request[v1alpha1.GenerateCellsRequest]) (*connect.Response[v1alpha1.GenerateCellsResponse], error)
+	// GetExample returns a learned example.
+	// This is mostly for observability.
+	GetExample(context.Context, *connect.Request[v1alpha1.GetExampleRequest]) (*connect.Response[v1alpha1.GetExampleResponse], error)
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	Status(context.Context, *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error)
 }
@@ -235,6 +241,12 @@ func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(aIServiceGenerateCellsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getExample: connect.NewClient[v1alpha1.GetExampleRequest, v1alpha1.GetExampleResponse](
+			httpClient,
+			baseURL+AIServiceGetExampleProcedure,
+			connect.WithSchema(aIServiceGetExampleMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		status: connect.NewClient[v1alpha1.StatusRequest, v1alpha1.StatusResponse](
 			httpClient,
 			baseURL+AIServiceStatusProcedure,
@@ -248,6 +260,7 @@ func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 type aIServiceClient struct {
 	streamGenerate *connect.Client[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]
 	generateCells  *connect.Client[v1alpha1.GenerateCellsRequest, v1alpha1.GenerateCellsResponse]
+	getExample     *connect.Client[v1alpha1.GetExampleRequest, v1alpha1.GetExampleResponse]
 	status         *connect.Client[v1alpha1.StatusRequest, v1alpha1.StatusResponse]
 }
 
@@ -261,6 +274,11 @@ func (c *aIServiceClient) GenerateCells(ctx context.Context, req *connect.Reques
 	return c.generateCells.CallUnary(ctx, req)
 }
 
+// GetExample calls AIService.GetExample.
+func (c *aIServiceClient) GetExample(ctx context.Context, req *connect.Request[v1alpha1.GetExampleRequest]) (*connect.Response[v1alpha1.GetExampleResponse], error) {
+	return c.getExample.CallUnary(ctx, req)
+}
+
 // Status calls AIService.Status.
 func (c *aIServiceClient) Status(ctx context.Context, req *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error) {
 	return c.status.CallUnary(ctx, req)
@@ -272,6 +290,9 @@ type AIServiceHandler interface {
 	StreamGenerate(context.Context, *connect.BidiStream[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]) error
 	// GenerateCells uses the AI to generate cells to insert into the notebook.
 	GenerateCells(context.Context, *connect.Request[v1alpha1.GenerateCellsRequest]) (*connect.Response[v1alpha1.GenerateCellsResponse], error)
+	// GetExample returns a learned example.
+	// This is mostly for observability.
+	GetExample(context.Context, *connect.Request[v1alpha1.GetExampleRequest]) (*connect.Response[v1alpha1.GetExampleResponse], error)
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	Status(context.Context, *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error)
 }
@@ -294,6 +315,12 @@ func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(aIServiceGenerateCellsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	aIServiceGetExampleHandler := connect.NewUnaryHandler(
+		AIServiceGetExampleProcedure,
+		svc.GetExample,
+		connect.WithSchema(aIServiceGetExampleMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	aIServiceStatusHandler := connect.NewUnaryHandler(
 		AIServiceStatusProcedure,
 		svc.Status,
@@ -306,6 +333,8 @@ func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (s
 			aIServiceStreamGenerateHandler.ServeHTTP(w, r)
 		case AIServiceGenerateCellsProcedure:
 			aIServiceGenerateCellsHandler.ServeHTTP(w, r)
+		case AIServiceGetExampleProcedure:
+			aIServiceGetExampleHandler.ServeHTTP(w, r)
 		case AIServiceStatusProcedure:
 			aIServiceStatusHandler.ServeHTTP(w, r)
 		default:
@@ -323,6 +352,10 @@ func (UnimplementedAIServiceHandler) StreamGenerate(context.Context, *connect.Bi
 
 func (UnimplementedAIServiceHandler) GenerateCells(context.Context, *connect.Request[v1alpha1.GenerateCellsRequest]) (*connect.Response[v1alpha1.GenerateCellsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("AIService.GenerateCells is not implemented"))
+}
+
+func (UnimplementedAIServiceHandler) GetExample(context.Context, *connect.Request[v1alpha1.GetExampleRequest]) (*connect.Response[v1alpha1.GetExampleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("AIService.GetExample is not implemented"))
 }
 
 func (UnimplementedAIServiceHandler) Status(context.Context, *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error) {
