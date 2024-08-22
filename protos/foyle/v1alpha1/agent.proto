@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/struct.proto";
 import "foyle/v1alpha1/doc.proto";
+import "foyle/v1alpha1/trainer.proto";
 import "runme/parser/v1/parser.proto";
 
 option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
@@ -63,6 +64,10 @@ service AIService {
 
   // GenerateCells uses the AI to generate cells to insert into the notebook.
   rpc GenerateCells(GenerateCellsRequest) returns (GenerateCellsResponse) {}
+
+  // GetExample returns a learned example.
+  // This is mostly for observability.
+  rpc GetExample(GetExampleRequest) returns (GetExampleResponse) {}
 
   // N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
   rpc Status(StatusRequest) returns (StatusResponse) {}
@@ -137,4 +142,11 @@ message StatusRequest{}
 message StatusResponse {
   AIServiceStatus status = 1;
 }
-  
+
+message GetExampleRequest{
+  string id = 1;
+}
+
+message GetExampleResponse {
+  Example example = 1;
+}
