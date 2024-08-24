@@ -7,9 +7,9 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
-	_ "google.golang.org/genproto/googleapis/api/annotations"
 	_ "google.golang.org/protobuf/types/known/structpb"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 )
 
@@ -302,6 +302,39 @@ func (m *StatusResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEnco
 
 	keyName = "status" // field status = 1
 	enc.AddString(keyName, m.Status.String())
+
+	return nil
+}
+
+func (m *GetExampleRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "id" // field id = 1
+	enc.AddString(keyName, m.Id)
+
+	return nil
+}
+
+func (m *GetExampleResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "example" // field example = 1
+	if m.Example != nil {
+		var vv interface{} = m.Example
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
 
 	return nil
 }

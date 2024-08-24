@@ -202,6 +202,9 @@ type AIServiceClient interface {
 	StreamGenerate(ctx context.Context, opts ...grpc.CallOption) (AIService_StreamGenerateClient, error)
 	// GenerateCells uses the AI to generate cells to insert into the notebook.
 	GenerateCells(ctx context.Context, in *GenerateCellsRequest, opts ...grpc.CallOption) (*GenerateCellsResponse, error)
+	// GetExample returns a learned example.
+	// This is mostly for observability.
+	GetExample(ctx context.Context, in *GetExampleRequest, opts ...grpc.CallOption) (*GetExampleResponse, error)
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 }
@@ -254,6 +257,15 @@ func (c *aIServiceClient) GenerateCells(ctx context.Context, in *GenerateCellsRe
 	return out, nil
 }
 
+func (c *aIServiceClient) GetExample(ctx context.Context, in *GetExampleRequest, opts ...grpc.CallOption) (*GetExampleResponse, error) {
+	out := new(GetExampleResponse)
+	err := c.cc.Invoke(ctx, "/AIService/GetExample", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *aIServiceClient) Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
 	out := new(StatusResponse)
 	err := c.cc.Invoke(ctx, "/AIService/Status", in, out, opts...)
@@ -271,6 +283,9 @@ type AIServiceServer interface {
 	StreamGenerate(AIService_StreamGenerateServer) error
 	// GenerateCells uses the AI to generate cells to insert into the notebook.
 	GenerateCells(context.Context, *GenerateCellsRequest) (*GenerateCellsResponse, error)
+	// GetExample returns a learned example.
+	// This is mostly for observability.
+	GetExample(context.Context, *GetExampleRequest) (*GetExampleResponse, error)
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	mustEmbedUnimplementedAIServiceServer()
@@ -285,6 +300,9 @@ func (UnimplementedAIServiceServer) StreamGenerate(AIService_StreamGenerateServe
 }
 func (UnimplementedAIServiceServer) GenerateCells(context.Context, *GenerateCellsRequest) (*GenerateCellsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateCells not implemented")
+}
+func (UnimplementedAIServiceServer) GetExample(context.Context, *GetExampleRequest) (*GetExampleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetExample not implemented")
 }
 func (UnimplementedAIServiceServer) Status(context.Context, *StatusRequest) (*StatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
@@ -346,6 +364,24 @@ func _AIService_GenerateCells_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AIService_GetExample_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetExampleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).GetExample(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/AIService/GetExample",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).GetExample(ctx, req.(*GetExampleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AIService_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StatusRequest)
 	if err := dec(in); err != nil {
@@ -374,6 +410,10 @@ var AIService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateCells",
 			Handler:    _AIService_GenerateCells_Handler,
+		},
+		{
+			MethodName: "GetExample",
+			Handler:    _AIService_GetExample_Handler,
 		},
 		{
 			MethodName: "Status",
