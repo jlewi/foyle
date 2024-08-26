@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"fmt"
-	gcplogs "github.com/jlewi/monogo/gcp/logging"
 	"io"
 	"net/http"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	gcplogs "github.com/jlewi/monogo/gcp/logging"
 
 	"github.com/jlewi/foyle/app/pkg/replicate"
 
