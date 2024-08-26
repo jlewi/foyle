@@ -22,9 +22,10 @@ RUN LDFLAGS="-s -w -X github.com/jlewi/foyle/app/cmd/commands.version=${VERSION}
     go build \
     -ldflags "${LDFLAGS}" \
     -a -o foyle github.com/jlewi/foyle/app/cmd
+RUN chmod a+x /workspace/app/foyle
 
 FROM ${RUNTIME_IMAGE}
 
 COPY --from=builder /workspace/app/foyle /
-RUN chmod +x /foyle
+
 ENTRYPOINT ["/foyle", "serve"]
