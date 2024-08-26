@@ -26,5 +26,5 @@ RUN LDFLAGS="-s -w -X github.com/jlewi/foyle/app/cmd/commands.version=${VERSION}
 FROM ${RUNTIME_IMAGE}
 
 COPY --from=builder /workspace/app/foyle /
-
+RUN chmod +x /foyle
 ENTRYPOINT ["/foyle", "serve"]
