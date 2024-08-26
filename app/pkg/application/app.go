@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	gcplogs "github.com/jlewi/monogo/gcp/logging"
+
 	"github.com/jlewi/foyle/app/pkg/replicate"
 
 	"github.com/jlewi/foyle/app/pkg/llms"
@@ -49,6 +51,11 @@ import (
 )
 
 type logCloser func()
+
+const (
+	// FoyleLogName is the name of the log in Google Cloud Logging
+	FoyleLogName = "foyle"
+)
 
 // App is a struct that takes care of wiring together all the different
 // components of the application. It is designed in a modular way so different subcommands
@@ -172,28 +179,64 @@ func (a *App) useHoneycomb() error {
 	return nil
 }
 
+// SetupLogging if logToFile is true then logs are configured based on the sinks configured in the
+// config a raw log file will also be produced. If logToFile is false then logs are written to stderr.
+// The purpose of logToFile is to avoid writing logs to durable files for ephemeral CLI commands
+// e.g. foyle config get
 func (a *App) SetupLogging(logToFile bool) error {
 	if a.Config == nil {
 		return errors.New("Config is nil; call LoadConfig first")
 	}
 
 	cores := make([]zapcore.Core, 0, 2)
-	// `foyle assets download`
-	// Configure encoder for JSON format
+
+	consolePaths := make([]string, 0, 1)
+	jsonPaths := make([]string, 0, 1)
+
 	if logToFile {
-		jsonCore, err := a.createCoreLoggerForFiles()
+		for _, sink := range a.Config.Logging.Sinks {
+			project, logName, isLog := gcplogs.ParseURI(sink.Path)
+			if isLog {
+				if err := gcplogs.RegisterSink(project, logName, nil); err != nil {
+					return err
+				}
+			}
+			if sink.JSON {
+				jsonPaths = append(jsonPaths, sink.Path)
+			} else {
+				consolePaths = append(consolePaths, sink.Path)
+			}
+		}
+
+		// We always write raw logs in JSON format to the rawLogFile because they are used for AI traces and learning.
+		// TODO(jeremy): If we are using Google Cloud Logging it would be nice if learning could just use that.
+		rawLogFile, err := a.getRawLogFile()
 		if err != nil {
-			return errors.Wrap(err, "Could not create core logger for files")
+			return errors.Wrap(err, "Could not create raw log file")
+		}
+		jsonPaths = append(jsonPaths, rawLogFile)
+	}
+
+	if len(consolePaths) == 0 && len(jsonPaths) == 0 {
+		// If no sinks are specified we default to console logging.
+		consolePaths = []string{"stderr"}
+	}
+
+	if len(consolePaths) > 0 {
+		consoleCore, err := a.createCoreForConsole(consolePaths)
+		if err != nil {
+			return errors.Wrap(err, "Could not create core logger for console")
+		}
+		cores = append(cores, consoleCore)
+	}
+
+	if len(jsonPaths) > 0 {
+		jsonCore, err := a.createJSONCoreLogger(jsonPaths)
+		if err != nil {
+			return errors.Wrap(err, "Could not create core logger for JSON paths")
 		}
 		cores = append(cores, jsonCore)
 	}
-
-	consoleCore, err := a.createCoreForConsole()
-	if err != nil {
-		return errors.Wrap(err, "Could not create core logger for console")
-	}
-
-	cores = append(cores, consoleCore)
 
 	// Create a multi-core logger with different encodings
 	core := zapcore.NewTee(cores...)
@@ -232,7 +275,7 @@ func (a *App) SetupRegistry() error {
 	return nil
 }
 
-func (a *App) createCoreForConsole() (zapcore.Core, error) {
+func (a *App) createCoreForConsole(paths []string) (zapcore.Core, error) {
 	// Configure encoder for non-JSON format (console-friendly)
 	c := zap.NewDevelopmentEncoderConfig()
 
@@ -249,9 +292,9 @@ func (a *App) createCoreForConsole() (zapcore.Core, error) {
 		return nil, errors.Wrapf(err, "Could not convert level %v to ZapLevel", lvl)
 	}
 
-	oFile, closer, err := zap.Open("stderr")
+	oFile, closer, err := zap.Open(paths...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not create writer for stderr")
+		return nil, errors.Wrapf(err, "could not create writer for paths %s", paths)
 	}
 	if a.logClosers == nil {
 		a.logClosers = []logCloser{}
@@ -259,14 +302,34 @@ func (a *App) createCoreForConsole() (zapcore.Core, error) {
 	a.logClosers = append(a.logClosers, closer)
 
 	encoder := zapcore.NewConsoleEncoder(c)
-	core := zapcore.NewCore(encoder, zapcore.AddSync(oFile), zapLvl)
+	core := zapcore.NewCore(encoder, oFile, zapLvl)
 	return core, nil
 }
 
-// createCoreLoggerForFiles creates a core logger that writes logs to files. These logs are always written in JSON
-// format. Their purpose is to capture AI traces that we use for retraining. Since these are supposed to be machine
-// readable they are always written in JSON format.
-func (a *App) createCoreLoggerForFiles() (zapcore.Core, error) {
+// getRawLogFile gets the file to write raw logs to. The file is written in JSON format.
+// Ensures the directory exists.
+func (a *App) getRawLogFile() (string, error) {
+	logDir := filepath.Join(a.Config.GetLogDir(), "raw")
+	if _, err := os.Stat(logDir); os.IsNotExist(err) {
+		// Logger won't be setup yet so we can't use it.
+		fmt.Fprintf(os.Stdout, "Creating log directory %s\n", logDir)
+		err := os.MkdirAll(logDir, 0755)
+		if err != nil {
+			return "", errors.Wrapf(err, "could not create log directory %s", logDir)
+		}
+	}
+
+	// We need to set a unique file name for the logs as a way of dealing with log rotation.
+	name := fmt.Sprintf("foyle.logs.%s.json", time.Now().Format("2006-01-02T15:04:05"))
+	logFile := filepath.Join(logDir, name)
+
+	return logFile, nil
+}
+
+// createJSONCoreLogger creates a core logger that writes logs in JSON format. These include raw logs which
+// always written in JSON  format. Their purpose is to capture AI traces that we use for retraining.
+// Since these are supposed to be machine  readable they are always written in JSON format.
+func (a *App) createJSONCoreLogger(paths []string) (zapcore.Core, error) {
 	// Configure encoder for JSON format
 	c := zap.NewProductionEncoderConfig()
 	// Use the keys used by cloud logging
@@ -279,25 +342,11 @@ func (a *App) createCoreLoggerForFiles() (zapcore.Core, error) {
 
 	jsonEncoder := zapcore.NewJSONEncoder(c)
 
-	logDir := filepath.Join(a.Config.GetLogDir(), "raw")
-	if _, err := os.Stat(logDir); os.IsNotExist(err) {
-		// Logger won't be setup yet so we can't use it.
-		fmt.Fprintf(os.Stdout, "Creating log directory %s\n", logDir)
-		err := os.MkdirAll(logDir, 0755)
-		if err != nil {
-			return nil, errors.Wrapf(err, "could not create log directory %s", logDir)
-		}
-	}
+	fmt.Fprintf(os.Stdout, "Writing JSON logs to %s\n", paths)
 
-	// We need to set a unique file name for the logs as a way of dealing with log rotation.
-	name := fmt.Sprintf("foyle.logs.%s.json", time.Now().Format("2006-01-02T15:04:05"))
-	logFile := filepath.Join(logDir, name)
-
-	fmt.Fprintf(os.Stdout, "Writing logs to %s\n", logFile)
-
-	oFile, closer, err := zap.Open(logFile)
+	oFile, closer, err := zap.Open(paths...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not open log file %s", logFile)
+		return nil, errors.Wrapf(err, "could not open paths %s", paths)
 	}
 	if a.logClosers == nil {
 		a.logClosers = []logCloser{}

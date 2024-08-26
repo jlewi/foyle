@@ -195,7 +195,6 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 
 			if _, err := w.Write(encoded); err != nil {
 				return errors.Wrapf(err, "Failed to write example %s; to file %s", b.GetId(), expectedFile)
-
 			}
 			return nil
 		}()
