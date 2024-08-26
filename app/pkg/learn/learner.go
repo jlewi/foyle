@@ -187,7 +187,7 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 			}
 			w, err := helper.NewWriter(expectedFile)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "Failed to create writer for example %s; to file %s", b.GetId(), expectedFile)
 			}
 			if closer, ok := w.(io.Closer); ok {
 				defer closer.Close()
@@ -212,8 +212,8 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 	}
 
 	if len(writeErrors.Causes) > 0 {
+		writeErrors.Final = errors.New("Not all examples could be successfully reconciled")
 		return writeErrors
-
 	}
 	return nil
 }
