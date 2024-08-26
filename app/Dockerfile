@@ -15,13 +15,14 @@ WORKDIR /workspace/app
 
 ## Build
 # The LDFLAG can't be specified multiple times so we use an environment variable to build it up over multiple lines
+# -a flag forces a rebuild of the package and its sources; is that what we want?
 RUN LDFLAGS="-s -w -X github.com/jlewi/foyle/app/cmd/commands.version=${VERSION}" && \
     LDFLAGS="${LDFLAGS} -X github.com/jlewi/foyle/app/cmd/commands.commit=${COMMIT}" && \
     LDFLAGS="${LDFLAGS} -X github.com/jlewi/foyle/app/cmd/commands.date=${DATE}" && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on \
     go build \
     -ldflags "${LDFLAGS}" \
-    -a -o foyle github.com/jlewi/foyle/app/cmd
+    -a -o foyle github.com/jlewi/foyle/app
 RUN chmod a+x /workspace/app/foyle
 
 FROM ${RUNTIME_IMAGE}
