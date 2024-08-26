@@ -1,0 +1,23 @@
+kind: Image
+apiVersion: hydros.dev/v1alpha1
+metadata:
+  name: foyle
+  namespace: foyle
+  labels:
+    env: release
+    app: foyle
+spec:
+  image: us-west1-docker.pkg.dev/foyle-public/images/foyle
+  source:  
+  - uri: https://github.com/jlewi/foyle.git
+    mappings:  
+      # Pick up the Dockerfile and go.mod/sum
+      - src: "/app/**/*"      
+      # Pick up the protos
+      - src: "protos/**/*"
+  builder:    
+    gcb:
+      project: foyle-public
+      bucket : builds-foyle-public
+      machineType: 'E2_HIGHCPU_8'
+      dockerfile: /app/Dockerfile
