@@ -170,6 +170,18 @@ type Asset struct {
 type Logging struct {
 	Level  string `json:"level,omitempty" yaml:"level,omitempty"`
 	LogDir string `json:"logDir,omitempty" yaml:"logDir,omitempty"`
+	// Sinks is a list of sinks to write logs to.
+	// Use stderr to write to stderr.
+	// Use gcplogs:///projects/${PROJECT}/logs/${LOGNAME} to write to Google Cloud Logging
+	Sinks []LogSink `json:"sinks,omitempty" yaml:"sinks,omitempty"`
+}
+
+type LogSink struct {
+	// Set to true to write logs in JSON format
+	JSON bool `json:"json,omitempty" yaml:"json,omitempty"`
+	// Path is the path to write logs to. Use "stderr" to write to stderr.
+	// Use gcplogs:///projects/${PROJECT}/logs/${LOGNAME} to write to Google Cloud Logging
+	Path string `json:"path,omitempty" yaml:"path,omitempty"`
 }
 
 type TelemetryConfig struct {
@@ -229,10 +241,6 @@ func (c *Config) GetTrainingDirs() []string {
 	}
 	return dirs
 }
-
-//func (c *Config) GetTrainingModelDir() string {
-//	return filepath.Join(c.GetTrainingDir(), c.GetModel())
-//}
 
 func (c *Config) GetLogLevel() string {
 	if c.Logging.Level == "" {
