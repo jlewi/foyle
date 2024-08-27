@@ -31,7 +31,7 @@ require (
 	github.com/honeycombio/otel-config-go v1.15.0
 	github.com/jlewi/foyle/protos/go v0.0.0-00010101000000-000000000000
 	github.com/jlewi/hydros v0.0.7-0.20240503183011-8f99ead373fb
-	github.com/jlewi/monogo v0.0.0-20240826232127-814ce2b6c0b9
+	github.com/jlewi/monogo v0.0.0-20240827035044-f4a3457933da
 	github.com/liushuangls/go-anthropic/v2 v2.4.1
 	github.com/maxence-charriere/go-app/v9 v9.8.0
 	github.com/oklog/ulid/v2 v2.1.0
