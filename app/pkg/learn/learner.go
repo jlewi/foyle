@@ -179,6 +179,8 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 
 	writeErrors := &helpers.ListOfErrors{}
 	posted := false
+	// An example can be saved in multiple locations.
+	// This supports sharing by allowing examples to be written to a shared bucket.
 	for _, expectedFile := range expectedFiles {
 		writeErr := func() error {
 			helper, err := l.factory.Get(expectedFile)
@@ -199,6 +201,8 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 			return nil
 		}()
 		if writeErr != nil {
+			// We need to log the individual error here so that its stack trace gets logged
+			log.Error(err, "Failed to write example", "id", b.GetId(), "file", expectedFile)
 			writeErrors.AddCause(writeErr)
 			continue
 		}

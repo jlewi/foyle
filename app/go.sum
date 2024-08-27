@@ -389,6 +389,8 @@ github.com/jlewi/monogo v0.0.0-20240822232451-ee70c5f8e5fb h1:PePq6KauWq5ntUe/sd
 github.com/jlewi/monogo v0.0.0-20240822232451-ee70c5f8e5fb/go.mod h1:s3nTD+owHZ6b+F13JdSpXLtrAH35pOqdwdcZEZ/gwBc=
 github.com/jlewi/monogo v0.0.0-20240826232127-814ce2b6c0b9 h1:a+B3B/9suHv+8LfXKvrxMKWUtH+75BKfvmwkeyKCTSA=
 github.com/jlewi/monogo v0.0.0-20240826232127-814ce2b6c0b9/go.mod h1:s3nTD+owHZ6b+F13JdSpXLtrAH35pOqdwdcZEZ/gwBc=
+github.com/jlewi/monogo v0.0.0-20240827035044-f4a3457933da h1:SBE/ERHbNWTrXG5SNMGYNKIQ+HlCniPzAKB35QfNIu4=
+github.com/jlewi/monogo v0.0.0-20240827035044-f4a3457933da/go.mod h1:s3nTD+owHZ6b+F13JdSpXLtrAH35pOqdwdcZEZ/gwBc=
 github.com/jlewi/runme/v3 v3.0.0-20240524042602-a01f865c4617 h1:lyXrThCive3plQ/HyiYvklcdQ6F84bZ7DX+dMU01iik=
 github.com/jlewi/runme/v3 v3.0.0-20240524042602-a01f865c4617/go.mod h1:RSMUWGN5b1i4eXEAKbuksB/z8thptDXVKyZ6lRXMcJc=
 github.com/jlewi/runme/v3 v3.0.0-20240524044247-2657f0b08e0f h1:NFOdz6g8E44q5RPLXbUQBK+Ox+3tRqk+NG+rTXWHgcY=
