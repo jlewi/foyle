@@ -49,6 +49,8 @@ const (
 	AIServiceGenerateCellsProcedure = "/AIService/GenerateCells"
 	// AIServiceGetExampleProcedure is the fully-qualified name of the AIService's GetExample RPC.
 	AIServiceGetExampleProcedure = "/AIService/GetExample"
+	// AIServiceLogEventsProcedure is the fully-qualified name of the AIService's LogEvents RPC.
+	AIServiceLogEventsProcedure = "/AIService/LogEvents"
 	// AIServiceStatusProcedure is the fully-qualified name of the AIService's Status RPC.
 	AIServiceStatusProcedure = "/AIService/Status"
 )
@@ -63,6 +65,7 @@ var (
 	aIServiceStreamGenerateMethodDescriptor = aIServiceServiceDescriptor.Methods().ByName("StreamGenerate")
 	aIServiceGenerateCellsMethodDescriptor  = aIServiceServiceDescriptor.Methods().ByName("GenerateCells")
 	aIServiceGetExampleMethodDescriptor     = aIServiceServiceDescriptor.Methods().ByName("GetExample")
+	aIServiceLogEventsMethodDescriptor      = aIServiceServiceDescriptor.Methods().ByName("LogEvents")
 	aIServiceStatusMethodDescriptor         = aIServiceServiceDescriptor.Methods().ByName("Status")
 )
 
@@ -215,6 +218,9 @@ type AIServiceClient interface {
 	// GetExample returns a learned example.
 	// This is mostly for observability.
 	GetExample(context.Context, *connect.Request[v1alpha1.GetExampleRequest]) (*connect.Response[v1alpha1.GetExampleResponse], error)
+	// LogEvents logs events to the AI service.
+	// These are used to log events to be used for training the AI model.
+	LogEvents(context.Context, *connect.Request[v1alpha1.LogEventsRequest]) (*connect.Response[v1alpha1.LogEventsResponse], error)
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	Status(context.Context, *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error)
 }
@@ -247,6 +253,12 @@ func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(aIServiceGetExampleMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		logEvents: connect.NewClient[v1alpha1.LogEventsRequest, v1alpha1.LogEventsResponse](
+			httpClient,
+			baseURL+AIServiceLogEventsProcedure,
+			connect.WithSchema(aIServiceLogEventsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		status: connect.NewClient[v1alpha1.StatusRequest, v1alpha1.StatusResponse](
 			httpClient,
 			baseURL+AIServiceStatusProcedure,
@@ -261,6 +273,7 @@ type aIServiceClient struct {
 	streamGenerate *connect.Client[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse]
 	generateCells  *connect.Client[v1alpha1.GenerateCellsRequest, v1alpha1.GenerateCellsResponse]
 	getExample     *connect.Client[v1alpha1.GetExampleRequest, v1alpha1.GetExampleResponse]
+	logEvents      *connect.Client[v1alpha1.LogEventsRequest, v1alpha1.LogEventsResponse]
 	status         *connect.Client[v1alpha1.StatusRequest, v1alpha1.StatusResponse]
 }
 
@@ -279,6 +292,11 @@ func (c *aIServiceClient) GetExample(ctx context.Context, req *connect.Request[v
 	return c.getExample.CallUnary(ctx, req)
 }
 
+// LogEvents calls AIService.LogEvents.
+func (c *aIServiceClient) LogEvents(ctx context.Context, req *connect.Request[v1alpha1.LogEventsRequest]) (*connect.Response[v1alpha1.LogEventsResponse], error) {
+	return c.logEvents.CallUnary(ctx, req)
+}
+
 // Status calls AIService.Status.
 func (c *aIServiceClient) Status(ctx context.Context, req *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error) {
 	return c.status.CallUnary(ctx, req)
@@ -293,6 +311,9 @@ type AIServiceHandler interface {
 	// GetExample returns a learned example.
 	// This is mostly for observability.
 	GetExample(context.Context, *connect.Request[v1alpha1.GetExampleRequest]) (*connect.Response[v1alpha1.GetExampleResponse], error)
+	// LogEvents logs events to the AI service.
+	// These are used to log events to be used for training the AI model.
+	LogEvents(context.Context, *connect.Request[v1alpha1.LogEventsRequest]) (*connect.Response[v1alpha1.LogEventsResponse], error)
 	// N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
 	Status(context.Context, *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error)
 }
@@ -321,6 +342,12 @@ func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(aIServiceGetExampleMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	aIServiceLogEventsHandler := connect.NewUnaryHandler(
+		AIServiceLogEventsProcedure,
+		svc.LogEvents,
+		connect.WithSchema(aIServiceLogEventsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	aIServiceStatusHandler := connect.NewUnaryHandler(
 		AIServiceStatusProcedure,
 		svc.Status,
@@ -335,6 +362,8 @@ func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (s
 			aIServiceGenerateCellsHandler.ServeHTTP(w, r)
 		case AIServiceGetExampleProcedure:
 			aIServiceGetExampleHandler.ServeHTTP(w, r)
+		case AIServiceLogEventsProcedure:
+			aIServiceLogEventsHandler.ServeHTTP(w, r)
 		case AIServiceStatusProcedure:
 			aIServiceStatusHandler.ServeHTTP(w, r)
 		default:
@@ -356,6 +385,10 @@ func (UnimplementedAIServiceHandler) GenerateCells(context.Context, *connect.Req
 
 func (UnimplementedAIServiceHandler) GetExample(context.Context, *connect.Request[v1alpha1.GetExampleRequest]) (*connect.Response[v1alpha1.GetExampleResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("AIService.GetExample is not implemented"))
+}
+
+func (UnimplementedAIServiceHandler) LogEvents(context.Context, *connect.Request[v1alpha1.LogEventsRequest]) (*connect.Response[v1alpha1.LogEventsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("AIService.LogEvents is not implemented"))
 }
 
 func (UnimplementedAIServiceHandler) Status(context.Context, *connect.Request[v1alpha1.StatusRequest]) (*connect.Response[v1alpha1.StatusResponse], error) {

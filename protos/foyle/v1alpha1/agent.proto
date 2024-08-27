@@ -69,6 +69,10 @@ service AIService {
   // This is mostly for observability.
   rpc GetExample(GetExampleRequest) returns (GetExampleResponse) {}
 
+  // LogEvents logs events to the AI service.
+  // These are used to log events to be used for training the AI model.
+  rpc LogEvents(LogEventsRequest) returns (LogEventsResponse) {}
+
   // N.B. This is for testing only. Wanted to add a non streaming response which we can use to verify things are working.
   rpc Status(StatusRequest) returns (StatusResponse) {}
 }
@@ -149,4 +153,37 @@ message GetExampleRequest{
 
 message GetExampleResponse {
   Example example = 1;
+}
+
+message LogEventsRequest {
+  repeated LogEvent events = 1;
+}
+
+message LogEvent {
+  // The type of event.
+  LogEventType type = 1;
+
+  // Cells involved in the event. These may not be fully populated; they might only be used to report
+  // the cell id and the cell type.
+  repeated runme.parser.v1.Cell cells = 2;
+
+  // The ID of the selected cell. This is the cell that was selected when the event occurred.
+  // For example in an executed event this would be the cell that was executed.
+  string selected_id = 3;
+
+  // The context ID identifies the context associated with the event.
+  string context_id = 4;
+}
+
+enum LogEventType {
+  UNKNOWN_EVENT = 0;
+  // EXECUTE is logged when a cell is executed.
+  EXECUTE = 1;
+  // ACCEPTED is logged when a completion is accepted.
+  ACCEPTED = 2;
+  // REJECTED is logged when a completion is rejected.
+  REJECTED = 3;
+}
+
+message LogEventsResponse {
 }
