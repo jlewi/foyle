@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"io"
 	"strings"
 	"sync"
@@ -12,7 +13,6 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
-	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -525,7 +525,7 @@ func (a *Agent) LogEvents(ctx context.Context, req *connect.Request[v1alpha1.Log
 	log := logs.FromContext(ctx)
 
 	for _, event := range req.Msg.Events {
-		log.Info("LogEvents", "eventType", event.Type, "selectedCellId", event.SelectedId, "event", zap.Object("event", event))
+		log.Info("LogEvent", "eventType", event.Type, "contextId", event.ContextId, "selectedCellId", event.SelectedId, "event", zap.Object("event", event))
 	}
 	return connect.NewResponse(&v1alpha1.LogEventsResponse{}), nil
 }

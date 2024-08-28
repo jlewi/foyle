@@ -173,6 +173,10 @@ message LogEvent {
 
   // The context ID identifies the context associated with the event.
   string context_id = 4;
+
+  // The position of the cell with selected_id. This will usually be the position in the full context as specified
+  // by selected_id.
+  int32 selected_index = 5;
 }
 
 enum LogEventType {
@@ -183,6 +187,12 @@ enum LogEventType {
   ACCEPTED = 2;
   // REJECTED is logged when a completion is rejected.
   REJECTED = 3;
+
+  // SESSION_START indicates the start of a session.
+  SESSION_START = 4;
+
+  // SESSION_END indicates the end of a session.
+  SESSION_END = 5;
 }
 
 message LogEventsResponse {

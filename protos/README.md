@@ -107,6 +107,16 @@ buf push
 
 ```
 
+## Push a development version
+
+* To push a development version add the label flag
+* In the UI this labels show up in the upper right corner of the window
+
+```bash {"id":"01J6CP47NS6RA0MXEME8CX5AFV"}
+buf build
+buf push --label=dev
+```
+
 # Developing The VSCode Extension
 
 There are two ways I think we can iterate on the vscode extension when making changes to the proto
@@ -118,3 +128,36 @@ There are two ways I think we can iterate on the vscode extension when making ch
 2. We can update `buf.gen.yaml` to output to a local path inside the vscode extension directory
 
    * See [buf.gen.yaml](https://github.com/jlewi/foyle/blob/9663fb81a36ab63876c33873cf4726dc8ef80092/protos/buf.gen.yaml#L28)
+
+# Troubleshooting
+
+## Error: In Typescript Type Is Not Assignable
+
+In vscode-runme I'd gotten
+
+```
+ERROR in ./src/extension/ai/events.ts:66:33
+TS2345: Argument of type 'LogEventsRequest' is not assignable to parameter of type 'PartialMessage<LogEventsRequest>'.
+  Types of property 'events' are incompatible.
+    Type 'LogEvent[]' is not assignable to type 'PartialMessage<LogEvent>[]'.
+      Type 'LogEvent' is not assignable to type 'PartialMessage<LogEvent>'.
+        Types of property 'type' are incompatible.
+          Type 'LogEventType' is not assignable to type 'LogEventType | undefined'.
+    64 |     const req = new LogEventsRequest()
+    65 |     req.events = events
+  > 66 |     await this.client.logEvents(req).catch((e) => {
+       |                                 ^^^
+    67 |       this.log.error(`Failed to log event; error: ${e}`)
+    68 |     })
+    69 |   }
+
+```
+
+* I had updated the bufbuild/es package but not the connect/es package 
+* When Up updated the connect/es package the error went away
+
+```bash {"id":"01J6CQT3CYQ76FRD1GX258JAW2"}
+cd /path/to/vscode-runme
+npm update @buf/stateful_runme.community_timostamm-protobuf-ts
+npm install
+```
