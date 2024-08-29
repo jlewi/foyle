@@ -154,13 +154,9 @@ func (a *Analyzer) Run(ctx context.Context, logDirs []string, blockNotifier Post
 	// Enqueue an item to process each file
 	for i, f := range jsonFiles {
 		// Only the last file should be active.
-		active := i < len(jsonFiles)-1
+		active := i == len(jsonFiles)-1
 		a.queue.Add(fileItem{path: f, active: active})
 	}
-
-	//if err := a.registerDirWatchers(ctx, a.queue, logDirs); err != nil {
-	//	return err
-	//}
 
 	a.handleLogFileIsDone.Add(1)
 	a.handleBlocksIsDone.Add(1)
@@ -221,10 +217,13 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 	log.V(logs.Debug).Info("Processing log file", "path", path)
 
 	offset := a.getLogFileOffset(path)
-	lines, offset, err := readLinesFromOffset(ctx, path, offset)
-	if offset < -1 {
+	if offset <= -1 {
+		// Offset of -1 means we are done processing the file because it is before the watermark
 		log.V(logs.Debug).Info("Logfile already processed", "path", path)
+		return nil
 	}
+	lines, offset, err := readLinesFromOffset(ctx, path, offset)
+
 	if err != nil {
 		return err
 	}
@@ -294,6 +293,7 @@ func (a *Analyzer) GetWatermark() *logspb.LogsWaterMark {
 func (a *Analyzer) getLogFileOffset(path string) int64 {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	// N.B. This code takes into account the full file path when deciding the ordering of the logfiles.
 	if path < a.logFileOffsets.File {
 		return -1
 	}
@@ -312,7 +312,7 @@ func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 		Offset: offset,
 	}
 
-	log := zapr.NewLogger(zap.L())
+	log := logs.NewLogger()
 	if path < oldWatermark.File {
 		log.Error(errors.New("Watermark is moving backwards"), "Watermark is moving backwards", zap.Object("oldWatermark", oldWatermark), zap.Object("newWatermark", a.logFileOffsets))
 	}
@@ -339,52 +339,6 @@ func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 	}
 	log.V(logs.Debug).Info("Wrote watermarks", "logOffsetsFile", a.logOffsetsFile)
 }
-
-// registerDirWatchers sets up notifications for changes in the log directories.
-// Any time a file is modified it will enqueue the file for processing.
-//func (a *Analyzer) registerDirWatchers(ctx context.Context, q workqueue.RateLimitingInterface, logDirs []string) error {
-//	log := logs.FromContext(ctx)
-//	watcher, err := fsnotify.NewWatcher()
-//	a.watcher = watcher
-//	if err != nil {
-//		return err
-//	}
-//	for _, dir := range logDirs {
-//		fullPath, err := filepath.Abs(dir)
-//		if err != nil {
-//			return errors.Wrapf(err, "Failed to get absolute path for %s", dir)
-//		}
-//
-//		log.Info("Watching logs directory", "dir", fullPath)
-//		if err := watcher.Add(fullPath); err != nil {
-//			return err
-//		}
-//	}
-//
-//	go handleFsnotifications(ctx, watcher, q)
-//	return nil
-//}
-
-// handleFsnotifications processes file system notifications by enqueuing the file for processing.
-//func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q workqueue.RateLimitingInterface) {
-//	log := logs.FromContext(ctx)
-//	for {
-//		select {
-//		case event, ok := <-watcher.Events:
-//			if !ok {
-//				return
-//			}
-//			if event.Op&fsnotify.Write == fsnotify.Write {
-//				q.AddRateLimited(fileItem{path: event.Name})
-//			}
-//		case err, ok := <-watcher.Errors:
-//			if !ok {
-//				return
-//			}
-//			log.Error(err, "Error from watcher")
-//		}
-//	}
-//}
 
 func (a *Analyzer) Shutdown(ctx context.Context) error {
 	log := logs.FromContext(ctx)

@@ -75,7 +75,7 @@ func createCrudHandler() (*CrudHandler, error) {
 	}
 
 	// Create a new CrudHandler with a mock configuration
-	return NewCrudHandler(cfg, db, tracesDB)
+	return NewCrudHandler(cfg, db, tracesDB, nil)
 }
 
 func tearDown(handler *CrudHandler) {
