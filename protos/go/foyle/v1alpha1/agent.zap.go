@@ -7,9 +7,9 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	_ "google.golang.org/protobuf/types/known/structpb"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	_ "google.golang.org/genproto/googleapis/api/annotations"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 )
 
@@ -334,6 +334,79 @@ func (m *GetExampleResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Object
 		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
 			enc.AddObject(keyName, marshaler)
 		}
+	}
+
+	return nil
+}
+
+func (m *LogEventsRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "events" // field events = 1
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Events {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	return nil
+}
+
+func (m *LogEvent) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "type" // field type = 1
+	enc.AddString(keyName, m.Type.String())
+
+	keyName = "cells" // field cells = 2
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.Cells {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	keyName = "selected_id" // field selected_id = 3
+	enc.AddString(keyName, m.SelectedId)
+
+	keyName = "context_id" // field context_id = 4
+	enc.AddString(keyName, m.ContextId)
+
+	keyName = "selected_index" // field selected_index = 5
+	enc.AddInt32(keyName, m.SelectedIndex)
+
+	return nil
+}
+
+func (m *LogEventsResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
 	}
 
 	return nil
