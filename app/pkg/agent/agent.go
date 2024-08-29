@@ -2,10 +2,11 @@ package agent
 
 import (
 	"context"
-	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"io"
 	"strings"
 	"sync"
+
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
