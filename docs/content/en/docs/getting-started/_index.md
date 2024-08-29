@@ -41,7 +41,7 @@ to provide the frontend.
    foyle serve
    ```
 
-   * By default foyle uses port 8080 for the http server and port 9080 for gRPC
+   * By default foyle uses port 8877 for the http server and port 9080 for gRPC
 
    * If you need to use different ports you can configure this as follows
 

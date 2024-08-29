@@ -33,6 +33,11 @@ const (
 	appName           = "foyle"
 	ConfigDir         = "." + appName
 	defaultMaxResults = 3
+
+	// defaultHTTPPort should be kept in sync with the default in RunMe
+	// https://github.com/stateful/vscode-runme/blob/f1cc965ab0c4cdffa9adb70922e2da792d7e23de/package.json#L849
+	// The value isn't 8080 because 8080 is over used and likely to conflict with other locally running services.
+	defaultHTTPPort = 8877
 )
 
 // Config represents the persistent configuration data for Foyle.
@@ -442,7 +447,7 @@ func (c *Config) Write(cfgFile string) error {
 
 func setServerDefaults() {
 	viper.SetDefault("server.bindAddress", "0.0.0.0")
-	viper.SetDefault("server.httpPort", 8080)
+	viper.SetDefault("server.httpPort", defaultHTTPPort)
 	// gRPC typically uses 50051. If we use that as the default we might end up conflicting with other gRPC services
 	// running by default.
 	viper.SetDefault("server.grpcPort", 9080)
