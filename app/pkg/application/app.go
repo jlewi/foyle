@@ -506,7 +506,7 @@ func (a *App) Serve() error {
 		return err
 	}
 
-	s, err := server.NewServer(*a.Config, a.blocksDB, agent, a.TracesDB)
+	s, err := server.NewServer(*a.Config, a.blocksDB, agent, a.TracesDB, a.analyzer)
 
 	if err != nil {
 		return err

@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "foyle/logs/logs.proto";
 import "foyle/v1alpha1/agent.proto";
 import "foyle/v1alpha1/trainer.proto";
 import "runme/runner/v1/runner.proto";
@@ -71,6 +72,8 @@ service LogsService {
   // These will include the rendered prompt and response. Unlike GetTraceRequest this has the
   // actual prompt and response of the LLM.
   rpc GetLLMLogs(GetLLMLogsRequest) returns (GetLLMLogsResponse) {}
+
+  rpc Status(GetLogsStatusRequest) returns (GetLogsStatusResponse) {}
 }
 
 message GetTraceRequest {

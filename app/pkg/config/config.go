@@ -69,6 +69,8 @@ type Config struct {
 
 type LearnerConfig struct {
 	// LogDirs is an additional list of directories to search for logs.
+	// Deprecated: We should remove this in v1alpha2. This is no longer needed now that we no longer rely on processing
+	// RunMe's logs but rather the UI sends the logs directly to the server.
 	LogDirs []string `json:"logDirs" yaml:"logDirs"`
 
 	// ExampleDirs is the list of directories to read/write examples.
@@ -215,7 +217,7 @@ func (c *Config) GetLogDir() string {
 }
 
 func (c *Config) GetLogOffsetsFile() string {
-	return filepath.Join(c.GetLogDir(), "offsets.json")
+	return filepath.Join(c.GetLogDir(), "offsets.v1.json")
 }
 
 func (c *Config) GetRawLogDir() string {

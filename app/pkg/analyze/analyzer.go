@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"google.golang.org/protobuf/proto"
 	"os"
 	"path/filepath"
 	"sort"
@@ -60,6 +61,7 @@ type Analyzer struct {
 	rawLogsDB *dbutil.LockingDB[*logspb.LogEntries]
 	// queue for log file processing
 	queue workqueue.RateLimitingInterface
+
 	// Queue for block log processing
 	// TODO(jeremy): We should really use a durable queue backed by files
 	blockQueue workqueue.DelayingInterface
@@ -70,7 +72,7 @@ type Analyzer struct {
 
 	handleLogFileIsDone sync.WaitGroup
 	handleBlocksIsDone  sync.WaitGroup
-	logFileOffsets      map[string]int64
+	logFileOffsets      *logspb.LogsWaterMark
 	mu                  sync.Mutex
 
 	logOffsetsFile string
@@ -107,24 +109,28 @@ func NewAnalyzer(logOffsetsFile string, rawLogsDB *dbutil.LockingDB[*logspb.LogE
 	}, nil
 }
 
-func initOffsets(logOffsetsFile string) (map[string]int64, error) {
+func initOffsets(logOffsetsFile string) (*logspb.LogsWaterMark, error) {
 	log := zapr.NewLogger(zap.L())
 	raw, err := os.ReadFile(logOffsetsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return map[string]int64{}, nil
+			return &logspb.LogsWaterMark{}, nil
 		}
 		return nil, errors.Wrapf(err, "Failed to read watermarks file %s", logOffsetsFile)
 	}
-	watermarks := map[string]int64{}
-	if err := json.Unmarshal(raw, &watermarks); err != nil {
+	watermark := &logspb.LogsWaterMark{}
+
+	if err := protojson.Unmarshal(raw, watermark); err != nil {
 		log.Error(err, "Failed to unmarshal watermarks file %s; watermarks will be reinitialized", logOffsetsFile)
 	}
-	return watermarks, nil
+	return watermark, nil
 }
 
 type fileItem struct {
 	path string
+
+	// Whether the file is still active. If the file is no longer active we should stop processing it.
+	active bool
 }
 
 type blockItem struct {
@@ -146,17 +152,22 @@ func (a *Analyzer) Run(ctx context.Context, logDirs []string, blockNotifier Post
 	}
 
 	// Enqueue an item to process each file
-	for _, f := range jsonFiles {
-		a.queue.Add(fileItem{path: f})
+	for i, f := range jsonFiles {
+		// Only the last file should be active.
+		active := i < len(jsonFiles)-1
+		a.queue.Add(fileItem{path: f, active: active})
 	}
 
-	if err := a.registerDirWatchers(ctx, a.queue, logDirs); err != nil {
-		return err
-	}
+	//if err := a.registerDirWatchers(ctx, a.queue, logDirs); err != nil {
+	//	return err
+	//}
 
 	a.handleLogFileIsDone.Add(1)
 	a.handleBlocksIsDone.Add(1)
 
+	// Important we should only process LogFileEvents in a single go func because the semantics of the watermark
+	// are that all log entries up to that mark have been processed. If we process log entries in parallel its not
+	// clear how we handle updating the waterMark.
 	go a.handleLogFileEvents(ctx)
 	go a.handleBlockEvents(ctx)
 
@@ -164,6 +175,9 @@ func (a *Analyzer) Run(ctx context.Context, logDirs []string, blockNotifier Post
 }
 
 // TODO(jeremy): How do we make the Analyzer thread safe? I believe the DB classes are thread safe
+//
+// TODO(jeremy): Should we instrument this with OTEL to get metrics on how long it takes to process a log file?
+// What we'd like is counters for how often a log file is processed. But maybe we should use logs for that?
 func (a *Analyzer) handleLogFileEvents(ctx context.Context) {
 	q := a.queue
 	log := logs.FromContext(ctx)
@@ -191,6 +205,13 @@ func (a *Analyzer) handleLogFileEvents(ctx context.Context) {
 			if a.signalFileDone != nil {
 				a.signalFileDone <- fileItem.path
 			}
+			// If the file is still active re-enqueue it.
+			if fileItem.active {
+				q.AddRateLimited(fileItem)
+			} else {
+				log.Info("Finished processing log file", "path", fileItem.path)
+			}
+
 		}()
 	}
 }
@@ -201,6 +222,9 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 
 	offset := a.getLogFileOffset(path)
 	lines, offset, err := readLinesFromOffset(ctx, path, offset)
+	if offset < -1 {
+		log.V(logs.Debug).Info("Logfile already processed", "path", path)
+	}
 	if err != nil {
 		return err
 	}
@@ -258,24 +282,47 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 	return nil
 }
 
+func (a *Analyzer) GetWatermark() *logspb.LogsWaterMark {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	w := proto.Clone(a.logFileOffsets).(*logspb.LogsWaterMark)
+	return w
+}
+
+// getLogOffSet returns the offset for the log file to start reading from.
+// A value < 0 means the watermark is already past the end of the file and no more processing is needed.
 func (a *Analyzer) getLogFileOffset(path string) int64 {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	offset, ok := a.logFileOffsets[path]
-	if !ok {
+	if path < a.logFileOffsets.File {
+		return -1
+	}
+	if path > a.logFileOffsets.File {
 		return 0
 	}
-	return offset
+	return a.logFileOffsets.Offset
 }
 
 func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.logFileOffsets[path] = offset
+	oldWatermark := a.logFileOffsets
+	a.logFileOffsets = &logspb.LogsWaterMark{
+		File:   path,
+		Offset: offset,
+	}
 
 	log := zapr.NewLogger(zap.L())
+	if path < oldWatermark.File {
+		log.Error(errors.New("Watermark is moving backwards"), "Watermark is moving backwards", zap.Object("oldWatermark", oldWatermark), zap.Object("newWatermark", a.logFileOffsets))
+	}
+
+	if oldWatermark.File != a.logFileOffsets.File {
+		log.Info("Logs watermark moving to new file", zap.Object("oldWatermark", oldWatermark), zap.Object("newWatermark", a.logFileOffsets))
+	}
+
 	// Persist the watermarks
-	raw, err := json.Marshal(a.logFileOffsets)
+	raw, err := protojson.Marshal(a.logFileOffsets)
 	if err != nil {
 		log.Error(err, "Failed to marshal watermarks")
 		return
@@ -295,49 +342,49 @@ func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 
 // registerDirWatchers sets up notifications for changes in the log directories.
 // Any time a file is modified it will enqueue the file for processing.
-func (a *Analyzer) registerDirWatchers(ctx context.Context, q workqueue.RateLimitingInterface, logDirs []string) error {
-	log := logs.FromContext(ctx)
-	watcher, err := fsnotify.NewWatcher()
-	a.watcher = watcher
-	if err != nil {
-		return err
-	}
-	for _, dir := range logDirs {
-		fullPath, err := filepath.Abs(dir)
-		if err != nil {
-			return errors.Wrapf(err, "Failed to get absolute path for %s", dir)
-		}
-
-		log.Info("Watching logs directory", "dir", fullPath)
-		if err := watcher.Add(fullPath); err != nil {
-			return err
-		}
-	}
-
-	go handleFsnotifications(ctx, watcher, q)
-	return nil
-}
+//func (a *Analyzer) registerDirWatchers(ctx context.Context, q workqueue.RateLimitingInterface, logDirs []string) error {
+//	log := logs.FromContext(ctx)
+//	watcher, err := fsnotify.NewWatcher()
+//	a.watcher = watcher
+//	if err != nil {
+//		return err
+//	}
+//	for _, dir := range logDirs {
+//		fullPath, err := filepath.Abs(dir)
+//		if err != nil {
+//			return errors.Wrapf(err, "Failed to get absolute path for %s", dir)
+//		}
+//
+//		log.Info("Watching logs directory", "dir", fullPath)
+//		if err := watcher.Add(fullPath); err != nil {
+//			return err
+//		}
+//	}
+//
+//	go handleFsnotifications(ctx, watcher, q)
+//	return nil
+//}
 
 // handleFsnotifications processes file system notifications by enqueuing the file for processing.
-func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q workqueue.RateLimitingInterface) {
-	log := logs.FromContext(ctx)
-	for {
-		select {
-		case event, ok := <-watcher.Events:
-			if !ok {
-				return
-			}
-			if event.Op&fsnotify.Write == fsnotify.Write {
-				q.AddRateLimited(fileItem{path: event.Name})
-			}
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			log.Error(err, "Error from watcher")
-		}
-	}
-}
+//func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q workqueue.RateLimitingInterface) {
+//	log := logs.FromContext(ctx)
+//	for {
+//		select {
+//		case event, ok := <-watcher.Events:
+//			if !ok {
+//				return
+//			}
+//			if event.Op&fsnotify.Write == fsnotify.Write {
+//				q.AddRateLimited(fileItem{path: event.Name})
+//			}
+//		case err, ok := <-watcher.Errors:
+//			if !ok {
+//				return
+//			}
+//			log.Error(err, "Error from watcher")
+//		}
+//	}
+//}
 
 func (a *Analyzer) Shutdown(ctx context.Context) error {
 	log := logs.FromContext(ctx)
