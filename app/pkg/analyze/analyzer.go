@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"google.golang.org/protobuf/proto"
 	"os"
 	"path/filepath"
@@ -15,9 +17,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
-
-	"github.com/jlewi/foyle/app/pkg/docs"
-	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/api"
@@ -241,12 +240,17 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 			continue
 		}
 
+		if strings.HasSuffix(entry.Function(), "agent.(*Agent).LogEvents") {
+			a.processLogEvent(ctx, entry)
+			continue
+		}
+
 		// Ignore log entries without traces
 		if entry.TraceID() == "" {
 			continue
 		}
 
-		// Drop all log entries that come from the Analyzer package itself. This should hadn't be neccessary
+		// Drop all log entries that come from the Analyzer package itself. This shouldn't be neccessary
 		// but its a precaution to guard against someone accidentally adding a log message with the the field "traceId"
 		// to log a message about processing that trace. If we include such messages as part of the trace
 		// we could trigger an infinite loop
@@ -360,6 +364,85 @@ func (a *Analyzer) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+// processLogEvent processes a log event.
+func (a *Analyzer) processLogEvent(ctx context.Context, entry *api.LogEntry) {
+	log := logs.FromContext(ctx)
+
+	event := &v1alpha1.LogEvent{}
+
+	if !entry.GetProto("event", event) {
+		log.Error(errors.New("Failed to decode event"), "Failed to decode LogEvent", "entry", entry)
+		return
+	}
+	log = log.WithValues("eventId", event.GetEventId())
+	switch event.Type {
+	case v1alpha1.LogEventType_EXECUTE:
+		bid := event.SelectedId
+		if bid == "" {
+			log.Error(errors.New("No selectedId"), "Execute event is missing selected id", "event", event)
+			return
+		}
+
+		var cell *parserv1.Cell
+		for _, c := range event.GetCells() {
+			if converters.GetCellID(c) == bid {
+				cell = c
+				break
+			}
+		}
+
+		if cell == nil {
+			log.Error(errors.New("Failed to find cell"), "Execution log event is missing the actual cell", "bid", bid, "event", event)
+			return
+		}
+		executedBlock, err := converters.CellToBlock(cell)
+		if err != nil {
+			jb, err := protojson.Marshal(cell)
+			if err != nil {
+				log.Error(err, "Failed to convert executed cell to block", "cellId", bid, "cell", string(jb))
+			} else {
+				log.Error(err, "Failed to convert executed cell to block", "cellId", bid)
+			}
+		}
+
+		if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
+			block.Id = bid
+			block.ExecutedBlock = executedBlock
+			return nil
+		}); err != nil {
+			log.Error(err, "Failed to update block with execution", "blockId", bid)
+		}
+	case v1alpha1.LogEventType_ACCEPTED:
+		fallthrough
+	case v1alpha1.LogEventType_REJECTED:
+		status := logspb.SuggestionStatus_SuggestionStatusUnknown
+		switch event.Type {
+		case v1alpha1.LogEventType_ACCEPTED:
+			status = logspb.SuggestionStatus_ACCEPTED
+		case v1alpha1.LogEventType_REJECTED:
+			status = logspb.SuggestionStatus_REJECTED
+		}
+
+		for _, c := range event.GetCells() {
+			bid := converters.GetCellID(c)
+			if bid == "" {
+				log.Error(errors.New("No cell id"), "Cell is missing id", zap.Object("event", event))
+				continue
+			}
+
+			if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
+				block.Id = bid
+				block.SuggestionStatus = status
+				return nil
+			}); err != nil {
+				log.Error(err, "Failed to update block with execution", "blockId", bid)
+			}
+		}
+	default:
+		// Do Nothing with the event
+	}
+}
+
 // buildTrace creates the trace and initializes the blocks.
 func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 	log := logs.FromContext(ctx)
@@ -421,7 +504,7 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 				}
 			}
 		case *logspb.Trace_Execute:
-			bid := t.Execute.Request.GetBlock().GetId()
+			bid := converters.GetCellID(t.Execute.GetCell())
 			if bid == "" {
 				return bids, nil
 			}
@@ -435,22 +518,6 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 				return nil
 			}); err != nil {
 				return bids, errors.Wrapf(err, "Failed to set execute trace on block %s", bid)
-			}
-		case *logspb.Trace_RunMe:
-			bid := t.RunMe.Request.GetKnownId()
-			if bid == "" {
-				return bids, nil
-			}
-			bids = append(bids, bid)
-			if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
-				block.Id = bid
-				if block.ExecTraceIds == nil {
-					block.ExecTraceIds = make([]string, 0, 10)
-				}
-				block.ExecTraceIds = append(block.ExecTraceIds, tid)
-				return nil
-			}); err != nil {
-				return bids, errors.Wrapf(err, "Failed to set RunMe trace on block %s", bid)
 			}
 		default:
 			log.Error(fmt.Errorf("Unknown trace type"), "Unknown trace type", "trace", t)
@@ -628,7 +695,7 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 				return
 			}
 
-			if trace.GetExecute() == nil && trace.GetRunMe() == nil {
+			if trace.GetExecute() == nil {
 				log.Error(errors.New("Invalid execution trace for traceId"), "Error getting execute trace", "execTraceId", tid)
 				return
 			}
@@ -676,23 +743,11 @@ func updateBlockForExecution(block *logspb.BlockLog, lastTrace *logspb.Trace) er
 
 	switch eTrace := lastTrace.Data.(type) {
 	case *logspb.Trace_Execute:
-		block.ExecutedBlock = eTrace.Execute.Request.GetBlock()
-
-		for _, o := range eTrace.Execute.Response.GetOutputs() {
-			exitCode, ok := docs.GetExitCode(o)
-			if ok {
-				block.ExitCode = int32(exitCode)
-				break
-			}
+		b, err := converters.CellToBlock(eTrace.Execute.GetCell())
+		if err != nil {
+			return errors.Wrapf(err, "Failed to convert cell to block for trace %s", lastTrace.Id)
 		}
-	case *logspb.Trace_RunMe:
-		// TODO(jeremy): Is this the right way to turn the command into a string?
-		block.ExecutedBlock = &v1alpha1.Block{
-			Kind:     v1alpha1.BlockKind_CODE,
-			Contents: strings.Join(eTrace.RunMe.Request.GetCommands(), " "),
-			Outputs:  nil,
-		}
-
+		block.ExecutedBlock = b
 	default:
 		return errors.WithStack(errors.Errorf("Can't update BlockLog with execution information. The last trace, id %s  is not an execution trace", lastTrace.Id))
 	}
@@ -710,14 +765,6 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (*logs
 		function := logEntry.Function()
 		if strings.HasSuffix(function, "agent.(*Agent).Generate") {
 			return combineGenerateTrace(ctx, entries)
-		}
-
-		if strings.HasSuffix(function, "executor.(*Executor).Execute") {
-			return combineExecuteTrace(ctx, entries)
-		}
-
-		if strings.HasSuffix(function, "runner.(*runnerService).Execute") {
-			return combineRunMeTrace(ctx, entries)
 		}
 
 		if strings.HasSuffix(function, "agent.(*Agent).StreamGenerate") {
@@ -784,105 +831,5 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb
 	trace.EvalMode = evalMode
 
 	combineSpans(trace)
-	return trace, nil
-}
-
-func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
-	eTrace := &logspb.ExecuteTrace{}
-	trace := &logspb.Trace{
-		Data: &logspb.Trace_Execute{
-			Execute: eTrace,
-		},
-	}
-	evalMode := false
-	for _, e := range entries {
-		if trace.Id == "" {
-			trace.Id = e.TraceID()
-		}
-		if mode, present := e.EvalMode(); present {
-			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
-			// We don't want to assume that the evalMode will be set on all log entries in the trace.
-			// So the logic is to assume its not eval mode by default and then set it to eval mode if we find
-			// One entry that is marked as eval mode.
-			if mode {
-				evalMode = mode
-			}
-		}
-
-		if eTrace.Request == nil {
-			raw := e.Request()
-			if raw != nil {
-				request := &v1alpha1.ExecuteRequest{}
-				if err := protojson.Unmarshal([]byte(raw), request); err != nil {
-					return nil, err
-				}
-
-				eTrace.Request = request
-				trace.StartTime = timestamppb.New(e.Time())
-			}
-		}
-		if eTrace.Response == nil {
-			raw := e.Response()
-			if raw != nil {
-				v := &v1alpha1.ExecuteResponse{}
-				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
-					return nil, err
-				}
-				eTrace.Response = v
-				trace.EndTime = timestamppb.New(e.Time())
-			}
-		}
-	}
-	trace.EvalMode = evalMode
-	return trace, nil
-}
-
-func combineRunMeTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
-	rTrace := &logspb.RunMeTrace{}
-	trace := &logspb.Trace{
-		Data: &logspb.Trace_RunMe{
-			RunMe: rTrace,
-		},
-	}
-	evalMode := false
-	for _, e := range entries {
-		if trace.Id == "" {
-			trace.Id = e.TraceID()
-		}
-		if mode, present := e.EvalMode(); present {
-			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
-			// We don't want to assume that the evalMode will be set on all log entries in the trace.
-			// So the logic is to assume its not eval mode by default and then set it to eval mode if we find
-			// One entry that is marked as eval mode.
-			if mode {
-				evalMode = mode
-			}
-		}
-
-		if rTrace.Request == nil {
-			raw := e.Request()
-			if raw != nil {
-				request := &runnerv1.ExecuteRequest{}
-				if err := protojson.Unmarshal([]byte(raw), request); err != nil {
-					return nil, err
-				}
-
-				rTrace.Request = request
-				trace.StartTime = timestamppb.New(e.Time())
-			}
-		}
-		if rTrace.Response == nil {
-			raw := e.Response()
-			if raw != nil {
-				v := &runnerv1.ExecuteResponse{}
-				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
-					return nil, err
-				}
-				rTrace.Response = v
-				trace.EndTime = timestamppb.New(e.Time())
-			}
-		}
-	}
-	trace.EvalMode = evalMode
 	return trace, nil
 }

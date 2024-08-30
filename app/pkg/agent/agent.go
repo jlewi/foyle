@@ -526,7 +526,7 @@ func (a *Agent) LogEvents(ctx context.Context, req *connect.Request[v1alpha1.Log
 	log := logs.FromContext(ctx)
 
 	for _, event := range req.Msg.Events {
-		log.Info("LogEvent", "eventType", event.Type, "contextId", event.ContextId, "selectedCellId", event.SelectedId, "event", zap.Object("event", event))
+		log.Info("LogEvent", "eventId", event.GetEventId(), "eventType", event.Type, "contextId", event.ContextId, "selectedCellId", event.SelectedId, "event", zap.Object("event", event))
 	}
 	return connect.NewResponse(&v1alpha1.LogEventsResponse{}), nil
 }

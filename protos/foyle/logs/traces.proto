@@ -7,6 +7,7 @@ import "runme/runner/v1/runner.proto";
 
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+import "runme/parser/v1/parser.proto";
 
 package foyle.logs;
 
@@ -21,13 +22,14 @@ message Trace {
   oneof data {
     GenerateTrace generate = 4;
     ExecuteTrace execute = 5;
-    RunMeTrace run_me = 7;
   }
 
   // Eval mode is true if the trace was generated in eval mode.
   bool eval_mode = 6;
 
   repeated Span spans = 8;
+
+  reserved 7;
 }
 
 message Span {
@@ -48,14 +50,12 @@ message GenerateTrace {
   GenerateResponse response = 2;
 }
 
+// N.B. I think this is no longer used because executions come from RunMe.
 message ExecuteTrace {
-  ExecuteRequest request = 1;
-  ExecuteResponse response = 2;
-}
+  // The cell that was executed.
+  runme.parser.v1.Cell cell = 3;
 
-message RunMeTrace {
-  runme.runner.v1.ExecuteRequest request = 1;
-  runme.runner.v1.ExecuteResponse response = 2;
+  reserved 1,2;
 }
 
 // LogEntries is used to store log lines keyed by a trace id.

@@ -33,4 +33,14 @@ message BlockLog {
 
     // ResourceVersion is an opaque string that can be used for optimistic concurrency control
     string resource_version = 9;
+
+    SuggestionStatus suggestion_status = 10;
+}
+
+// SuggestionStatus is the status of a suggestion
+enum SuggestionStatus {
+    // SuggestionStatusUnknown is the default status
+    SuggestionStatusUnknown = 0;
+    ACCEPTED = 1;
+    REJECTED = 2;
 }
