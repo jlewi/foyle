@@ -1,10 +1,11 @@
 package dbutil
 
 import (
-	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"os"
 	"sync"
 	"testing"
+
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 
 	"github.com/cockroachdb/pebble"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
