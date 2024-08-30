@@ -21,7 +21,6 @@ message Trace {
   // TODO(jeremy): Should these really be spans?
   oneof data {
     GenerateTrace generate = 4;
-    ExecuteTrace execute = 5;
   }
 
   // Eval mode is true if the trace was generated in eval mode.
@@ -29,7 +28,7 @@ message Trace {
 
   repeated Span spans = 8;
 
-  reserved 7;
+  reserved 5,7;
 }
 
 message Span {
@@ -49,14 +48,6 @@ message GenerateTrace {
   GenerateRequest request = 1;
   GenerateResponse response = 2;
 }
-
-// N.B. I think this is no longer used because executions come from RunMe.
-//message ExecuteTrace {
-//  // The cell that was executed.
-//  runme.parser.v1.Cell cell = 3;
-//
-//  reserved 1,2;
-//}
 
 // LogEntries is used to store log lines keyed by a trace id.
 message LogEntries {

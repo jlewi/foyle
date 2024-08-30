@@ -503,22 +503,6 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 					return bids, errors.Wrapf(err, "Failed to set generate trace on block %s", bid)
 				}
 			}
-		case *logspb.Trace_Execute:
-			bid := converters.GetCellID(t.Execute.GetCell())
-			if bid == "" {
-				return bids, nil
-			}
-			bids = append(bids, bid)
-			if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
-				block.Id = bid
-				if block.ExecTraceIds == nil {
-					block.ExecTraceIds = make([]string, 0, 10)
-				}
-				block.ExecTraceIds = append(block.ExecTraceIds, tid)
-				return nil
-			}); err != nil {
-				return bids, errors.Wrapf(err, "Failed to set execute trace on block %s", bid)
-			}
 		default:
 			log.Error(fmt.Errorf("Unknown trace type"), "Unknown trace type", "trace", t)
 		}
@@ -632,6 +616,8 @@ func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 	}
 }
 
+// buildBlockLog updates blocklogs given a generate trace.
+// Since a single generate trace can generate multiple blocks, its a one to many operation.
 func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble.DB) error {
 	log := logs.FromContext(ctx)
 	log = log.WithValues("blockId", block.Id)
@@ -673,84 +659,6 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 		}()
 	}
 
-	// Dedupe the execution traces just in case
-	uEids := make(map[string]bool)
-	for _, eid := range block.GetExecTraceIds() {
-		uEids[eid] = true
-	}
-	block.ExecTraceIds = make([]string, 0, len(uEids))
-	for eid := range uEids {
-		block.ExecTraceIds = append(block.ExecTraceIds, eid)
-	}
-
-	eidToTime := make(map[string]time.Time)
-
-	var lastTrace *logspb.Trace
-	// Get the last execution trace
-	for _, tid := range block.GetExecTraceIds() {
-		func() {
-			trace := &logspb.Trace{}
-			if err := dbutil.GetProto(tracesDB, tid, trace); err != nil {
-				log.Error(err, "Error getting execute trace", "execTraceId", tid)
-				return
-			}
-
-			if trace.GetExecute() == nil {
-				log.Error(errors.New("Invalid execution trace for traceId"), "Error getting execute trace", "execTraceId", tid)
-				return
-			}
-
-			eidToTime[tid] = trace.StartTime.AsTime()
-
-			if lastTrace == nil {
-				lastTrace = trace
-				return
-			}
-
-			if lastTrace.StartTime.AsTime().Before(trace.StartTime.AsTime()) {
-				lastTrace = trace
-			}
-		}()
-	}
-
-	// Sort execTrace ids based on their time. This is so the ordering is stable for the unittest.
-	// It should also be convenient for manual analysis since we usually care about the last exec trace.
-	sort.Slice(block.ExecTraceIds, func(i, j int) bool {
-		left := block.ExecTraceIds[i]
-		right := block.ExecTraceIds[j]
-		leftTime := eidToTime[left]
-		rightTime := eidToTime[right]
-		return leftTime.Before(rightTime)
-	})
-
-	if lastTrace != nil {
-		if err := updateBlockForExecution(block, lastTrace); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// updateBlockForExecution updates fields in the block log based the last execution trace of that block
-func updateBlockForExecution(block *logspb.BlockLog, lastTrace *logspb.Trace) error {
-	// If the block was executed as part of evaluation mode then consider it to be in evaluation mode.
-	if lastTrace.EvalMode {
-		block.EvalMode = true
-	}
-	block.ExecutedBlock = nil
-	block.ExitCode = unsetExitCode
-
-	switch eTrace := lastTrace.Data.(type) {
-	case *logspb.Trace_Execute:
-		b, err := converters.CellToBlock(eTrace.Execute.GetCell())
-		if err != nil {
-			return errors.Wrapf(err, "Failed to convert cell to block for trace %s", lastTrace.Id)
-		}
-		block.ExecutedBlock = b
-	default:
-		return errors.WithStack(errors.Errorf("Can't update BlockLog with execution information. The last trace, id %s  is not an execution trace", lastTrace.Id))
-	}
 	return nil
 }
 

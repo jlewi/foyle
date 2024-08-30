@@ -53,17 +53,6 @@ func (m *Trace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) erro
 		}
 	}
 
-	keyName = "execute" // field execute = 5
-	if ov, ok := m.GetData().(*Trace_Execute); ok {
-		_ = ov
-		if ov.Execute != nil {
-			var vv interface{} = ov.Execute
-			if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
-				enc.AddObject(keyName, marshaler)
-			}
-		}
-	}
-
 	keyName = "eval_mode" // field eval_mode = 6
 	enc.AddBool(keyName, m.EvalMode)
 
@@ -156,25 +145,6 @@ func (m *GenerateTrace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncod
 	keyName = "response" // field response = 2
 	if m.Response != nil {
 		var vv interface{} = m.Response
-		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
-			enc.AddObject(keyName, marshaler)
-		}
-	}
-
-	return nil
-}
-
-func (m *ExecuteTrace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
-	var keyName string
-	_ = keyName
-
-	if m == nil {
-		return nil
-	}
-
-	keyName = "cell" // field cell = 3
-	if m.Cell != nil {
-		var vv interface{} = m.Cell
 		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
 			enc.AddObject(keyName, marshaler)
 		}
