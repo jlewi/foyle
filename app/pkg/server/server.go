@@ -139,10 +139,7 @@ func (s *Server) createGinEngine() error {
 		}
 	}
 
-	// Add REST handlers for blocklogs
-	// TODO(jeremy): We should probably standardize on connect-rpc
 	apiPrefix := s.config.APIPrefix()
-	router.GET(apiPrefix+"/blocklogs/:id", s.logsCrud.GetBlockLog)
 
 	// Set  up the connect-rpc handlers for the EvalServer
 	otelInterceptor, err := otelconnect.NewInterceptor()

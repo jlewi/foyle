@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "foyle/v1alpha1/agent.proto";
 import "foyle/v1alpha1/trainer.proto";
+import "foyle/logs/blocks.proto";
 import "runme/runner/v1/runner.proto";
 
 import "google/protobuf/struct.proto";
@@ -67,6 +68,8 @@ message LogEntries {
 service LogsService {
   rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) {}
 
+  rpc GetBlockLog(GetBlockLogRequest) returns (GetBlockLogResponse) {}
+
   // GetLLMLogs returns the logs associated with an LLM call.
   // These will include the rendered prompt and response. Unlike GetTraceRequest this has the
   // actual prompt and response of the LLM.
@@ -79,6 +82,14 @@ message GetTraceRequest {
 
 message GetTraceResponse {
   Trace trace = 1;
+}
+
+message GetBlockLogRequest {
+  string id = 1;
+}
+
+message GetBlockLogResponse {
+  BlockLog block_log = 1;
 }
 
 message GetLLMLogsRequest {

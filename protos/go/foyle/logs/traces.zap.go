@@ -284,6 +284,39 @@ func (m *GetTraceResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEn
 	return nil
 }
 
+func (m *GetBlockLogRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "id" // field id = 1
+	enc.AddString(keyName, m.Id)
+
+	return nil
+}
+
+func (m *GetBlockLogResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "block_log" // field block_log = 1
+	if m.BlockLog != nil {
+		var vv interface{} = m.BlockLog
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
+
+	return nil
+}
+
 func (m *GetLLMLogsRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
 	var keyName string
 	_ = keyName
