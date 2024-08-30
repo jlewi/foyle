@@ -51,12 +51,12 @@ message GenerateTrace {
 }
 
 // N.B. I think this is no longer used because executions come from RunMe.
-message ExecuteTrace {
-  // The cell that was executed.
-  runme.parser.v1.Cell cell = 3;
-
-  reserved 1,2;
-}
+//message ExecuteTrace {
+//  // The cell that was executed.
+//  runme.parser.v1.Cell cell = 3;
+//
+//  reserved 1,2;
+//}
 
 // LogEntries is used to store log lines keyed by a trace id.
 message LogEntries {
