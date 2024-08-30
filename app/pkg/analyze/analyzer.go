@@ -33,9 +33,6 @@ import (
 )
 
 const (
-	// unsetExitCode is a random negative exit code so we can tell when it hasn't been set.
-	unsetExitCode = -2377
-
 	// traceField is the field that contains the traceId in a log entry. We use this to identify processing related
 	// to a particular trace. We don't use the field "traceId" because these log entries aren't actually part of the
 	// trace.

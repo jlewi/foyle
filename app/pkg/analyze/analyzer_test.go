@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,11 +29,6 @@ func timeMustParse(layoutString, value string) *timestamppb.Timestamp {
 		panic(err)
 	}
 	return timestamppb.New(t)
-}
-
-func shuffle(in []string) []string {
-	rand.Shuffle(len(in), func(i, j int) { in[i], in[j] = in[j], in[i] })
-	return in
 }
 
 func Test_BuildBlockLog(t *testing.T) {
