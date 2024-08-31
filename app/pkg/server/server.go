@@ -307,7 +307,7 @@ func (s *Server) setupViewerApp(router *gin.Engine) error {
 	if !strings.HasPrefix(logsviewer.AppPath, "/") {
 		return errors.New("logsviewer.AppPath should have a leading slash")
 	}
-	
+
 	log.Info("Setting up logs viewer", "path", logsviewer.AppPath)
 
 	viewerApp := &app.Handler{

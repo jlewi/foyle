@@ -1,12 +1,13 @@
 package logsviewer
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 	"go.uber.org/zap"
-	"net/http"
-	"strings"
 )
 
 var (

@@ -1,9 +1,10 @@
 package logsviewer
 
 import (
+	"strings"
+
 	"connectrpc.com/connect"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
-	"strings"
 
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 )

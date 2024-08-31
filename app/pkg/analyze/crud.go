@@ -1,8 +1,9 @@
 package analyze
 
 import (
-	"connectrpc.com/connect"
 	"context"
+
+	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/logs"
 
 	"github.com/cockroachdb/pebble"
@@ -39,7 +40,7 @@ func (h *CrudHandler) GetTrace(ctx context.Context, request *connect.Request[log
 	err := dbutil.GetProto(h.tracesDB, getReq.GetId(), trace)
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {
-			connect.NewError(connect.CodeNotFound, errors.Wrapf(err, "Failed to get trace with id %s", getReq.GetId()))
+			return nil, connect.NewError(connect.CodeNotFound, errors.Wrapf(err, "Failed to get trace with id %s", getReq.GetId()))
 		} else {
 			log := logs.FromContext(ctx)
 			log.Error(err, "Failed to read trace with id", "id", getReq.GetId())
