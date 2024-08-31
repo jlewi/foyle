@@ -307,9 +307,8 @@ func (s *Server) setupViewerApp(router *gin.Engine) error {
 	if !strings.HasPrefix(logsviewer.AppPath, "/") {
 		return errors.New("logsviewer.AppPath should have a leading slash")
 	}
-
-	endpoint := fmt.Sprintf("http://%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
-	log.Info("Setting up logs viewer", "endpoint", endpoint, "path", logsviewer.AppPath)
+	
+	log.Info("Setting up logs viewer", "path", logsviewer.AppPath)
 
 	viewerApp := &app.Handler{
 		Name:        "FoyleLogsViewer",
@@ -321,7 +320,7 @@ func (s *Server) setupViewerApp(router *gin.Engine) error {
 			"/web/table.css",  // Loads table.css file.
 		},
 		Env: map[string]string{
-			logsviewer.EndpointEnvVar: endpoint,
+			logsviewer.APIPrefixEnvVar: s.config.APIPrefix(),
 		},
 	}
 

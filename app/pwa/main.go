@@ -55,7 +55,7 @@ func main() {
 			"/web/viewer.css",
 		},
 		Env: map[string]string{
-			logsviewer.EndpointEnvVar: "http://localhost:8000",
+			logsviewer.APIPrefixEnvVar: "api",
 		},
 	}))
 

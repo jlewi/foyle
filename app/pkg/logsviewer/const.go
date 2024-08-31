@@ -1,6 +1,6 @@
 package logsviewer
 
 const (
-	AppPath        = "/viewer"
-	EndpointEnvVar = "FOYLE_ENDPOINT"
+	AppPath         = "/viewer"
+	APIPrefixEnvVar = "FOYLE_ENDPOINT"
 )
