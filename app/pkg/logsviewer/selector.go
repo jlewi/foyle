@@ -3,6 +3,9 @@ package logsviewer
 import (
 	"strings"
 
+	"connectrpc.com/connect"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 )
 
@@ -37,12 +40,13 @@ func (h *blockSelector) Render() app.UI {
 					h.Update()
 					return
 				}
-				blockLog, err := client.GetBlockLog(ctx, blockID)
+				req := &logspb.GetBlockLogRequest{Id: blockID}
+				blockLogResp, err := client.GetBlockLog(ctx, connect.NewRequest(req))
 				if err != nil {
 					ctx.SetState(getErrorState, err.Error())
 					ctx.NewActionWithValue(getAction, errorView)
 				} else {
-					ctx.SetState(blockLogState, blockLog)
+					ctx.SetState(blockLogState, blockLogResp.Msg)
 					ctx.NewActionWithValue(getAction, rawView)
 				}
 			}),
