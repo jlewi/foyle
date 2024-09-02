@@ -41,21 +41,20 @@ to provide the frontend.
    foyle serve
    ```
 
-   * By default foyle uses port 8877 for the http server and port 9080 for gRPC
+   * By default foyle uses port 8877 for the http server
 
-   * If you need to use different ports you can configure this as follows
+   * If you need to use a different port you can configure this as follows
 
    ```sh
    foyle config set server.httpPort=<YOUR HTTP PORT>
-   foyle config set server.grpcPort=<YOUR GRPC PORT> 
    ```
 
 1. Inside VSCode configure RunMe to use Foyle
    1. Open the VSCode setting palette
-   1. Search for `Runme: Foyle Address`
-   1. Set the address to `localhost:${GRPC_PORT}`
-      * The default port is 9080
-      * If you set a non default value then it will be the value of `server.grpcPort`
+   1. Search for `Runme: Ai Base URL`
+   1. Set the address to `http://localhost:${HTTP_PORT}/api`
+      * The default port is 8877
+      * If you set a non default value then it will be the value of `server.httpPort`
 
 ## Try it out!
 
@@ -80,8 +79,8 @@ Now that foyle is running you can open markdown documents in VSCode and start in
 ### Customizing the Foyle Server Address
 
 1. Open the settings panel; you can click the gear icon in the lower left window and then select settings
-2. Search for `Foyle`
-3. Set `Runme: Foyle Address` to the address of the Foyle server to use as the Agent
+2. Search for `Runme: Ai base URL
+3. Set `Runme: Ai base URL` to the address of the Foyle server to use as the Agent
    * The Agent handles requests to generate completions
 
 ### Customizing the keybindings
