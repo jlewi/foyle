@@ -21,3 +21,7 @@ To run hugo locally
 ```sh {"id":"01J49NA03YRB6QCR5CGWN31V0K"}
 hugo serve -D
 ```
+
+## References
+
+[stateful/runme#663](https://github.com/stateful/runme/issues/663) - RunMe notebooks don't pell well with Hugo
