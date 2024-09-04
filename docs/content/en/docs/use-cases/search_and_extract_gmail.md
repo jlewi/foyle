@@ -1,6 +1,6 @@
 ---
 description: Search Gmail and classify and extract information
-title: Search Gmail and Extract Information
+title: Email Processing
 weight: 15
 ---
 
@@ -9,10 +9,10 @@ weight: 15
 This guide walks you through
 
 * Searching Gmail using the [gctl CLI](https://github.com/jlewi/gctl)
-* Download emails using the [gctl CLI](https://github.com/jlewi/gctl)
+* Downloading Gmail with [gctl CLI](https://github.com/jlewi/gctl)
 * Extracting information from emails using the [llm CLI](https://github.com/simonw/llm)
 
-For a demo video see [here]](https://x.com/jeremylewi/status/1830662143374696738).
+For a demo video see [here](https://x.com/jeremylewi/status/1830662143374696738).
 
 This document is intended to be opened and run in [RunMe](https://runme.dev/).
 
@@ -20,7 +20,7 @@ This document is intended to be opened and run in [RunMe](https://runme.dev/).
 
 Clone the [Foyle repository](https://github.com/jlewi/foyle) to get a copy of the document.
 
-```sh {"id":"01J6X766FHRH4AC815057T6WNP"}
+```sh
 git clone https://github.com/jlewi/foyle /tmp/foyle
 ```
 
@@ -32,13 +32,13 @@ Install the [llm CLI](https://github.com/simonw/llm)
 
 Using pip
 
-```sh {"id":"01J6X7AH6JNSJ04APK1A0F5KTB"}
+```sh
 pip install llm
 ```
 
 Download the latest [release of gctl](https://github.com/jlewi/gctl/releases/latest)
 
-```sh {"id":"01J6X7CM9S958Q9Q8H6G9Z66EW"}
+```sh
 TAG=$(curl -s https://api.github.com/repos/jlewi/gctl/releases/latest | jq -r '.tag_name')
 # Remove the leading v because its not part of the binary name
 TAGNOV=${TAG#v}
@@ -54,10 +54,9 @@ wget $LINK -O /tmp/gctl
 
 Move gctl onto your PATH
 
-```bash {"id":"01J6X86VFTNVW8DHVXHTMCEAQ4"}
+```bash
 chmod a+rx /usr/local/bin/gctl
 sudo mv /tmp/gctl /usr/local/bin/gctl
-
 ```
 
 ## Search For Emails
@@ -65,11 +64,11 @@ sudo mv /tmp/gctl /usr/local/bin/gctl
 Search for emails using the gctl CLI
 
 * Change the search query to match your use case
-* You can refer to the [Gmail search documentation](https://developers.google.com/gmail/api/guides/filtering) 
+* You can refer to the [Gmail search documentation](https://developers.google.com/gmail/api/guides/filtering)
 * Or if you've enabled Foyle you can just describe the search query in natural language in a markdown cell and let Foyle figure out
-  the syntax for you!
+   the syntax for you!
 
-```bash {"id":"01J6X89W4VDVV86CRN06BAPCT9"}
+```bash
 gctl mail search "kamala" > /tmp/list.json
 cat /tmp/list.json
 ```
@@ -91,12 +90,10 @@ Here is an example program that generated the code below:
    * isKamala
    * usubscribeLink
 
-```bash {"id":"01J6X8RAJNT84B6CDBZ0SK1YXX"}
+```bash
 #!/bin/bash
 for id in $(jq -r '.[].ID' /tmp/list.json); do
   gctl mail get "$id" > "/tmp/message_${id}.json"
   cat "/tmp/message_${id}.json" | llm "Is this email from the Kamala Harris campaign? If yes, extract the unsubscribe link. Output a JSON with fields: from, isKamala (true/false), unsubscribeLink (or null if not found)" 
 done
 ```
-
-
