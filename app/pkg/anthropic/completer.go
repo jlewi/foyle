@@ -4,6 +4,10 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/jlewi/foyle/app/api"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/llms"
@@ -33,6 +37,11 @@ type Completer struct {
 
 // Complete returns a ContextLengthExceededError if the context is too long
 func (c *Completer) Complete(ctx context.Context, systemPrompt string, message string) ([]*v1alpha1.Block, error) {
+	tp := tracer()
+	// Start a span to record metrics.
+	ctx, span := tp.Start(ctx, "Complete", trace.WithAttributes(attribute.String("llm.model", c.config.GetModel()), attribute.String("llm.provider", string(api.ModelProviderAnthropic))))
+	defer span.End()
+
 	log := logs.FromContext(ctx)
 	// See: https://docs.anthropic.com/en/api/messages
 	// Claude doesn't have a system prompt.
@@ -62,6 +71,9 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 	if err != nil {
 		// https://docs.anthropic.com/en/api/errors
 		aErr, ok := err.(*anthropic.RequestError)
+		if ok {
+			span.SetAttributes(attribute.Int("llm.statusCode", aErr.StatusCode))
+		}
 		// 413 means context length exceeded.
 		if ok && aErr.StatusCode == http.StatusRequestEntityTooLarge {
 			return nil, llms.ContextLengthExceededError{Cause: err}
@@ -69,6 +81,12 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 		// TODO(jeremy): Should we surface the error to the user as blocks in the notebook
 		return nil, errors.Wrapf(err, "CreateChatCompletion failed")
 	}
+
+	span.SetAttributes(
+		attribute.Int("llm.input_tokens", resp.Usage.InputTokens),
+		attribute.Int("llm.output_tokens", resp.Usage.OutputTokens),
+		attribute.String("llm.stop_reason", string(resp.StopReason)),
+	)
 
 	log.Info("Anthropic:CreateMessages response", "resp", resp)
 

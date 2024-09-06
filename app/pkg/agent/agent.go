@@ -468,7 +468,7 @@ func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.
 	tp := tracer()
 	// We need to generate a new ctx with a new trace ID because we want one trace per completion
 	// We need to use withNewRoot because we want to make it a new trace and not rooted at the current one
-	generateCtx, generateSpan := tp.Start(ctx, "StreamAgentGenerate", trace.WithNewRoot(), trace.WithAttributes(attribute.String("streamTraceID", traceId.String()), attribute.String("contextID", contextID)))
+	generateCtx, generateSpan := tp.Start(ctx, "CreateCompletion", trace.WithNewRoot(), trace.WithAttributes(attribute.String("streamTraceID", traceId.String()), attribute.String("contextID", contextID)))
 	generateTraceId := generateSpan.SpanContext().TraceID()
 	log = log.WithValues("traceId", generateTraceId, "streamTraceId", traceId.String(), "contextId", contextID)
 	generateCtx = logr.NewContext(generateCtx, log)
@@ -524,9 +524,13 @@ func (a *Agent) GetExample(ctx context.Context, req *connect.Request[v1alpha1.Ge
 
 func (a *Agent) LogEvents(ctx context.Context, req *connect.Request[v1alpha1.LogEventsRequest]) (*connect.Response[v1alpha1.LogEventsResponse], error) {
 	log := logs.FromContext(ctx)
-
+	tp := tracer()
 	for _, event := range req.Msg.Events {
-		log.Info("LogEvent", "eventType", event.Type, "contextId", event.ContextId, "selectedCellId", event.SelectedId, "event", zap.Object("event", event))
+		func() {
+			_, span := tp.Start(ctx, "LogEvent", trace.WithAttributes(attribute.String("eventType", event.Type.String()), attribute.String("contextId", event.ContextId), attribute.String("selectedCellId", event.SelectedId)))
+			defer span.End()
+			log.Info("LogEvent", "eventType", event.Type, "contextId", event.ContextId, "selectedCellId", event.SelectedId, "event", zap.Object("event", event))
+		}()
 	}
 	return connect.NewResponse(&v1alpha1.LogEventsResponse{}), nil
 }
