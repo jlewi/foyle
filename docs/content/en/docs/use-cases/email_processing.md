@@ -55,7 +55,7 @@ wget $LINK -O /tmp/gctl
 Move gctl onto your PATH
 
 ```bash
-chmod a+rx /usr/local/bin/gctl
+chmod a+rx /tmp/gctl
 sudo mv /tmp/gctl /usr/local/bin/gctl
 ```
 

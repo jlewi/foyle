@@ -3,6 +3,10 @@ package oai
 import (
 	"context"
 
+	"github.com/jlewi/foyle/app/api"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/llms"
@@ -31,7 +35,12 @@ type Completer struct {
 
 // Complete returns a ContextLengthExceededError if the context is too long
 func (c *Completer) Complete(ctx context.Context, systemPrompt string, message string) ([]*v1alpha1.Block, error) {
+	tp := tracer()
 	log := logs.FromContext(ctx)
+	// Start a span to record metrics.
+	ctx, span := tp.Start(ctx, "Complete", trace.WithAttributes(attribute.String("llm.model", c.config.GetModel()), attribute.String("llm.provider", string(api.ModelProviderOpenAI))))
+	defer span.End()
+
 	messages := []openai.ChatCompletionMessage{
 		{Role: openai.ChatMessageRoleSystem,
 			Content: systemPrompt,
@@ -51,6 +60,14 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 	resp, err := c.client.CreateChatCompletion(ctx, request)
 
 	if err != nil {
+		apiErr, ok := err.(*openai.APIError)
+		if ok {
+			val, ok := apiErr.Code.(string)
+			if ok {
+				span.SetAttributes(attribute.String("llm.error", val))
+			}
+		}
+
 		if ErrorIs(err, ContextLengthExceededCode) {
 			return nil, llms.ContextLengthExceededError{Cause: err}
 		}
@@ -59,6 +76,16 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 	}
 
 	log.Info("OpenAI:CreateChatCompletion response", "resp", resp)
+
+	stopReason := ""
+	if len(resp.Choices) > 0 {
+		stopReason = string(resp.Choices[0].FinishReason)
+	}
+	span.SetAttributes(
+		attribute.Int("llm.input_tokens", resp.Usage.PromptTokens),
+		attribute.Int("llm.output_tokens", resp.Usage.CompletionTokens),
+		attribute.String("llm.stop_reason", stopReason),
+	)
 
 	blocks, err := c.parseResponse(ctx, &resp)
 	if err != nil {

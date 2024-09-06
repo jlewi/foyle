@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"strings"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/hashicorp/go-retryablehttp"
 
 	"github.com/go-logr/zapr"
@@ -35,6 +37,10 @@ func NewClient(cfg config.Config) (*openai.Client, error) {
 	// retryable errors like 429; rate limiting
 	retryClient := retryablehttp.NewClient()
 	httpClient := retryClient.StandardClient()
+
+	if cfg.UseHoneycomb() {
+		httpClient.Transport = otelhttp.NewTransport(httpClient.Transport)
+	}
 
 	var clientConfig openai.ClientConfig
 	if cfg.AzureOpenAI != nil {
