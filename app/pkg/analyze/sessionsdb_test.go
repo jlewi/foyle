@@ -25,9 +25,9 @@ func Test_SessionsCRUD(t *testing.T) {
 		LogDir: dir.Name,
 	}
 
-	m, err := NewSessionsDB(cfg)
+	m, err := NewSessionsManager(cfg)
 	if err != nil {
-		t.Fatalf("Error creating SessionsDB: %v", err)
+		t.Fatalf("Error creating SessionsManager: %v", err)
 	}
 
 	cid := "1"

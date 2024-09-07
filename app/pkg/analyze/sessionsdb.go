@@ -21,15 +21,13 @@ var ddl string
 // SessionUpdater is a function that updates a session.
 type SessionUpdater func(session *logspb.Session) error
 
-// TODO: Rename this to SessionsManager so we don't have db.db which stutters
-
-// SessionsDB manages the database containing sessions.
-type SessionsDB struct {
+// SessionsManager manages the database containing sessions.
+type SessionsManager struct {
 	queries *fsql.Queries
 	db      *sql.DB
 }
 
-func NewSessionsDB(cfg config.Config) (*SessionsDB, error) {
+func NewSessionsManager(cfg config.Config) (*SessionsManager, error) {
 	db, err := sql.Open("sqlite", cfg.GetSessionsDB())
 
 	if err != nil {
@@ -52,14 +50,14 @@ func NewSessionsDB(cfg config.Config) (*SessionsDB, error) {
 	log := zapr.NewLogger(zap.L())
 	log.Info("Got sessions", "number", len(sessions))
 
-	return &SessionsDB{
+	return &SessionsManager{
 		queries: queries,
 		db:      db,
 	}, nil
 }
 
 // Get retrieves a session with the given contextID.
-func (db *SessionsDB) Get(ctx context.Context, contextID string) (*logspb.Session, error) {
+func (db *SessionsManager) Get(ctx context.Context, contextID string) (*logspb.Session, error) {
 	queries := db.queries
 
 	// Read the record
@@ -83,7 +81,7 @@ func (db *SessionsDB) Get(ctx context.Context, contextID string) (*logspb.Sessio
 // If the given contextID doesn't exist then an empty Session is passed to updateFunc and the session will be
 // inserted if the updateFunc returns nil. If the session already exists then the session is passed to updateFunc
 // and the updated value is then written to the database
-func (db *SessionsDB) Update(ctx context.Context, contextID string, updateFunc SessionUpdater) error {
+func (db *SessionsManager) Update(ctx context.Context, contextID string, updateFunc SessionUpdater) error {
 	if contextID == "" {
 		return errors.WithStack(errors.New("contextID must be non-empty"))
 	}
@@ -150,7 +148,7 @@ func (db *SessionsDB) Update(ctx context.Context, contextID string, updateFunc S
 	return nil
 }
 
-func (db *SessionsDB) Close() error {
+func (db *SessionsManager) Close() error {
 	return db.Close()
 }
 
