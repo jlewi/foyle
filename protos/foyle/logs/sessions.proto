@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+import "foyle/v1alpha1/agent.proto";
+import "foyle/v1alpha1/trainer.proto";
+import "foyle/logs/blocks.proto";
+import "runme/runner/v1/runner.proto";
+import "google/protobuf/timestamp.proto";
+
+// Session is a series of events in the logs
+message Session {
+  // context_id is the unique id for the context
+  string context_id = 1;
+
+  google.protobuf.Timestamp    end_time = 2;
+  google.protobuf.Timestamp    end_time = 3;
+
+
+  // Log events associated with the session.
+  repeated LogEvent log_events = 4;
+
+  // FullContext is the full context of the session
+  FullContext full_context = 5;
+}

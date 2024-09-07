@@ -235,6 +235,10 @@ func (c *Config) GetTracesDBDir() string {
 	return filepath.Join(c.GetLogDir(), "traces")
 }
 
+func (c *Config) GetSessionsDB() string {
+	return filepath.Join(c.GetLogDir(), "sessions.sqllite3")
+}
+
 func (c *Config) GetTrainingDirs() []string {
 	if c.Learner == nil {
 		return []string{}
