@@ -2,9 +2,6 @@ package analyze
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -13,7 +10,6 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/gin-gonic/gin"
 	"github.com/jlewi/foyle/app/pkg/config"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/pkg/errors"
@@ -85,44 +81,6 @@ func createCrudHandler() (*CrudHandler, error) {
 func tearDown(handler *CrudHandler) {
 	handler.blocksDB.Close()
 	handler.tracesDB.Close()
-}
-
-func TestGetBlockLog(t *testing.T) {
-	handler, err := createCrudHandler()
-	defer tearDown(handler)
-
-	if err != nil {
-		t.Fatalf("Failed to create handler: %v", err)
-	}
-	// Create a new Gin engine
-	router := gin.Default()
-
-	// Register the GetBlockLog handler
-	router.GET("/block/:id", handler.GetBlockLog)
-
-	// Create a new HTTP request
-	req, err := http.NewRequest(http.MethodGet, "/block/test-id", nil)
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	// Record the response
-	w := httptest.NewRecorder()
-
-	// Serve the HTTP request
-	router.ServeHTTP(w, req)
-
-	// Check the HTTP status code
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", w.Code)
-	}
-
-	// Check the response body
-	actualBody := w.Body.String()
-	actual := &logspb.BlockLog{}
-	if err := json.Unmarshal([]byte(actualBody), &actual); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
-	}
 }
 
 func TestGetTrace(t *testing.T) {

@@ -7,15 +7,6 @@ import "runme/parser/v1/parser.proto";
 
 option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
 
-// grpc-gateway
-// https://github.com/grpc-ecosystem/grpc-gateway
-import "google/api/annotations.proto";
-
-
-// IMPORTANT:
-// If you update or add any new methods to this file then you need to update
-// Server.registerGRPCGatewayRoutes to have gin delegate the appropriate requests to the grpc gateway server.
-
 message GenerateRequest {
   Doc doc = 1;
 }
@@ -28,12 +19,7 @@ message GenerateResponse {
 // Generate completions using AI
 service GenerateService {
   // Generate generates new cells given an existing document.
-  rpc Generate (GenerateRequest) returns (GenerateResponse) {
-    option (google.api.http) = {
-      post: "/api/v1alpha1/generate"
-      body: "*"
-    };
-  }
+  rpc Generate (GenerateRequest) returns (GenerateResponse) {}
 }
 
 message ExecuteRequest {
@@ -47,12 +33,7 @@ message ExecuteResponse {
 // Execute code and commands
 service ExecuteService {
   // Execute executes a cell in an existing document.
-  rpc Execute(ExecuteRequest) returns (ExecuteResponse) {
-    option (google.api.http) = {
-      post: "/api/v1alpha1/execute"
-      body: "*"
-    };
-  }
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse) {}
 }
 
 // TODO(jeremy): Should we rename this? Maybe NotebookAIService? I think it make sense to keep this

@@ -92,7 +92,8 @@ type ServerConfig struct {
 	HttpPort int `json:"httpPort" yaml:"httpPort"`
 
 	// GRPCPort is the port for the gRPC service
-	GRPCPort int `json:"grpcPort" yaml:"grpcPort"`
+	// Deprecated: GRPCPort is no longer used and should be removed in the next version of the config.
+	GRPCPort int `json:"grpcPort,omitempty" yaml:"grpcPort,omitempty"`
 
 	// CORS contains the CORS configuration
 	CORS *CorsConfig `json:"cors,omitempty" yaml:"cors,omitempty"`

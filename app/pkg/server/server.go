@@ -19,9 +19,6 @@ import (
 
 	"github.com/cockroachdb/pebble"
 
-	"github.com/jlewi/foyle/app/pkg/runme"
-	aiv1alpha1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/ai/v1alpha1"
-
 	"github.com/jlewi/foyle/app/pkg/eval"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 
@@ -42,37 +39,24 @@ import (
 	"connectrpc.com/otelconnect"
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/zapr"
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/executor"
-	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/grpclog"
-	"google.golang.org/grpc/health"
-	"google.golang.org/grpc/health/grpc_health_v1"
-	"google.golang.org/grpc/reflection"
 )
 
 // Server is the main application server for foyle
 type Server struct {
-	config     config.Config
-	engine     *gin.Engine
-	grpcServer *grpc.Server
-	hServer    *http.Server
+	config  config.Config
+	engine  *gin.Engine
+	hServer *http.Server
 	// builtinExtensionPaths is a list of serving paths to the built in extensions
 	builtinExtensionPaths []string
 
 	agent            *agent.Agent
-	runmeProxy       *runme.Proxy
 	executor         *executor.Executor
-	conn             *grpc.ClientConn
 	logsCrud         *analyze.CrudHandler
 	shutdownComplete chan bool
 }
@@ -87,21 +71,16 @@ func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent, tr
 	if agent == nil {
 		return nil, errors.New("Agent is required")
 	}
-	runmeProxy, err := runme.NewProxy(agent)
-	if err != nil {
-		return nil, err
-	}
 
 	logsCrud, err := analyze.NewCrudHandler(config, blocksDB, tracesDB, analyzer)
 	if err != nil {
 		return nil, err
 	}
 	s := &Server{
-		config:     config,
-		executor:   e,
-		agent:      agent,
-		runmeProxy: runmeProxy,
-		logsCrud:   logsCrud,
+		config:   config,
+		executor: e,
+		agent:    agent,
+		logsCrud: logsCrud,
 	}
 
 	if err := s.createGinEngine(); err != nil {
@@ -123,6 +102,7 @@ func (s *Server) createGinEngine() error {
 
 	router := gin.Default()
 
+	// TODO(jeremy): Should we turn this into a protobuf service and use connect?
 	router.GET("/healthz", s.healthCheck)
 	router.NoRoute(func(c *gin.Context) {
 		log.Info("Request for not found path", "path", c.Request.URL.Path)
@@ -139,10 +119,7 @@ func (s *Server) createGinEngine() error {
 		}
 	}
 
-	// Add REST handlers for blocklogs
-	// TODO(jeremy): We should probably standardize on connect-rpc
 	apiPrefix := s.config.APIPrefix()
-	router.GET(apiPrefix+"/blocklogs/:id", s.logsCrud.GetBlockLog)
 
 	// Set  up the connect-rpc handlers for the EvalServer
 	otelInterceptor, err := otelconnect.NewInterceptor()
@@ -311,8 +288,7 @@ func (s *Server) setupViewerApp(router *gin.Engine) error {
 		return errors.New("logsviewer.AppPath should have a leading slash")
 	}
 
-	endpoint := fmt.Sprintf("http://%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
-	log.Info("Setting up logs viewer", "endpoint", endpoint, "path", logsviewer.AppPath)
+	log.Info("Setting up logs viewer", "path", logsviewer.AppPath)
 
 	viewerApp := &app.Handler{
 		Name:        "FoyleLogsViewer",
@@ -324,7 +300,7 @@ func (s *Server) setupViewerApp(router *gin.Engine) error {
 			"/web/table.css",  // Loads table.css file.
 		},
 		Env: map[string]string{
-			logsviewer.EndpointEnvVar: endpoint,
+			logsviewer.APIPrefixEnvVar: s.config.APIPrefix(),
 		},
 	}
 
@@ -421,29 +397,10 @@ func (s *Server) setHTMLTemplates(router *gin.Engine) error {
 
 // Run starts the http server
 func (s *Server) Run() error {
-	grpcAddress := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.GRPCPort)
-	grpcLis, err := net.Listen("tcp", grpcAddress)
-	if err != nil {
-		return errors.Wrapf(err, "failed to listen: %v", err)
-	}
-
 	s.shutdownComplete = make(chan bool, 1)
 	trapInterrupt(s)
 
 	log := zapr.NewLogger(zap.L())
-	go func() {
-		err := s.startGRPCServer(grpcLis)
-		if err != nil {
-			log.Error(err, "GRPC server exited")
-			// TODO(jeremy): Should come up with a better way to do a clean shutdown; i.e stopping the http server
-			os.Exit(1)
-		}
-
-	}()
-
-	if err := s.registerGRPCGatewayRoutes(); err != nil {
-		return err
-	}
 	address := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
 	log.Info("Starting http server", "address", address)
 
@@ -486,12 +443,6 @@ func (s *Server) shutdown() {
 	log := zapr.NewLogger(zap.L())
 	log.Info("Shutting down the Foyle server")
 
-	// Shutdown the grpc server
-	if s.grpcServer != nil {
-		s.grpcServer.GracefulStop()
-		log.Info("GRPC Server shutdown complete")
-	}
-
 	if s.hServer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
@@ -502,100 +453,6 @@ func (s *Server) shutdown() {
 	}
 	log.Info("Shutdown complete")
 	s.shutdownComplete <- true
-}
-
-// startGRPCServer starts the grpc server.
-// Taking the listener as an argument lets us create tests that inject a listener suitable for tests
-func (s *Server) startGRPCServer(lis net.Listener) error {
-	log := zapr.NewLogger(zap.L())
-
-	s.grpcServer = grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
-
-	v1alpha1.RegisterExecuteServiceServer(s.grpcServer, s.executor)
-	v1alpha1.RegisterGenerateServiceServer(s.grpcServer, s.agent)
-	aiv1alpha1.RegisterAIServiceServer(s.grpcServer, s.runmeProxy)
-
-	// So that gRPC curl can be used to inspect it
-	reflection.Register(s.grpcServer)
-
-	// Support health checks
-	grpc_health_v1.RegisterHealthServer(s.grpcServer, health.NewServer())
-
-	log.Info("Starting grpc service", "address", lis.Addr())
-	return s.grpcServer.Serve(lis)
-}
-
-// registerGRPCGateway starts the gRPC gateway which provides a REST proxy to the grpc server.
-func (s *Server) registerGRPCGatewayRoutes() error {
-	// TODO(jeremy): I think we could use a ctx with Cancel and then potentially trigger cancel to shutdown the
-	// connection.
-	ctx := context.Background()
-
-	// Create a connection to the gRPC server
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-
-	log := zapr.NewLogger(zap.L())
-
-	grpcServerEndpoint := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.GRPCPort)
-	log.Info("Dialing grpc server", "endpoint", grpcServerEndpoint)
-	conn, err := grpc.NewClient(grpcServerEndpoint, opts...)
-	if err != nil {
-		return err
-	}
-	go func() {
-		<-ctx.Done()
-		if err := conn.Close(); err != nil {
-			grpclog.Errorf("failed to close connection to the gRPC server: %v", err)
-		}
-	}()
-	s.conn = conn
-	log.Info("Connected to grpc server", "connectionState", conn.GetState())
-
-	// TODO(jeremy): Should we add a handler for openapi spec; e.g.
-	// https://github.com/grpc-ecosystem/grpc-gateway/blob/10d49ec19ecab090aa3318245e3fe0d5db666c3f/examples/internal/gateway/main.go#L51C2-L51C49
-
-	gwMux := runtime.NewServeMux()
-
-	if err := v1alpha1.RegisterExecuteServiceHandler(ctx, gwMux, conn); err != nil {
-		return err
-	}
-
-	if err := v1alpha1.RegisterGenerateServiceHandler(ctx, gwMux, conn); err != nil {
-		return err
-	}
-
-	// Configure gin to delegate to the grpc gateway
-	handleFunc := func(c *gin.Context) {
-		log.V(logs.Debug).Info("Delegating request to grpc gateway")
-		gwMux.ServeHTTP(c.Writer, c.Request)
-	}
-
-	// N.B since we want to to server our grpc gateway on the same port as our gin server
-	// we need to configure the gin server to delegate to the gateway mux for the appropriate routes.
-	// There currently doesn't seem to be anyway to do this programmatically. So if we add new routes we'd
-	// have to update the code here.
-	// TODO(jeremy): Actually I don't think we can use the group method but I think we can use the star method.
-	// e.g. router.Any("/api/*any", handleFunc)
-	// api := router.Group("/api", handleFunc)
-	pathPrefix := "/api/v1alpha1"
-
-	type method struct {
-		Method string
-		Path   string
-	}
-
-	methods := []method{
-		{Method: http.MethodPost, Path: "execute"},
-		{Method: http.MethodPost, Path: "generate"},
-	}
-
-	for _, m := range methods {
-		fullPath := pathPrefix + "/" + m.Path
-		log.Info("configuring gin to delegate to the grpc gateway", "path", fullPath, "methods", m.Method)
-		s.engine.Handle(m.Method, fullPath, handleFunc)
-	}
-
-	return nil
 }
 
 // trapInterrupt shutdowns the server if the appropriate signals are sent
@@ -616,17 +473,11 @@ func trapInterrupt(s *Server) {
 
 func (s *Server) healthCheck(ctx *gin.Context) {
 	// TODO(jeremy): We should return the version
-	connState := s.conn.GetState()
 	d := gin.H{
-		"server":              "foyle",
-		"status":              "healthy",
-		"grpcConnectionState": connState.String(),
+		"server": "foyle",
+		"status": "healthy",
 	}
 	code := http.StatusOK
-	if connState != connectivity.Ready && connState != connectivity.Idle {
-		d["status"] = "unhealthy"
-		code = http.StatusServiceUnavailable
-	}
 	ctx.JSON(code, d)
 }
 

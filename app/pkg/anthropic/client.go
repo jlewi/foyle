@@ -3,6 +3,8 @@ package anthropic
 import (
 	"strings"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/go-logr/zapr"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/jlewi/foyle/app/pkg/config"
@@ -24,6 +26,10 @@ func NewClient(cfg config.Config) (*anthropic.Client, error) {
 	// retryable errors like 429; rate limiting
 	retryClient := retryablehttp.NewClient()
 	httpClient := retryClient.StandardClient()
+
+	if cfg.UseHoneycomb() {
+		httpClient.Transport = otelhttp.NewTransport(httpClient.Transport)
+	}
 
 	if cfg.Anthropic == nil {
 		return nil, errors.New("Anthropic config is nil; You must configure Anthropic to create an Anthropic client")

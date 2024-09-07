@@ -7,11 +7,11 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
-	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	_ "google.golang.org/protobuf/types/known/structpb"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
@@ -201,6 +201,39 @@ func (m *GetTraceResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEn
 	keyName = "trace" // field trace = 1
 	if m.Trace != nil {
 		var vv interface{} = m.Trace
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
+
+	return nil
+}
+
+func (m *GetBlockLogRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "id" // field id = 1
+	enc.AddString(keyName, m.Id)
+
+	return nil
+}
+
+func (m *GetBlockLogResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "block_log" // field block_log = 1
+	if m.BlockLog != nil {
+		var vv interface{} = m.BlockLog
 		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
 			enc.AddObject(keyName, marshaler)
 		}

@@ -69,7 +69,7 @@ hccli querytourl --query-file=/tmp/query3.json --base-url=https://ui.honeycomb.i
 * Be sure to replace `YOURORG` and `YOURDATASET` with the appropriate values for your organization and dataset
   * You can determine `base-url` just by opening up any existing query in Honeycomb and copying the URL
 * When you execute the cell, it will print the query and open it in your browser
-* You can use the [share query](https://docs.honeycomb.io/investigate/collaborate/share-query/)
+* You can use the [share query](https://docs.honeycomb.io/investigate/collaborate/share-query/) feature to encode the query in the URL
 
 ## Training Foyle to be your Honeycomb Expert
 
