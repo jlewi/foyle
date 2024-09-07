@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
-
-	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/google/go-cmp/cmp"
@@ -32,11 +29,6 @@ func timeMustParse(layoutString, value string) *timestamppb.Timestamp {
 		panic(err)
 	}
 	return timestamppb.New(t)
-}
-
-func shuffle(in []string) []string {
-	rand.Shuffle(len(in), func(i, j int) { in[i], in[j] = in[j], in[i] })
-	return in
 }
 
 func Test_BuildBlockLog(t *testing.T) {
@@ -77,60 +69,6 @@ func Test_BuildBlockLog(t *testing.T) {
 		},
 	}
 
-	execTrace1 := &logspb.Trace{
-		Id:        "e456",
-		StartTime: timeMustParse(time.RFC3339, "2021-01-02T00:00:00Z"),
-		EndTime:   timeMustParse(time.RFC3339, "2021-01-02T00:01:00Z"),
-		Data: &logspb.Trace_Execute{
-			Execute: &logspb.ExecuteTrace{
-				Request: &v1alpha1.ExecuteRequest{
-					Block: &v1alpha1.Block{
-						Contents: "echo hello",
-						Id:       bid1,
-					},
-				},
-				Response: &v1alpha1.ExecuteResponse{
-					Outputs: []*v1alpha1.BlockOutput{
-						{
-							Items: []*v1alpha1.BlockOutputItem{
-								{
-									TextData: "exitCode: 4",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	execTrace2 := &logspb.Trace{
-		Id:        "e789",
-		StartTime: timeMustParse(time.RFC3339, "2021-01-03T00:00:00Z"),
-		EndTime:   timeMustParse(time.RFC3339, "2021-01-03T00:01:00Z"),
-		Data: &logspb.Trace_Execute{
-			Execute: &logspb.ExecuteTrace{
-				Request: &v1alpha1.ExecuteRequest{
-					Block: &v1alpha1.Block{
-						Contents: "echo hello",
-						Id:       bid1,
-					},
-				},
-				Response: &v1alpha1.ExecuteResponse{
-					Outputs: []*v1alpha1.BlockOutput{
-						{
-							Items: []*v1alpha1.BlockOutputItem{
-								{
-									TextData: "exitCode: 7",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
 	// Create a block in evaluation mode
 	const bid2 = "g456output1"
 	genTrace2 := &logspb.Trace{
@@ -161,59 +99,21 @@ func Test_BuildBlockLog(t *testing.T) {
 		EvalMode: true,
 	}
 
-	execTrace3 := &logspb.Trace{
-		Id:        "e912",
-		StartTime: timeMustParse(time.RFC3339, "2021-01-03T00:00:00Z"),
-		EndTime:   timeMustParse(time.RFC3339, "2021-01-03T00:01:00Z"),
-		Data: &logspb.Trace_Execute{
-			Execute: &logspb.ExecuteTrace{
-				Request: &v1alpha1.ExecuteRequest{
-					Block: &v1alpha1.Block{
-						Contents: "echo hello",
-						Id:       bid2,
-					},
-				},
-				Response: &v1alpha1.ExecuteResponse{
-					Outputs: []*v1alpha1.BlockOutput{
-						{
-							Items: []*v1alpha1.BlockOutputItem{
-								{
-									TextData: "exitCode: 7",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
 	traces[genTrace.Id] = genTrace
 	traces[genTrace2.Id] = genTrace2
-	traces[execTrace1.Id] = execTrace1
-	traces[execTrace2.Id] = execTrace2
-	traces[execTrace3.Id] = execTrace3
-
-	// We shuffle ExecTraceIds to make sure we properly set block log based on the later trace
-	execTraceIds := shuffle([]string{execTrace1.GetId(), execTrace2.GetId()})
 
 	cases := []testCase{
 		{
 			name: "basic",
 			block: &logspb.BlockLog{
-				Id:           bid1,
-				GenTraceId:   genTrace.Id,
-				ExecTraceIds: execTraceIds,
-			},
-			expected: &logspb.BlockLog{
 				Id:         bid1,
 				GenTraceId: genTrace.Id,
-				// ExecTraceIds should be sorted by the timestamp
-				ExecTraceIds:   []string{execTrace1.GetId(), execTrace2.GetId()},
+			},
+			expected: &logspb.BlockLog{
+				Id:             bid1,
+				GenTraceId:     genTrace.Id,
 				Doc:            genTrace.GetGenerate().Request.Doc,
 				GeneratedBlock: genTrace.GetGenerate().Response.Blocks[0],
-				ExecutedBlock:  execTrace2.GetExecute().Request.Block,
-				ExitCode:       7,
 				EvalMode:       false,
 			},
 			traces: traces,
@@ -223,17 +123,12 @@ func Test_BuildBlockLog(t *testing.T) {
 			block: &logspb.BlockLog{
 				Id:         bid2,
 				GenTraceId: genTrace2.Id,
-
-				ExecTraceIds: []string{execTrace3.Id},
 			},
 			expected: &logspb.BlockLog{
 				Id:             bid2,
 				GenTraceId:     genTrace2.Id,
-				ExecTraceIds:   []string{execTrace3.Id},
 				Doc:            genTrace2.GetGenerate().Request.Doc,
 				GeneratedBlock: genTrace2.GetGenerate().Response.Blocks[0],
-				ExecutedBlock:  execTrace3.GetExecute().Request.Block,
-				ExitCode:       7,
 				EvalMode:       true,
 			},
 			traces: traces,
@@ -356,7 +251,24 @@ func Test_Analyzer(t *testing.T) {
 	t.Logf("File processed: %s", fileDone)
 	t.Logf("Output written to: %s", oDir)
 
-	waitForBlock(t, "23706965-8e3b-440d-ba1a-1e1cc035fbd4", 2, blockProccessed)
+	// Wait for the logs to be fully processed
+	done := false
+	timeend := time.Now().Add(1 * time.Minute)
+	var w *logspb.LogsWaterMark
+	for !done && time.Now().Before(timeend) {
+		w = a.GetWatermark()
+		if w.Offset < 23457 {
+			time.Sleep(5 * time.Second)
+		} else {
+			done = true
+		}
+	}
+	if !done {
+		t.Fatalf("Timed out waiting for logs to be processed; final offset %d", w.Offset)
+	}
+
+	// Signal should be triggered  once for the blocklog.
+	waitForBlock(t, "23706965-8e3b-440d-ba1a-1e1cc035fbd4", 1, blockProccessed)
 
 	// This is a block that was generated via the AI and then executed so run some additional checks
 	block := &logspb.BlockLog{}
@@ -366,9 +278,7 @@ func Test_Analyzer(t *testing.T) {
 	if block.GenTraceId == "" {
 		t.Errorf("Expected GenTraceID to be set")
 	}
-	if len(block.ExecTraceIds) == 0 {
-		t.Errorf("Expected ExecTraceIDs to be set")
-	}
+
 	if block.Doc == nil {
 		t.Errorf("Expected Doc to be set")
 	}
@@ -523,221 +433,6 @@ func Test_CombineGenerateEntries(t *testing.T) {
 
 			if trace.EvalMode != c.expectedEvalMode {
 				t.Errorf("Expected EvalMode to be %v but got %v", c.expectedEvalMode, trace.EvalMode)
-			}
-		})
-	}
-}
-
-func Test_CombineExecuteEntries(t *testing.T) {
-	type testCase struct {
-		name             string
-		linesFile        string
-		expectedEvalMode bool
-	}
-
-	cases := []testCase{
-		{
-			name:             "basic",
-			linesFile:        "execute_traces_lines.jsonl",
-			expectedEvalMode: false,
-		},
-		{
-			name:             "eval_mode_true",
-			linesFile:        "execute_traces_lines_eval_mode.jsonl",
-			expectedEvalMode: true,
-		},
-		{
-			name:             "eval_mode_false",
-			linesFile:        "execute_traces_lines_eval_mode_false.jsonl",
-			expectedEvalMode: false,
-		},
-	}
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current working directory: %v", err)
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			entries := make([]*api.LogEntry, 0, 10)
-			testFile, err := os.Open(filepath.Join(cwd, "test_data", c.linesFile))
-			if err != nil {
-				t.Fatalf("Failed to open test file: %v", err)
-			}
-			d := json.NewDecoder(testFile)
-			for {
-				e := &api.LogEntry{}
-				err := d.Decode(e)
-				if err != nil {
-					if err == io.EOF {
-						break
-					}
-					t.Fatalf("Failed to unmarshal log entry: %v", err)
-				}
-				entries = append(entries, e)
-			}
-			trace, err := combineExecuteTrace(context.Background(), entries)
-			if err != nil {
-				t.Fatalf("combineExecuteTrace failed: %+v", err)
-			}
-			if trace == nil {
-				t.Fatalf("combineExecuteTrace should have returned non nil response")
-			}
-
-			execTrace := trace.GetExecute()
-			if execTrace == nil {
-				t.Fatalf("Expected trace to have an execute trace")
-			}
-			// Assert the trace has a request and a response
-			if execTrace.Request == nil {
-				t.Errorf("Expected trace to have a request")
-			}
-			if execTrace.Response == nil {
-				t.Errorf("Expected trace to have a response")
-			}
-			if trace.EvalMode != c.expectedEvalMode {
-				t.Errorf("Expected EvalMode to be %v but got %v", c.expectedEvalMode, trace.EvalMode)
-			}
-		})
-	}
-}
-
-func Test_CombineRunmeEntries(t *testing.T) {
-	type testCase struct {
-		name             string
-		linesFile        string
-		expectedEvalMode bool
-	}
-
-	cases := []testCase{
-		{
-			name:             "basic",
-			linesFile:        "runme_traces_lines.jsonl",
-			expectedEvalMode: false,
-		},
-	}
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current working directory: %v", err)
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			entries := make([]*api.LogEntry, 0, 10)
-			testFile, err := os.Open(filepath.Join(cwd, "test_data", c.linesFile))
-			if err != nil {
-				t.Fatalf("Failed to open test file: %v", err)
-			}
-			d := json.NewDecoder(testFile)
-			for {
-				e := &api.LogEntry{}
-				err := d.Decode(e)
-				if err != nil {
-					if err == io.EOF {
-						break
-					}
-					t.Fatalf("Failed to unmarshal log entry: %v", err)
-				}
-				entries = append(entries, e)
-			}
-			trace, err := combineRunMeTrace(context.Background(), entries)
-			if err != nil {
-				t.Fatalf("combineRunMeTrace failed: %+v", err)
-			}
-			if trace == nil {
-				t.Fatalf("combineRunMeTrace should have returned non nil response")
-			}
-
-			rTrace := trace.GetRunMe()
-			if rTrace == nil {
-				t.Fatalf("Expected trace to have a runme trace")
-			}
-			// Assert the trace has a request and no response
-			if rTrace.Request == nil {
-				t.Errorf("Expected trace to have a request")
-			}
-			// TODO(jeremy): We don't currently log the response with RunMe
-			// https://github.com/stateful/runme/blob/6e56cfae38c5a72193a86677356927e14ce87b27/internal/runner/service.go#L461
-			if rTrace.Response != nil {
-				t.Errorf("Expected trace not to have a response")
-			}
-			if trace.EvalMode != c.expectedEvalMode {
-				t.Errorf("Expected EvalMode to be %v but got %v", c.expectedEvalMode, trace.EvalMode)
-			}
-		})
-	}
-}
-
-func Test_updateBlockForExecution(t *testing.T) {
-	type testCase struct {
-		name     string
-		block    *logspb.BlockLog
-		trace    *logspb.Trace
-		expected *logspb.BlockLog
-	}
-
-	cases := []testCase{
-		{
-			name:  "ExecuteTrace",
-			block: &logspb.BlockLog{},
-			trace: &logspb.Trace{
-				Data: &logspb.Trace_Execute{
-					Execute: &logspb.ExecuteTrace{
-						Request: &v1alpha1.ExecuteRequest{
-							Block: &v1alpha1.Block{
-								Contents: "echo hello",
-							},
-						},
-						Response: &v1alpha1.ExecuteResponse{
-							Outputs: []*v1alpha1.BlockOutput{
-								{
-									Items: []*v1alpha1.BlockOutputItem{
-										{
-											TextData: "exitCode: 4",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			expected: &logspb.BlockLog{
-				ExecutedBlock: &v1alpha1.Block{
-					Contents: "echo hello",
-				},
-				ExitCode: 4,
-			},
-		},
-		{
-			name:  "RunMeTrace",
-			block: &logspb.BlockLog{},
-			trace: &logspb.Trace{
-				Data: &logspb.Trace_RunMe{
-					RunMe: &logspb.RunMeTrace{
-						Request: &runnerv1.ExecuteRequest{
-							Commands: []string{"prog1", "arg1"},
-						},
-					},
-				},
-			},
-			expected: &logspb.BlockLog{
-				ExecutedBlock: &v1alpha1.Block{
-					Contents: "prog1 arg1",
-					Kind:     v1alpha1.BlockKind_CODE,
-				},
-				ExitCode: -2377,
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if err := updateBlockForExecution(c.block, c.trace); err != nil {
-				t.Fatalf("updateBlockForExecution failed: %v", err)
-			}
-			if d := cmp.Diff(c.expected, c.block, cmpopts.IgnoreUnexported(logspb.BlockLog{}), testutil.BlockComparer); d != "" {
-				t.Errorf("Unexpected diff:\n%s", d)
 			}
 		})
 	}

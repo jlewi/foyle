@@ -20,13 +20,15 @@ type CrudHandler struct {
 	cfg      config.Config
 	blocksDB *pebble.DB
 	tracesDB *pebble.DB
+	analyzer *Analyzer
 }
 
-func NewCrudHandler(cfg config.Config, blocksDB *pebble.DB, tracesDB *pebble.DB) (*CrudHandler, error) {
+func NewCrudHandler(cfg config.Config, blocksDB *pebble.DB, tracesDB *pebble.DB, analyzer *Analyzer) (*CrudHandler, error) {
 	return &CrudHandler{
 		cfg:      cfg,
 		blocksDB: blocksDB,
 		tracesDB: tracesDB,
+		analyzer: analyzer,
 	}, nil
 }
 
@@ -93,4 +95,12 @@ func (h *CrudHandler) GetBlockLog(ctx context.Context, request *connect.Request[
 	}
 
 	return connect.NewResponse(&logspb.GetBlockLogResponse{BlockLog: bLog}), nil
+}
+
+func (h *CrudHandler) Status(ctx context.Context, request *connect.Request[logspb.GetLogsStatusRequest]) (*connect.Response[logspb.GetLogsStatusResponse], error) {
+	response := &logspb.GetLogsStatusResponse{
+		Watermark: h.analyzer.GetWatermark(),
+	}
+
+	return connect.NewResponse(response), nil
 }

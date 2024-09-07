@@ -7,10 +7,11 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
-	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	_ "google.golang.org/protobuf/types/known/structpb"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
@@ -46,28 +47,6 @@ func (m *Trace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) erro
 		_ = ov
 		if ov.Generate != nil {
 			var vv interface{} = ov.Generate
-			if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
-				enc.AddObject(keyName, marshaler)
-			}
-		}
-	}
-
-	keyName = "execute" // field execute = 5
-	if ov, ok := m.GetData().(*Trace_Execute); ok {
-		_ = ov
-		if ov.Execute != nil {
-			var vv interface{} = ov.Execute
-			if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
-				enc.AddObject(keyName, marshaler)
-			}
-		}
-	}
-
-	keyName = "run_me" // field run_me = 7
-	if ov, ok := m.GetData().(*Trace_RunMe); ok {
-		_ = ov
-		if ov.RunMe != nil {
-			var vv interface{} = ov.RunMe
 			if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
 				enc.AddObject(keyName, marshaler)
 			}
@@ -148,60 +127,6 @@ func (m *RAGSpan) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) er
 }
 
 func (m *GenerateTrace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
-	var keyName string
-	_ = keyName
-
-	if m == nil {
-		return nil
-	}
-
-	keyName = "request" // field request = 1
-	if m.Request != nil {
-		var vv interface{} = m.Request
-		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
-			enc.AddObject(keyName, marshaler)
-		}
-	}
-
-	keyName = "response" // field response = 2
-	if m.Response != nil {
-		var vv interface{} = m.Response
-		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
-			enc.AddObject(keyName, marshaler)
-		}
-	}
-
-	return nil
-}
-
-func (m *ExecuteTrace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
-	var keyName string
-	_ = keyName
-
-	if m == nil {
-		return nil
-	}
-
-	keyName = "request" // field request = 1
-	if m.Request != nil {
-		var vv interface{} = m.Request
-		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
-			enc.AddObject(keyName, marshaler)
-		}
-	}
-
-	keyName = "response" // field response = 2
-	if m.Response != nil {
-		var vv interface{} = m.Response
-		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
-			enc.AddObject(keyName, marshaler)
-		}
-	}
-
-	return nil
-}
-
-func (m *RunMeTrace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
 	var keyName string
 	_ = keyName
 

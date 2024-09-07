@@ -7,8 +7,8 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
-	_ "google.golang.org/protobuf/types/known/structpb"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+	_ "google.golang.org/protobuf/types/known/structpb"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 )
 
@@ -396,6 +396,9 @@ func (m *LogEvent) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) e
 
 	keyName = "selected_index" // field selected_index = 5
 	enc.AddInt32(keyName, m.SelectedIndex)
+
+	keyName = "event_id" // field event_id = 6
+	enc.AddString(keyName, m.EventId)
 
 	return nil
 }

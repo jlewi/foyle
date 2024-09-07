@@ -158,6 +158,9 @@ message LogEvent {
   // The position of the cell with selected_id. This will usually be the position in the full context as specified
   // by selected_id.
   int32 selected_index = 5;
+
+  // A unique ID for the event
+  string event_id = 6;
 }
 
 enum LogEventType {

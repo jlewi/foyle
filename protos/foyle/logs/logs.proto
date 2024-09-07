@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package foyle.logs;
+
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/logs;logspb";
+
+// LogsWaterMark is the watermark keep track of the logs that have been processed
+message LogsWaterMark {
+  // The file is the name of the file that is associated with the watermark
+	string file = 1;
+  // The offset is the offset in the file that is associated with the watermark
+  int64 offset = 2;
+}
+
+message GetLogsStatusRequest {
+}
+
+message GetLogsStatusResponse {
+  LogsWaterMark watermark = 1;
+}

@@ -32,15 +32,6 @@ func (m *BlockLog) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) e
 	keyName = "gen_trace_id" // field gen_trace_id = 2
 	enc.AddString(keyName, m.GenTraceId)
 
-	keyName = "exec_trace_ids" // field exec_trace_ids = 3
-	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
-		for _, rv := range m.ExecTraceIds {
-			_ = rv
-			aenc.AppendString(rv)
-		}
-		return nil
-	}))
-
 	keyName = "doc" // field doc = 4
 	if m.Doc != nil {
 		var vv interface{} = m.Doc
@@ -73,6 +64,9 @@ func (m *BlockLog) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) e
 
 	keyName = "resource_version" // field resource_version = 9
 	enc.AddString(keyName, m.ResourceVersion)
+
+	keyName = "suggestion_status" // field suggestion_status = 10
+	enc.AddString(keyName, m.SuggestionStatus.String())
 
 	return nil
 }

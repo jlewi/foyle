@@ -479,12 +479,7 @@ func (a *App) Serve() error {
 	}
 
 	// Start any asynchronous workers in the components
-	logDirs := make([]string, 0, 2)
-	logDirs = append(logDirs, a.Config.GetRawLogDir())
-
-	if a.Config.Learner != nil {
-		logDirs = append(logDirs, a.Config.Learner.LogDirs...)
-	}
+	logDirs := []string{a.Config.GetRawLogDir()}
 
 	if err := a.analyzer.Run(context.Background(), logDirs, a.learner.Enqueue); err != nil {
 		return err
@@ -506,7 +501,7 @@ func (a *App) Serve() error {
 		return err
 	}
 
-	s, err := server.NewServer(*a.Config, a.blocksDB, agent, a.TracesDB)
+	s, err := server.NewServer(*a.Config, a.blocksDB, agent, a.TracesDB, a.analyzer)
 
 	if err != nil {
 		return err

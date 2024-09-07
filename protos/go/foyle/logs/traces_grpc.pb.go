@@ -28,6 +28,7 @@ type LogsServiceClient interface {
 	// These will include the rendered prompt and response. Unlike GetTraceRequest this has the
 	// actual prompt and response of the LLM.
 	GetLLMLogs(ctx context.Context, in *GetLLMLogsRequest, opts ...grpc.CallOption) (*GetLLMLogsResponse, error)
+	Status(ctx context.Context, in *GetLogsStatusRequest, opts ...grpc.CallOption) (*GetLogsStatusResponse, error)
 }
 
 type logsServiceClient struct {
@@ -65,6 +66,15 @@ func (c *logsServiceClient) GetLLMLogs(ctx context.Context, in *GetLLMLogsReques
 	return out, nil
 }
 
+func (c *logsServiceClient) Status(ctx context.Context, in *GetLogsStatusRequest, opts ...grpc.CallOption) (*GetLogsStatusResponse, error) {
+	out := new(GetLogsStatusResponse)
+	err := c.cc.Invoke(ctx, "/foyle.logs.LogsService/Status", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // LogsServiceServer is the server API for LogsService service.
 // All implementations must embed UnimplementedLogsServiceServer
 // for forward compatibility
@@ -75,6 +85,7 @@ type LogsServiceServer interface {
 	// These will include the rendered prompt and response. Unlike GetTraceRequest this has the
 	// actual prompt and response of the LLM.
 	GetLLMLogs(context.Context, *GetLLMLogsRequest) (*GetLLMLogsResponse, error)
+	Status(context.Context, *GetLogsStatusRequest) (*GetLogsStatusResponse, error)
 	mustEmbedUnimplementedLogsServiceServer()
 }
 
@@ -90,6 +101,9 @@ func (UnimplementedLogsServiceServer) GetBlockLog(context.Context, *GetBlockLogR
 }
 func (UnimplementedLogsServiceServer) GetLLMLogs(context.Context, *GetLLMLogsRequest) (*GetLLMLogsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLLMLogs not implemented")
+}
+func (UnimplementedLogsServiceServer) Status(context.Context, *GetLogsStatusRequest) (*GetLogsStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
 }
 func (UnimplementedLogsServiceServer) mustEmbedUnimplementedLogsServiceServer() {}
 
@@ -158,6 +172,24 @@ func _LogsService_GetLLMLogs_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LogsService_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLogsStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LogsServiceServer).Status(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/foyle.logs.LogsService/Status",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LogsServiceServer).Status(ctx, req.(*GetLogsStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // LogsService_ServiceDesc is the grpc.ServiceDesc for LogsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -176,6 +208,10 @@ var LogsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLLMLogs",
 			Handler:    _LogsService_GetLLMLogs_Handler,
+		},
+		{
+			MethodName: "Status",
+			Handler:    _LogsService_Status_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

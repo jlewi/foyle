@@ -3,6 +3,7 @@ package analyze
 import (
 	"bufio"
 	"context"
+	"io"
 	"os"
 
 	"github.com/pkg/errors"
@@ -10,16 +11,16 @@ import (
 
 // readLinesFromOffset reads lines from a file starting at the given offset.
 // It will read until the end of the file.
-func readLinesFromOffset(ctx context.Context, path string, offset int64) ([]string, int64, error) {
+func readLinesFromOffset(ctx context.Context, path string, startOffset int64) ([]string, int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to open file %s", path)
 	}
 	defer f.Close()
 
-	offset, err = f.Seek(offset, 0)
+	offset, err := f.Seek(startOffset, io.SeekStart)
 	if err != nil {
-		return nil, 0, errors.Wrapf(err, "failed to seek to offset %d in file %s", offset, path)
+		return nil, 0, errors.Wrapf(err, "failed to seek to offset %d in file %s", startOffset, path)
 	}
 
 	var lines []string

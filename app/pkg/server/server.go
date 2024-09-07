@@ -62,7 +62,7 @@ type Server struct {
 }
 
 // NewServer creates a new server
-func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent, tracesDB *pebble.DB) (*Server, error) {
+func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent, tracesDB *pebble.DB, analyzer *analyze.Analyzer) (*Server, error) {
 	e, err := executor.NewExecutor(config)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent, tr
 		return nil, errors.New("Agent is required")
 	}
 
-	logsCrud, err := analyze.NewCrudHandler(config, blocksDB, tracesDB)
+	logsCrud, err := analyze.NewCrudHandler(config, blocksDB, tracesDB, analyzer)
 	if err != nil {
 		return nil, err
 	}

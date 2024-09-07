@@ -5,8 +5,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+
 	"github.com/cockroachdb/pebble"
-	"github.com/google/go-cmp/cmp"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/jlewi/monogo/helpers"
 )
@@ -82,7 +83,9 @@ func Test_Locking(t *testing.T) {
 
 	execId := "exec"
 	setExec := createModifyFunc(execId, wg, controlChan, func(block *logspb.BlockLog) error {
-		block.ExecTraceIds = []string{"exec1", "exec2"}
+		block.ExecutedBlock = &v1alpha1.Block{
+			Id: execId,
+		}
 		return nil
 	})
 
@@ -132,7 +135,7 @@ func Test_Locking(t *testing.T) {
 		t.Errorf("Expected GenTraceId to be generateID but got %s", block.GenTraceId)
 	}
 
-	if d := cmp.Diff([]string{"exec1", "exec2"}, block.ExecTraceIds); d != "" {
-		t.Errorf("ExecTraceIds not as expected: diff:\n%v", d)
+	if block.ExecutedBlock.Id != execId {
+		t.Errorf("Expected ExecutedBlock.Id %s got %s", execId, block.ExecutedBlock.Id)
 	}
 }

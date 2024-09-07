@@ -11,12 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
-
-	"github.com/jlewi/foyle/app/pkg/docs"
-	runnerv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/api"
@@ -32,9 +33,6 @@ import (
 )
 
 const (
-	// unsetExitCode is a random negative exit code so we can tell when it hasn't been set.
-	unsetExitCode = -2377
-
 	// traceField is the field that contains the traceId in a log entry. We use this to identify processing related
 	// to a particular trace. We don't use the field "traceId" because these log entries aren't actually part of the
 	// trace.
@@ -60,6 +58,7 @@ type Analyzer struct {
 	rawLogsDB *dbutil.LockingDB[*logspb.LogEntries]
 	// queue for log file processing
 	queue workqueue.RateLimitingInterface
+
 	// Queue for block log processing
 	// TODO(jeremy): We should really use a durable queue backed by files
 	blockQueue workqueue.DelayingInterface
@@ -70,7 +69,7 @@ type Analyzer struct {
 
 	handleLogFileIsDone sync.WaitGroup
 	handleBlocksIsDone  sync.WaitGroup
-	logFileOffsets      map[string]int64
+	logFileOffsets      *logspb.LogsWaterMark
 	mu                  sync.Mutex
 
 	logOffsetsFile string
@@ -107,24 +106,28 @@ func NewAnalyzer(logOffsetsFile string, rawLogsDB *dbutil.LockingDB[*logspb.LogE
 	}, nil
 }
 
-func initOffsets(logOffsetsFile string) (map[string]int64, error) {
+func initOffsets(logOffsetsFile string) (*logspb.LogsWaterMark, error) {
 	log := zapr.NewLogger(zap.L())
 	raw, err := os.ReadFile(logOffsetsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return map[string]int64{}, nil
+			return &logspb.LogsWaterMark{}, nil
 		}
 		return nil, errors.Wrapf(err, "Failed to read watermarks file %s", logOffsetsFile)
 	}
-	watermarks := map[string]int64{}
-	if err := json.Unmarshal(raw, &watermarks); err != nil {
+	watermark := &logspb.LogsWaterMark{}
+
+	if err := protojson.Unmarshal(raw, watermark); err != nil {
 		log.Error(err, "Failed to unmarshal watermarks file %s; watermarks will be reinitialized", logOffsetsFile)
 	}
-	return watermarks, nil
+	return watermark, nil
 }
 
 type fileItem struct {
 	path string
+
+	// Whether the file is still active. If the file is no longer active we should stop processing it.
+	active bool
 }
 
 type blockItem struct {
@@ -146,17 +149,18 @@ func (a *Analyzer) Run(ctx context.Context, logDirs []string, blockNotifier Post
 	}
 
 	// Enqueue an item to process each file
-	for _, f := range jsonFiles {
-		a.queue.Add(fileItem{path: f})
-	}
-
-	if err := a.registerDirWatchers(ctx, a.queue, logDirs); err != nil {
-		return err
+	for i, f := range jsonFiles {
+		// Only the last file should be active.
+		active := i == len(jsonFiles)-1
+		a.queue.Add(fileItem{path: f, active: active})
 	}
 
 	a.handleLogFileIsDone.Add(1)
 	a.handleBlocksIsDone.Add(1)
 
+	// Important we should only process LogFileEvents in a single go func because the semantics of the watermark
+	// are that all log entries up to that mark have been processed. If we process log entries in parallel its not
+	// clear how we handle updating the waterMark.
 	go a.handleLogFileEvents(ctx)
 	go a.handleBlockEvents(ctx)
 
@@ -164,6 +168,9 @@ func (a *Analyzer) Run(ctx context.Context, logDirs []string, blockNotifier Post
 }
 
 // TODO(jeremy): How do we make the Analyzer thread safe? I believe the DB classes are thread safe
+//
+// TODO(jeremy): Should we instrument this with OTEL to get metrics on how long it takes to process a log file?
+// What we'd like is counters for how often a log file is processed. But maybe we should use logs for that?
 func (a *Analyzer) handleLogFileEvents(ctx context.Context) {
 	q := a.queue
 	log := logs.FromContext(ctx)
@@ -191,6 +198,13 @@ func (a *Analyzer) handleLogFileEvents(ctx context.Context) {
 			if a.signalFileDone != nil {
 				a.signalFileDone <- fileItem.path
 			}
+			// If the file is still active re-enqueue it.
+			if fileItem.active {
+				q.AddRateLimited(fileItem)
+			} else {
+				log.Info("Finished processing log file", "path", fileItem.path)
+			}
+
 		}()
 	}
 }
@@ -200,7 +214,13 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 	log.V(logs.Debug).Info("Processing log file", "path", path)
 
 	offset := a.getLogFileOffset(path)
+	if offset <= -1 {
+		// Offset of -1 means we are done processing the file because it is before the watermark
+		log.V(logs.Debug).Info("Logfile already processed", "path", path)
+		return nil
+	}
 	lines, offset, err := readLinesFromOffset(ctx, path, offset)
+
 	if err != nil {
 		return err
 	}
@@ -218,12 +238,17 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 			continue
 		}
 
+		if strings.HasSuffix(entry.Function(), "agent.(*Agent).LogEvents") {
+			a.processLogEvent(ctx, entry)
+			continue
+		}
+
 		// Ignore log entries without traces
 		if entry.TraceID() == "" {
 			continue
 		}
 
-		// Drop all log entries that come from the Analyzer package itself. This should hadn't be neccessary
+		// Drop all log entries that come from the Analyzer package itself. This shouldn't be neccessary
 		// but its a precaution to guard against someone accidentally adding a log message with the the field "traceId"
 		// to log a message about processing that trace. If we include such messages as part of the trace
 		// we could trigger an infinite loop
@@ -258,24 +283,48 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 	return nil
 }
 
+func (a *Analyzer) GetWatermark() *logspb.LogsWaterMark {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	w := proto.Clone(a.logFileOffsets).(*logspb.LogsWaterMark)
+	return w
+}
+
+// getLogOffSet returns the offset for the log file to start reading from.
+// A value < 0 means the watermark is already past the end of the file and no more processing is needed.
 func (a *Analyzer) getLogFileOffset(path string) int64 {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	offset, ok := a.logFileOffsets[path]
-	if !ok {
+	// N.B. This code takes into account the full file path when deciding the ordering of the logfiles.
+	if path < a.logFileOffsets.File {
+		return -1
+	}
+	if path > a.logFileOffsets.File {
 		return 0
 	}
-	return offset
+	return a.logFileOffsets.Offset
 }
 
 func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.logFileOffsets[path] = offset
+	oldWatermark := a.logFileOffsets
+	a.logFileOffsets = &logspb.LogsWaterMark{
+		File:   path,
+		Offset: offset,
+	}
 
-	log := zapr.NewLogger(zap.L())
+	log := logs.NewLogger()
+	if path < oldWatermark.File {
+		log.Error(errors.New("Watermark is moving backwards"), "Watermark is moving backwards", zap.Object("oldWatermark", oldWatermark), zap.Object("newWatermark", a.logFileOffsets))
+	}
+
+	if oldWatermark.File != a.logFileOffsets.File {
+		log.Info("Logs watermark moving to new file", zap.Object("oldWatermark", oldWatermark), zap.Object("newWatermark", a.logFileOffsets))
+	}
+
 	// Persist the watermarks
-	raw, err := json.Marshal(a.logFileOffsets)
+	raw, err := protojson.Marshal(a.logFileOffsets)
 	if err != nil {
 		log.Error(err, "Failed to marshal watermarks")
 		return
@@ -291,52 +340,6 @@ func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 		log.Error(err, "Failed to rename watermarks file", "tempFile", tempFile, "logOffsetsFile", a.logOffsetsFile)
 	}
 	log.V(logs.Debug).Info("Wrote watermarks", "logOffsetsFile", a.logOffsetsFile)
-}
-
-// registerDirWatchers sets up notifications for changes in the log directories.
-// Any time a file is modified it will enqueue the file for processing.
-func (a *Analyzer) registerDirWatchers(ctx context.Context, q workqueue.RateLimitingInterface, logDirs []string) error {
-	log := logs.FromContext(ctx)
-	watcher, err := fsnotify.NewWatcher()
-	a.watcher = watcher
-	if err != nil {
-		return err
-	}
-	for _, dir := range logDirs {
-		fullPath, err := filepath.Abs(dir)
-		if err != nil {
-			return errors.Wrapf(err, "Failed to get absolute path for %s", dir)
-		}
-
-		log.Info("Watching logs directory", "dir", fullPath)
-		if err := watcher.Add(fullPath); err != nil {
-			return err
-		}
-	}
-
-	go handleFsnotifications(ctx, watcher, q)
-	return nil
-}
-
-// handleFsnotifications processes file system notifications by enqueuing the file for processing.
-func handleFsnotifications(ctx context.Context, watcher *fsnotify.Watcher, q workqueue.RateLimitingInterface) {
-	log := logs.FromContext(ctx)
-	for {
-		select {
-		case event, ok := <-watcher.Events:
-			if !ok {
-				return
-			}
-			if event.Op&fsnotify.Write == fsnotify.Write {
-				q.AddRateLimited(fileItem{path: event.Name})
-			}
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			log.Error(err, "Error from watcher")
-		}
-	}
 }
 
 func (a *Analyzer) Shutdown(ctx context.Context) error {
@@ -357,6 +360,85 @@ func (a *Analyzer) Shutdown(ctx context.Context) error {
 
 	log.Info("Analyzer shutdown")
 	return nil
+}
+
+// processLogEvent processes a log event.
+func (a *Analyzer) processLogEvent(ctx context.Context, entry *api.LogEntry) {
+	log := logs.FromContext(ctx)
+
+	event := &v1alpha1.LogEvent{}
+
+	if !entry.GetProto("event", event) {
+		log.Error(errors.New("Failed to decode event"), "Failed to decode LogEvent", "entry", entry)
+		return
+	}
+	log = log.WithValues("eventId", event.GetEventId())
+	switch event.Type {
+	case v1alpha1.LogEventType_EXECUTE:
+		bid := event.SelectedId
+		if bid == "" {
+			log.Error(errors.New("No selectedId"), "Execute event is missing selected id", "event", event)
+			return
+		}
+
+		var cell *parserv1.Cell
+		for _, c := range event.GetCells() {
+			if converters.GetCellID(c) == bid {
+				cell = c
+				break
+			}
+		}
+
+		if cell == nil {
+			log.Error(errors.New("Failed to find cell"), "Execution log event is missing the actual cell", "bid", bid, "event", event)
+			return
+		}
+		executedBlock, err := converters.CellToBlock(cell)
+		if err != nil {
+			jb, err := protojson.Marshal(cell)
+			if err != nil {
+				log.Error(err, "Failed to convert executed cell to block", "cellId", bid, "cell", string(jb))
+			} else {
+				log.Error(err, "Failed to convert executed cell to block", "cellId", bid)
+			}
+		}
+
+		if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
+			block.Id = bid
+			block.ExecutedBlock = executedBlock
+			return nil
+		}); err != nil {
+			log.Error(err, "Failed to update block with execution", "blockId", bid)
+		}
+	case v1alpha1.LogEventType_ACCEPTED:
+		fallthrough
+	case v1alpha1.LogEventType_REJECTED:
+		status := logspb.SuggestionStatus_SuggestionStatusUnknown
+		switch event.Type {
+		case v1alpha1.LogEventType_ACCEPTED:
+			status = logspb.SuggestionStatus_ACCEPTED
+		case v1alpha1.LogEventType_REJECTED:
+			status = logspb.SuggestionStatus_REJECTED
+		}
+
+		for _, c := range event.GetCells() {
+			bid := converters.GetCellID(c)
+			if bid == "" {
+				log.Error(errors.New("No cell id"), "Cell is missing id", zap.Object("event", event))
+				continue
+			}
+
+			if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
+				block.Id = bid
+				block.SuggestionStatus = status
+				return nil
+			}); err != nil {
+				log.Error(err, "Failed to update block with execution", "blockId", bid)
+			}
+		}
+	default:
+		// Do Nothing with the event
+	}
 }
 
 // buildTrace creates the trace and initializes the blocks.
@@ -418,38 +500,6 @@ func (a *Analyzer) buildTrace(ctx context.Context, tid string) error {
 				}); err != nil {
 					return bids, errors.Wrapf(err, "Failed to set generate trace on block %s", bid)
 				}
-			}
-		case *logspb.Trace_Execute:
-			bid := t.Execute.Request.GetBlock().GetId()
-			if bid == "" {
-				return bids, nil
-			}
-			bids = append(bids, bid)
-			if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
-				block.Id = bid
-				if block.ExecTraceIds == nil {
-					block.ExecTraceIds = make([]string, 0, 10)
-				}
-				block.ExecTraceIds = append(block.ExecTraceIds, tid)
-				return nil
-			}); err != nil {
-				return bids, errors.Wrapf(err, "Failed to set execute trace on block %s", bid)
-			}
-		case *logspb.Trace_RunMe:
-			bid := t.RunMe.Request.GetKnownId()
-			if bid == "" {
-				return bids, nil
-			}
-			bids = append(bids, bid)
-			if err := a.blocksDB.ReadModifyWrite(bid, func(block *logspb.BlockLog) error {
-				block.Id = bid
-				if block.ExecTraceIds == nil {
-					block.ExecTraceIds = make([]string, 0, 10)
-				}
-				block.ExecTraceIds = append(block.ExecTraceIds, tid)
-				return nil
-			}); err != nil {
-				return bids, errors.Wrapf(err, "Failed to set RunMe trace on block %s", bid)
 			}
 		default:
 			log.Error(fmt.Errorf("Unknown trace type"), "Unknown trace type", "trace", t)
@@ -564,6 +614,8 @@ func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 	}
 }
 
+// buildBlockLog updates blocklogs given a generate trace.
+// Since a single generate trace can generate multiple blocks, its a one to many operation.
 func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble.DB) error {
 	log := logs.FromContext(ctx)
 	log = log.WithValues("blockId", block.Id)
@@ -605,96 +657,6 @@ func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble
 		}()
 	}
 
-	// Dedupe the execution traces just in case
-	uEids := make(map[string]bool)
-	for _, eid := range block.GetExecTraceIds() {
-		uEids[eid] = true
-	}
-	block.ExecTraceIds = make([]string, 0, len(uEids))
-	for eid := range uEids {
-		block.ExecTraceIds = append(block.ExecTraceIds, eid)
-	}
-
-	eidToTime := make(map[string]time.Time)
-
-	var lastTrace *logspb.Trace
-	// Get the last execution trace
-	for _, tid := range block.GetExecTraceIds() {
-		func() {
-			trace := &logspb.Trace{}
-			if err := dbutil.GetProto(tracesDB, tid, trace); err != nil {
-				log.Error(err, "Error getting execute trace", "execTraceId", tid)
-				return
-			}
-
-			if trace.GetExecute() == nil && trace.GetRunMe() == nil {
-				log.Error(errors.New("Invalid execution trace for traceId"), "Error getting execute trace", "execTraceId", tid)
-				return
-			}
-
-			eidToTime[tid] = trace.StartTime.AsTime()
-
-			if lastTrace == nil {
-				lastTrace = trace
-				return
-			}
-
-			if lastTrace.StartTime.AsTime().Before(trace.StartTime.AsTime()) {
-				lastTrace = trace
-			}
-		}()
-	}
-
-	// Sort execTrace ids based on their time. This is so the ordering is stable for the unittest.
-	// It should also be convenient for manual analysis since we usually care about the last exec trace.
-	sort.Slice(block.ExecTraceIds, func(i, j int) bool {
-		left := block.ExecTraceIds[i]
-		right := block.ExecTraceIds[j]
-		leftTime := eidToTime[left]
-		rightTime := eidToTime[right]
-		return leftTime.Before(rightTime)
-	})
-
-	if lastTrace != nil {
-		if err := updateBlockForExecution(block, lastTrace); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// updateBlockForExecution updates fields in the block log based the last execution trace of that block
-func updateBlockForExecution(block *logspb.BlockLog, lastTrace *logspb.Trace) error {
-	// If the block was executed as part of evaluation mode then consider it to be in evaluation mode.
-	if lastTrace.EvalMode {
-		block.EvalMode = true
-	}
-	block.ExecutedBlock = nil
-	block.ExitCode = unsetExitCode
-
-	switch eTrace := lastTrace.Data.(type) {
-	case *logspb.Trace_Execute:
-		block.ExecutedBlock = eTrace.Execute.Request.GetBlock()
-
-		for _, o := range eTrace.Execute.Response.GetOutputs() {
-			exitCode, ok := docs.GetExitCode(o)
-			if ok {
-				block.ExitCode = int32(exitCode)
-				break
-			}
-		}
-	case *logspb.Trace_RunMe:
-		// TODO(jeremy): Is this the right way to turn the command into a string?
-		block.ExecutedBlock = &v1alpha1.Block{
-			Kind:     v1alpha1.BlockKind_CODE,
-			Contents: strings.Join(eTrace.RunMe.Request.GetCommands(), " "),
-			Outputs:  nil,
-		}
-
-	default:
-		return errors.WithStack(errors.Errorf("Can't update BlockLog with execution information. The last trace, id %s  is not an execution trace", lastTrace.Id))
-	}
 	return nil
 }
 
@@ -709,14 +671,6 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (*logs
 		function := logEntry.Function()
 		if strings.HasSuffix(function, "agent.(*Agent).Generate") {
 			return combineGenerateTrace(ctx, entries)
-		}
-
-		if strings.HasSuffix(function, "executor.(*Executor).Execute") {
-			return combineExecuteTrace(ctx, entries)
-		}
-
-		if strings.HasSuffix(function, "runner.(*runnerService).Execute") {
-			return combineRunMeTrace(ctx, entries)
 		}
 
 		if strings.HasSuffix(function, "agent.(*Agent).StreamGenerate") {
@@ -783,105 +737,5 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb
 	trace.EvalMode = evalMode
 
 	combineSpans(trace)
-	return trace, nil
-}
-
-func combineExecuteTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
-	eTrace := &logspb.ExecuteTrace{}
-	trace := &logspb.Trace{
-		Data: &logspb.Trace_Execute{
-			Execute: eTrace,
-		},
-	}
-	evalMode := false
-	for _, e := range entries {
-		if trace.Id == "" {
-			trace.Id = e.TraceID()
-		}
-		if mode, present := e.EvalMode(); present {
-			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
-			// We don't want to assume that the evalMode will be set on all log entries in the trace.
-			// So the logic is to assume its not eval mode by default and then set it to eval mode if we find
-			// One entry that is marked as eval mode.
-			if mode {
-				evalMode = mode
-			}
-		}
-
-		if eTrace.Request == nil {
-			raw := e.Request()
-			if raw != nil {
-				request := &v1alpha1.ExecuteRequest{}
-				if err := protojson.Unmarshal([]byte(raw), request); err != nil {
-					return nil, err
-				}
-
-				eTrace.Request = request
-				trace.StartTime = timestamppb.New(e.Time())
-			}
-		}
-		if eTrace.Response == nil {
-			raw := e.Response()
-			if raw != nil {
-				v := &v1alpha1.ExecuteResponse{}
-				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
-					return nil, err
-				}
-				eTrace.Response = v
-				trace.EndTime = timestamppb.New(e.Time())
-			}
-		}
-	}
-	trace.EvalMode = evalMode
-	return trace, nil
-}
-
-func combineRunMeTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
-	rTrace := &logspb.RunMeTrace{}
-	trace := &logspb.Trace{
-		Data: &logspb.Trace_RunMe{
-			RunMe: rTrace,
-		},
-	}
-	evalMode := false
-	for _, e := range entries {
-		if trace.Id == "" {
-			trace.Id = e.TraceID()
-		}
-		if mode, present := e.EvalMode(); present {
-			// If any of the entries are marked as true then we will consider the trace to be in eval mode.
-			// We don't want to assume that the evalMode will be set on all log entries in the trace.
-			// So the logic is to assume its not eval mode by default and then set it to eval mode if we find
-			// One entry that is marked as eval mode.
-			if mode {
-				evalMode = mode
-			}
-		}
-
-		if rTrace.Request == nil {
-			raw := e.Request()
-			if raw != nil {
-				request := &runnerv1.ExecuteRequest{}
-				if err := protojson.Unmarshal([]byte(raw), request); err != nil {
-					return nil, err
-				}
-
-				rTrace.Request = request
-				trace.StartTime = timestamppb.New(e.Time())
-			}
-		}
-		if rTrace.Response == nil {
-			raw := e.Response()
-			if raw != nil {
-				v := &runnerv1.ExecuteResponse{}
-				if err := protojson.Unmarshal([]byte(raw), v); err != nil {
-					return nil, err
-				}
-				rTrace.Response = v
-				trace.EndTime = timestamppb.New(e.Time())
-			}
-		}
-	}
-	trace.EvalMode = evalMode
 	return trace, nil
 }
