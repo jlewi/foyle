@@ -48,7 +48,8 @@ func CellToBlock(cell *parserv1.Cell) (*v1alpha1.Block, error) {
 
 	id := ""
 	if cell.Metadata != nil {
-		if newId, ok := cell.Metadata[IdField]; ok {
+		newId := GetCellID(cell)
+		if newId != "" {
 			id = newId
 		}
 	}
@@ -62,6 +63,22 @@ func CellToBlock(cell *parserv1.Cell) (*v1alpha1.Block, error) {
 	}, nil
 }
 
+// GetCellID returns the ID of a cell if it exists or none if it doesn't
+func GetCellID(cell *parserv1.Cell) string {
+	if cell.Metadata != nil {
+		// See this thread
+		// See this thread https://discord.com/channels/1102639988832735374/1218835142962053193/1278863895813165128
+		// RunMe uses two different fields for the ID field. We check both because the field we get could depend
+		// On how the cell was generated e.g. whether it went through the serializer or not.
+		if id, ok := cell.Metadata[RunmeIdField]; ok {
+			return id
+		}
+		if id, ok := cell.Metadata[IdField]; ok {
+			return id
+		}
+	}
+	return ""
+}
 func CellKindToBlockKind(kind parserv1.CellKind) v1alpha1.BlockKind {
 	switch kind {
 	case parserv1.CellKind_CELL_KIND_CODE:

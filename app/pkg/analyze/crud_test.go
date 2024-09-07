@@ -27,12 +27,16 @@ func populateDB(db *pebble.DB) error {
 func populateTraceDB(db *pebble.DB) error {
 	trace := &logspb.Trace{
 		Id: "test-trace",
-		Data: &logspb.Trace_Execute{
-			Execute: &logspb.ExecuteTrace{
-				Request: &v1alpha1.ExecuteRequest{
-					Block: &v1alpha1.Block{
-						Id:       "test-block",
-						Contents: "echo hello",
+		Data: &logspb.Trace_Generate{
+			Generate: &logspb.GenerateTrace{
+				Request: &v1alpha1.GenerateRequest{
+					Doc: &v1alpha1.Doc{
+						Blocks: []*v1alpha1.Block{
+							{
+								Id:       "test-block",
+								Contents: "echo hello",
+							},
+						},
 					},
 				},
 			},
@@ -71,7 +75,7 @@ func createCrudHandler() (*CrudHandler, error) {
 	}
 
 	// Create a new CrudHandler with a mock configuration
-	return NewCrudHandler(cfg, db, tracesDB)
+	return NewCrudHandler(cfg, db, tracesDB, nil)
 }
 
 func tearDown(handler *CrudHandler) {

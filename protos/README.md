@@ -135,7 +135,7 @@ There are two ways I think we can iterate on the vscode extension when making ch
 
 In vscode-runme I'd gotten
 
-```
+```ts {"id":"01J6FX93E4T2E0TPG5KX7GBT1Q"}
 ERROR in ./src/extension/ai/events.ts:66:33
 TS2345: Argument of type 'LogEventsRequest' is not assignable to parameter of type 'PartialMessage<LogEventsRequest>'.
   Types of property 'events' are incompatible.
@@ -153,7 +153,7 @@ TS2345: Argument of type 'LogEventsRequest' is not assignable to parameter of ty
 
 ```
 
-* I had updated the bufbuild/es package but not the connect/es package 
+* I had updated the bufbuild/es package but not the connect/es package
 * When Up updated the connect/es package the error went away
 
 ```bash {"id":"01J6CQT3CYQ76FRD1GX258JAW2"}
