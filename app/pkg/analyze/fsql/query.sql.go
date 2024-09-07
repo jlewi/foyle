@@ -7,7 +7,25 @@ package fsql
 
 import (
 	"context"
+	"database/sql"
 )
+
+const getSession = `-- name: GetSession :one
+SELECT contextid, starttime, endtime, proto FROM sessions
+WHERE contextID = ?
+`
+
+func (q *Queries) GetSession(ctx context.Context, contextid string) (Session, error) {
+	row := q.db.QueryRowContext(ctx, getSession, contextid)
+	var i Session
+	err := row.Scan(
+		&i.Contextid,
+		&i.Starttime,
+		&i.Endtime,
+		&i.Proto,
+	)
+	return i, err
+}
 
 const listSessions = `-- name: ListSessions :many
 SELECT contextid, starttime, endtime, proto FROM sessions
@@ -40,4 +58,28 @@ func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateSession = `-- name: UpdateSession :exec
+INSERT OR REPLACE INTO sessions 
+(contextID, startTime, endTime, proto)
+VALUES 
+(?, ?, ?, ?)
+`
+
+type UpdateSessionParams struct {
+	Contextid string
+	Starttime sql.NullTime
+	Endtime   sql.NullTime
+	Proto     []byte
+}
+
+func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) error {
+	_, err := q.db.ExecContext(ctx, updateSession,
+		arg.Contextid,
+		arg.Starttime,
+		arg.Endtime,
+		arg.Proto,
+	)
+	return err
 }

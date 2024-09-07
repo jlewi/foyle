@@ -9,7 +9,7 @@ import (
 )
 
 type Session struct {
-	Contextid sql.NullString
+	Contextid string
 	Starttime sql.NullTime
 	Endtime   sql.NullTime
 	Proto     []byte

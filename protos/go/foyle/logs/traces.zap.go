@@ -7,11 +7,11 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
+	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	_ "google.golang.org/protobuf/types/known/structpb"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
@@ -32,13 +32,13 @@ func (m *Trace) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) erro
 	keyName = "id" // field id = 1
 	enc.AddString(keyName, m.Id)
 
-	keyName = "start_time" // field start_time = 2
-	if t, err := github_com_golang_protobuf_ptypes.Timestamp(m.StartTime); err == nil {
+	keyName = "end_time" // field end_time = 3
+	if t, err := github_com_golang_protobuf_ptypes.Timestamp(m.EndTime); err == nil {
 		enc.AddTime(keyName, t)
 	}
 
-	keyName = "end_time" // field end_time = 3
-	if t, err := github_com_golang_protobuf_ptypes.Timestamp(m.EndTime); err == nil {
+	keyName = "start_time" // field start_time = 2
+	if t, err := github_com_golang_protobuf_ptypes.Timestamp(m.StartTime); err == nil {
 		enc.AddTime(keyName, t)
 	}
 
