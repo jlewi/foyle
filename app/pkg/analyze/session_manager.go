@@ -3,15 +3,12 @@ package analyze
 import (
 	"context"
 	"database/sql"
-	"github.com/go-logr/zapr"
+	_ "embed"
 	"github.com/jlewi/foyle/app/pkg/analyze/fsql"
 	"github.com/jlewi/foyle/app/pkg/config"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
-
-	_ "embed"
 	_ "modernc.org/sqlite"
 )
 
@@ -41,14 +38,6 @@ func NewSessionsManager(cfg config.Config) (*SessionsManager, error) {
 
 	// Create the dbtx from the actual database
 	queries := fsql.New(db)
-
-	sessions, err := queries.ListSessions(context.Background())
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to list sessions")
-	}
-
-	log := zapr.NewLogger(zap.L())
-	log.Info("Got sessions", "number", len(sessions))
 
 	return &SessionsManager{
 		queries: queries,
@@ -160,11 +149,10 @@ func protoToRow(session *logspb.Session) (*fsql.Session, error) {
 	}
 
 	// TODO: How do we deal with the end/starttime? In sqlc should we specify the type as timestamp?
-
 	return &fsql.Session{
 		Contextid: session.ContextId,
-		// StartTime: session.StartTime,
-		// EndTime:   session.EndTime,
-		Proto: protoBytes,
+		Starttime: session.StartTime.AsTime(),
+		Endtime:   session.EndTime.AsTime(),
+		Proto:     protoBytes,
 	}, nil
 }

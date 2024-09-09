@@ -7,7 +7,7 @@ package fsql
 
 import (
 	"context"
-	"database/sql"
+	"time"
 )
 
 const getSession = `-- name: GetSession :one
@@ -69,8 +69,8 @@ VALUES
 
 type UpdateSessionParams struct {
 	Contextid string
-	Starttime sql.NullTime
-	Endtime   sql.NullTime
+	Starttime time.Time
+	Endtime   time.Time
 	Proto     []byte
 }
 

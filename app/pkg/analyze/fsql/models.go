@@ -5,12 +5,12 @@
 package fsql
 
 import (
-	"database/sql"
+	"time"
 )
 
 type Session struct {
 	Contextid string
-	Starttime sql.NullTime
-	Endtime   sql.NullTime
+	Starttime time.Time
+	Endtime   time.Time
 	Proto     []byte
 }
