@@ -9,31 +9,49 @@ import (
 	"github.com/jlewi/foyle/app/pkg/fnames"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"github.com/pkg/errors"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"go.uber.org/zap"
 	"testing"
 	"time"
 )
 
-func Test_ProcessLogEvent(t *testing.T) {
+type testTuple struct {
+	p        *logEntryProcessor
+	sessions *SessionsManager
+}
+
+func setup() (testTuple, error) {
 	d := zap.NewDevelopmentConfig()
 	d.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	logger, err := d.Build()
 	if err != nil {
-		t.Fatalf("Failed to create logger: %v", err)
+		return testTuple{}, errors.Wrapf(err, "Failed to create logger")
 	}
 	zap.ReplaceGlobals(logger)
 
 	cfg, err := config.NewWithTempDir()
 	if err != nil {
-		t.Fatalf("Failed to create config: %v", err)
+		return testTuple{}, errors.Wrapf(err, "failed to create config")
 	}
 	sessions, err := NewSessionsManager(*cfg)
 	if err != nil {
-		t.Fatalf("Failed to create session manager: %v", err)
+		return testTuple{}, errors.Wrapf(err, "Failed to create session manager")
 	}
 
 	p := NewLogEntryProcessor(sessions)
 
+	return testTuple{
+		p:        p,
+		sessions: sessions,
+	}, nil
+}
+
+func Test_ProcessLogEvent(t *testing.T) {
+	tuple, err := setup()
+	if err != nil {
+		t.Fatalf("Setup failed: %+v", err)
+	}
 	event := &v1alpha1.LogEvent{
 		EventId:   "event1",
 		ContextId: "context1",
@@ -61,9 +79,9 @@ func Test_ProcessLogEvent(t *testing.T) {
 	}
 
 	// Process the log entry
-	p.processLogEvent(entry)
+	tuple.p.processLogEvent(entry)
 
-	s, err := sessions.Get(context.Background(), event.GetContextId())
+	s, err := tuple.sessions.Get(context.Background(), event.GetContextId())
 	if err != nil {
 		t.Fatalf("Failed to get session: %v", err)
 	}
@@ -80,5 +98,49 @@ func Test_ProcessLogEvent(t *testing.T) {
 	// Verify that session time is set to the start of the session message.
 	if s.StartTime.AsTime().UTC() != startTime.UTC() {
 		t.Errorf("Expected start time to be %v but got %v", startTime.UTC(), s.StartTime.AsTime().UTC())
+	}
+}
+
+func Test_ProcessStreamGeneerate(t *testing.T) {
+	tuple, err := setup()
+	if err != nil {
+		t.Fatalf("Setup failed: %+v", err)
+	}
+
+	if err != nil {
+		t.Fatalf("Setup failed: %+v", err)
+	}
+	contextId := "context1"
+
+	fullContext := &v1alpha1.FullContext{
+		Selected: 5,
+		Notebook: &parserv1.Notebook{
+			Cells: []*parserv1.Cell{
+				{
+					Kind:  parserv1.CellKind_CELL_KIND_MARKUP,
+					Value: "cellcontents",
+				},
+			},
+		},
+	}
+	// Create a log entry for the LogEvent
+	entry := &api.LogEntry{
+		"function":  fnames.StreamGenerate,
+		"context":   logs.ZapProto("context", fullContext).Interface,
+		"contextId": contextId,
+	}
+
+	// Process the log entry
+	tuple.p.processLogEntry(entry)
+
+	s, err := tuple.sessions.Get(context.Background(), contextId)
+	if err != nil {
+		t.Fatalf("Failed to get session: %v", err)
+	}
+	
+	opts := cmpopts.IgnoreUnexported(v1alpha1.FullContext{}, parserv1.Notebook{}, parserv1.Cell{})
+
+	if d := cmp.Diff(fullContext, s.GetFullContext(), opts); d != "" {
+		t.Errorf("Unexpected diff in full context:\n%v", d)
 	}
 }

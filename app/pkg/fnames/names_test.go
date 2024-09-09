@@ -28,6 +28,10 @@ func Test_Names(t *testing.T) {
 			expected: LogEvents,
 			input:    (&agent.Agent{}).LogEvents,
 		},
+		{
+			expected: StreamGenerate,
+			input:    (&agent.Agent{}).StreamGenerate,
+		},
 	}
 
 	for _, c := range cases {

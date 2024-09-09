@@ -42,6 +42,16 @@ func (L *LogEntry) GetBool(field string) (bool, bool) {
 	return f, ok
 }
 
+func (L *LogEntry) GetString(field string) (string, bool) {
+	v, ok := (*L)[field]
+	if !ok {
+		return "", false
+	}
+
+	f, ok := v.(string)
+	return f, ok
+}
+
 func (L *LogEntry) GetFloat64(field string) (float64, bool) {
 	v, ok := (*L)[field]
 	if !ok {

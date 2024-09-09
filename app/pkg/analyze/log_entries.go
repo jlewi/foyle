@@ -37,6 +37,10 @@ func (p *logEntryProcessor) processLogEntry(entry *api.LogEntry) {
 		// TODO(Jeremy): There is also Analyzer.processLogEvent
 		p.processLogEvent(entry)
 	}
+
+	if entry.Function() == fnames.StreamGenerate {
+		p.processStreamGenerate(entry)
+	}
 }
 
 func (p *logEntryProcessor) processLogEvent(entry *api.LogEntry) {
@@ -75,5 +79,26 @@ func (p *logEntryProcessor) processLogEvent(entry *api.LogEntry) {
 
 	if err := p.sessions.Update(context.Background(), event.GetContextId(), updateFunc); err != nil {
 		log.Error(err, "Failed to update session", "event", event)
+	}
+}
+
+func (p *logEntryProcessor) processStreamGenerate(entry *api.LogEntry) {
+	log := zapr.NewLogger(zap.L())
+	contextId, ok := entry.GetString("contextId")
+	if !ok {
+		return
+	}
+	fullContext := &v1alpha1.FullContext{}
+	if ok := entry.GetProto("context", fullContext); !ok {
+		return
+	}
+
+	updateFunc := func(s *logspb.Session) error {
+		s.FullContext = fullContext
+		return nil
+	}
+
+	if err := p.sessions.Update(context.Background(), contextId, updateFunc); err != nil {
+		log.Error(err, "Failed to update session", "contextId", contextId)
 	}
 }

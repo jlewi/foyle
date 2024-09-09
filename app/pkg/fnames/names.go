@@ -4,5 +4,6 @@
 package fnames
 
 const (
-	LogEvents = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).LogEvents"
+	LogEvents      = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).LogEvents"
+	StreamGenerate = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).StreamGenerate"
 )
