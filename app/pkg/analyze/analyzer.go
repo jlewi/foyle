@@ -301,7 +301,6 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 			return nil
 		}
 	}
-	return nil
 }
 
 // combineAndCheckpoint runs a combine operation for all the traceIDs listed in the map.
