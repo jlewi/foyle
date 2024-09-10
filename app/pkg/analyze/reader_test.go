@@ -22,7 +22,7 @@ func Test_readFromOffset(t *testing.T) {
 	}
 
 	// Read the data from the file
-	lines, offset, err := readLinesFromOffset(context.Background(), logFile.Name(), 0)
+	lines, offset, err := readLinesFromOffset(context.Background(), logFile.Name(), 0, readAllLines)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func Test_readFromOffset(t *testing.T) {
 	}
 
 	// Read the data from the file and see that we properly carry on reading.
-	newLines, offset, err := readLinesFromOffset(context.Background(), logFile.Name(), offset)
+	newLines, offset, err := readLinesFromOffset(context.Background(), logFile.Name(), offset, readAllLines)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func Test_readFromOffset(t *testing.T) {
 		t.Fatalf("failed to write to file: %v", err)
 	}
 
-	partialLines, offset, err := readLinesFromOffset(context.Background(), logFile.Name(), offset)
+	partialLines, offset, err := readLinesFromOffset(context.Background(), logFile.Name(), offset, readAllLines)
 	if err != nil {
 		t.Fatalf("failed to read from file: %v", err)
 	}
@@ -76,7 +76,7 @@ func Test_readFromOffset(t *testing.T) {
 		t.Fatalf("failed to write to file: %v", err)
 	}
 
-	lastLine, offset, err := readLinesFromOffset(context.Background(), logFile.Name(), offset)
+	lastLine, offset, err := readLinesFromOffset(context.Background(), logFile.Name(), offset, readAllLines)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func Test_readReallyLongLines(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lines, _, err := readLinesFromOffset(context.Background(), filePath, 0)
+	lines, _, err := readLinesFromOffset(context.Background(), filePath, 0, readAllLines)
 	if err != nil {
 		t.Fatal(err)
 	}
