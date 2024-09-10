@@ -2,7 +2,6 @@ package analyze
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"io"
 	"os"
@@ -217,17 +216,6 @@ func Test_Analyzer(t *testing.T) {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
 
-	sessionsPath := filepath.Join(oDir, "sessions.sqllite3")
-	db, err := sql.Open(SQLLiteDriver, sessionsPath)
-	if err != nil {
-		t.Fatalf("Failed to open database: %v; error: %+v", sessionsPath, err)
-	}
-
-	sessionsManager, err := NewSessionsManager(db)
-	if err != nil {
-		t.Fatalf("Failed to create sessions manager: %v", err)
-	}
-
 	// Copy the logs to the raw logs directory
 	logContents, err := os.ReadFile(filepath.Join(testDir, "foyle.logs.2024-04-16T19:06:47.json"))
 	if err != nil {
@@ -243,7 +231,7 @@ func Test_Analyzer(t *testing.T) {
 	}
 
 	logOffsetsFile := filepath.Join(rawDir, "log_offsets.json")
-	a, err := NewAnalyzer(logOffsetsFile, lockingRawDB, tracesDB, lockingBlocksDB, sessionsManager)
+	a, err := NewAnalyzer(logOffsetsFile, lockingRawDB, tracesDB, lockingBlocksDB)
 	if err != nil {
 		t.Fatalf("Failed to create analyzer: %v", err)
 	}
