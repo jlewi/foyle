@@ -17,7 +17,7 @@ import (
 )
 
 type testTuple struct {
-	p        *logEntryProcessor
+	p        *sessionBuilder
 	sessions *SessionsManager
 }
 
@@ -39,7 +39,7 @@ func setup() (testTuple, error) {
 		return testTuple{}, errors.Wrapf(err, "Failed to create session manager")
 	}
 
-	p := NewLogEntryProcessor(sessions)
+	p := NewSessionBuilder(sessions)
 
 	return testTuple{
 		p:        p,
@@ -137,7 +137,7 @@ func Test_ProcessStreamGeneerate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get session: %v", err)
 	}
-	
+
 	opts := cmpopts.IgnoreUnexported(v1alpha1.FullContext{}, parserv1.Notebook{}, parserv1.Cell{})
 
 	if d := cmp.Diff(fullContext, s.GetFullContext(), opts); d != "" {

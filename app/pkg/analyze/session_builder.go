@@ -12,27 +12,20 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// logEntryProcessor processes log entries.
-// Processing a log entry has the following steps
-//  1. Identifying the type of log entry based on LogEntry properties such as callstack location
-//  2. Delegating to the appropriate handler for that specific call site.
-//  3. Updating the DB where the processed logs are stored.
-//
-// The 3rd step usually involves updating a database via a ReadModifyWrite operation.
-// To make it easy to unittest we may use interfaces to abstract the ReadModifyWrite operation. This way in the
-// unittest we don't need to construct a real database.
-type logEntryProcessor struct {
+// sessionBuilder build sessions by processing log entries.
+type sessionBuilder struct {
 	sessions *SessionsManager
 }
 
-func NewLogEntryProcessor(sessions *SessionsManager) *logEntryProcessor {
-	return &logEntryProcessor{
+func NewSessionBuilder(sessions *SessionsManager) *sessionBuilder {
+	return &sessionBuilder{
 		sessions: sessions,
 	}
 }
 
 // n.b. processLogEntry doesn't return a error because we expect errors to be ignored and for processing to continue.
-func (p *logEntryProcessor) processLogEntry(entry *api.LogEntry) {
+// I'm not sure that's a good idea but we'll see.
+func (p *sessionBuilder) processLogEntry(entry *api.LogEntry) {
 	if entry.Function() == fnames.LogEvents {
 		// TODO(Jeremy): There is also Analyzer.processLogEvent
 		p.processLogEvent(entry)
@@ -43,7 +36,7 @@ func (p *logEntryProcessor) processLogEntry(entry *api.LogEntry) {
 	}
 }
 
-func (p *logEntryProcessor) processLogEvent(entry *api.LogEntry) {
+func (p *sessionBuilder) processLogEvent(entry *api.LogEntry) {
 	log := zapr.NewLogger(zap.L())
 	event := &v1alpha1.LogEvent{}
 
@@ -82,7 +75,7 @@ func (p *logEntryProcessor) processLogEvent(entry *api.LogEntry) {
 	}
 }
 
-func (p *logEntryProcessor) processStreamGenerate(entry *api.LogEntry) {
+func (p *sessionBuilder) processStreamGenerate(entry *api.LogEntry) {
 	log := zapr.NewLogger(zap.L())
 	contextId, ok := entry.GetString("contextId")
 	if !ok {
