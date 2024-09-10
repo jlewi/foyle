@@ -2,6 +2,10 @@ package analyze
 
 import (
 	"context"
+	"database/sql"
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jlewi/foyle/app/api"
@@ -12,8 +16,6 @@ import (
 	"github.com/pkg/errors"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"go.uber.org/zap"
-	"testing"
-	"time"
 )
 
 type testTuple struct {
@@ -34,12 +36,21 @@ func setup() (testTuple, error) {
 	if err != nil {
 		return testTuple{}, errors.Wrapf(err, "failed to create config")
 	}
-	sessions, err := NewSessionsManager(*cfg)
+
+	db, err := sql.Open(SQLLiteDriver, cfg.GetSessionsDB())
+	if err != nil {
+		return testTuple{}, errors.Wrapf(err, "Failed to open database")
+	}
+	sessions, err := NewSessionsManager(db)
 	if err != nil {
 		return testTuple{}, errors.Wrapf(err, "Failed to create session manager")
 	}
 
-	p := NewSessionBuilder(sessions)
+	p, err := NewSessionBuilder(sessions)
+
+	if err != nil {
+		return testTuple{}, err
+	}
 
 	return testTuple{
 		p:        p,

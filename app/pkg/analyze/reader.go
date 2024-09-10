@@ -9,9 +9,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	readAllLines = -1
+)
+
 // readLinesFromOffset reads lines from a file starting at the given offset.
 // It will read until the end of the file.
-func readLinesFromOffset(ctx context.Context, path string, startOffset int64) ([]string, int64, error) {
+//
+// maxLines specifies the maximum number of lines to read. If maxLines is <=0 then all lines are read.
+func readLinesFromOffset(ctx context.Context, path string, startOffset int64, maxLines int) ([]string, int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to open file %s", path)
@@ -38,6 +44,10 @@ func readLinesFromOffset(ctx context.Context, path string, startOffset int64) ([
 		line := scanner.Text()
 		lines = append(lines, line)
 		offset += int64(len(line) + 1) // +1 for newline
+
+		if maxLines > 0 && len(lines) >= maxLines {
+			break
+		}
 	}
 
 	if err := scanner.Err(); err != nil {

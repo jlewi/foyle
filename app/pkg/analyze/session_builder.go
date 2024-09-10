@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"context"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/fnames"
@@ -17,10 +18,10 @@ type sessionBuilder struct {
 	sessions *SessionsManager
 }
 
-func NewSessionBuilder(sessions *SessionsManager) *sessionBuilder {
+func NewSessionBuilder(sessions *SessionsManager) (*sessionBuilder, error) {
 	return &sessionBuilder{
 		sessions: sessions,
-	}
+	}, nil
 }
 
 // n.b. processLogEntry doesn't return a error because we expect errors to be ignored and for processing to continue.

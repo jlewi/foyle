@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+
 	"github.com/jlewi/foyle/app/pkg/analyze/fsql"
-	"github.com/jlewi/foyle/app/pkg/config"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
@@ -14,6 +14,10 @@ import (
 
 //go:embed fsql/schema.sql
 var ddl string
+
+const (
+	SQLLiteDriver = "sqlite"
+)
 
 // SessionUpdater is a function that updates a session.
 type SessionUpdater func(session *logspb.Session) error
@@ -24,13 +28,7 @@ type SessionsManager struct {
 	db      *sql.DB
 }
 
-func NewSessionsManager(cfg config.Config) (*SessionsManager, error) {
-	db, err := sql.Open("sqlite", cfg.GetSessionsDB())
-
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to open database: %v", cfg.GetSessionsDB())
-	}
-
+func NewSessionsManager(db *sql.DB) (*SessionsManager, error) {
 	// create tables
 	if _, err := db.ExecContext(context.TODO(), ddl); err != nil {
 		return nil, err
@@ -135,10 +133,6 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	}
 
 	return nil
-}
-
-func (db *SessionsManager) Close() error {
-	return db.Close()
 }
 
 // protoToRow converts from the proto representation of a session to the database row representation.

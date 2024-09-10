@@ -1,11 +1,12 @@
 package fnames
 
 import (
-	"github.com/jlewi/foyle/app/pkg/agent"
 	"reflect"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/jlewi/foyle/app/pkg/agent"
 )
 
 func GetFunctionNameFromFunc(f interface{}) string {

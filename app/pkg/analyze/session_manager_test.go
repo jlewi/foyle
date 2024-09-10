@@ -2,15 +2,17 @@ package analyze
 
 import (
 	"context"
+	"database/sql"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/jlewi/foyle/app/pkg/config"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/utils/temp"
-	"testing"
-	"time"
 )
 
 func Test_SessionsCRUD(t *testing.T) {
@@ -19,13 +21,12 @@ func Test_SessionsCRUD(t *testing.T) {
 		t.Fatalf("Error creating temp dir: %v", err)
 	}
 
-	cfg := config.Config{}
-	// TO control the location of the sqllite database we have to set LogDir
-	cfg.Logging = config.Logging{
-		LogDir: dir.Name,
+	dbPath := filepath.Join(dir.Name, "sessions.db")
+	db, err := sql.Open(SQLLiteDriver, dbPath)
+	if err != nil {
+		t.Fatalf("Error opening database: %v", err)
 	}
-
-	m, err := NewSessionsManager(cfg)
+	m, err := NewSessionsManager(db)
 	if err != nil {
 		t.Fatalf("Error creating SessionsManager: %v", err)
 	}
