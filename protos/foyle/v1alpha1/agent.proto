@@ -77,6 +77,7 @@ message StreamGenerateRequest {
 message FullContext {
   runme.parser.v1.Notebook notebook = 1;
   // TODO(jeremy): Should we move selected and notebook_uri out of the full_context and into the StreamGenerateRequest?
+  // selected is the index of the selected cell
   int32 selected = 2;
   string notebook_uri = 3;
 }

@@ -7,9 +7,9 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
-	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
+	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
@@ -61,6 +61,37 @@ func (m *Session) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) er
 			enc.AddObject(keyName, marshaler)
 		}
 	}
+
+	return nil
+}
+
+func (m *DumpExamplesRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "output" // field output = 1
+	enc.AddString(keyName, m.Output)
+
+	return nil
+}
+
+func (m *DumpExamplesResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "num_examples" // field num_examples = 1
+	enc.AddInt32(keyName, m.NumExamples)
+
+	keyName = "num_sessions" // field num_sessions = 2
+	enc.AddInt32(keyName, m.NumSessions)
 
 	return nil
 }

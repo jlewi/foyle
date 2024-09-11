@@ -432,6 +432,7 @@ type FullContext struct {
 
 	Notebook *v1.Notebook `protobuf:"bytes,1,opt,name=notebook,proto3" json:"notebook,omitempty"`
 	// TODO(jeremy): Should we move selected and notebook_uri out of the full_context and into the StreamGenerateRequest?
+	// selected is the index of the selected cell
 	Selected    int32  `protobuf:"varint,2,opt,name=selected,proto3" json:"selected,omitempty"`
 	NotebookUri string `protobuf:"bytes,3,opt,name=notebook_uri,json=notebookUri,proto3" json:"notebook_uri,omitempty"`
 }

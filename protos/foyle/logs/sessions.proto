@@ -24,3 +24,20 @@ message Session {
   // FullContext is the full context of the session
   FullContext full_context = 5;
 }
+
+service SessionsService {
+  // DumpExamples from the sessions
+  rpc DumpExamples(DumpExamplesRequest) returns (DumpExamplesResponse) {}
+}
+
+message DumpExamplesRequest {
+  // The directory where the examples will be stored
+  string output = 1;
+}
+
+message DumpExamplesResponse {
+  // The number of examples generated
+  int32 num_examples = 1;
+  // Number of sessions processed
+  int32 num_sessions = 2;
+}

@@ -1,9 +1,15 @@
 package analyze
 
 import (
+	"connectrpc.com/connect"
 	"context"
 	"database/sql"
 	_ "embed"
+	"fmt"
+	"github.com/jlewi/foyle/app/pkg/logs"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"os"
+	"path/filepath"
 
 	"github.com/jlewi/foyle/app/pkg/analyze/fsql"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
@@ -134,6 +140,72 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	return nil
 }
 
+func (m *SessionsManager) DumpExamples(ctx context.Context, request *connect.Request[logspb.DumpExamplesRequest]) (*connect.Response[logspb.DumpExamplesResponse], error) {
+	log := logs.FromContext(ctx)
+	output := request.Msg.Output
+	if output == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("output must be non-empty"))
+	}
+
+	_, err := os.Stat(output)
+	if os.IsNotExist(err) {
+		log.Info("Creating directory", "output", output)
+
+		if err := os.MkdirAll(output, 0755); err != nil {
+			log.Error(err, "Failed to create directory", "output", output)
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to create directory %v", output))
+		}
+	} else if err != nil {
+		log.Error(err, "Failed to stat directory", "output", output)
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to stat directory %v", output))
+	}
+
+	// List all the sessions
+	// TODO(jeremy): We probably need to implement pagination when the number of sessions gets large.
+	// We could do that by using the contextId as a pagination token and returning the next N sessions after that token.
+	// and ordering by sessions
+	sessions, err := m.queries.ListSessions(ctx)
+	if err != nil {
+		log.Error(err, "Failed to list sessions")
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to list sessions"))
+	}
+
+	numExamples := 0
+	for _, s := range sessions {
+		session := &logspb.Session{}
+		if err := proto.Unmarshal(s.Proto, session); err != nil {
+			log.Error(err, "Failed to deserialize session", "contextId", s.Contextid)
+			continue
+		}
+		example, err := getExampleFromSession(session)
+		if err != nil {
+			log.Error(err, "Failed to get example from session", "contextId", s.Contextid)
+			continue
+		}
+		if example == nil {
+			continue
+		}
+
+		b, err := proto.Marshal(example)
+		if err != nil {
+			log.Error(err, "Failed to marshal example", "contextId", s.Contextid)
+			continue
+		}
+
+		filename := filepath.Join(output, fmt.Sprintf("%v.evalexample.binpb", example.GetId()))
+
+		if err := os.WriteFile(filename, b, 0644); err != nil {
+			log.Error(err, "Failed to write example to file", "filename", filename, "exampleId", example.GetId())
+		}
+		numExamples += 1
+	}
+	resp := connect.NewResponse(&logspb.DumpExamplesResponse{
+		NumExamples: int32(numExamples),
+		NumSessions: int32(len(sessions)),
+	})
+	return resp, nil
+}
+
 // protoToRow converts from the proto representation of a session to the database row representation.
 func protoToRow(session *logspb.Session) (*fsql.Session, error) {
 	protoBytes, err := proto.Marshal(session)
@@ -148,4 +220,62 @@ func protoToRow(session *logspb.Session) (*fsql.Session, error) {
 		Endtime:   session.EndTime.AsTime(),
 		Proto:     protoBytes,
 	}, nil
+}
+
+// getExampleFromSession turns a session into an example used for evaluation
+// returns nil for the Example if the Session doesn't contain data suitable for an example
+func getExampleFromSession(s *logspb.Session) (*v1alpha1.EvalExample, error) {
+	if s.ContextId == "" {
+		return nil, nil
+	}
+
+	var executeEvent *v1alpha1.LogEvent
+	for _, e := range s.LogEvents {
+		if e.GetType() == v1alpha1.LogEventType_EXECUTE {
+			executeEvent = e
+			break
+		}
+	}
+
+	// Only sessions with execute events are turned into examples
+	if executeEvent == nil {
+		return nil, nil
+	}
+
+	if s.GetFullContext().GetNotebook() == nil {
+		return nil, errors.Errorf("Session doesn't contain a notebook for the full context")
+	}
+
+	// If its the first cell in the notebook there's no context from which to do the prediction.
+	if s.GetFullContext().GetSelected() <= 0 {
+		return nil, nil
+	}
+
+	if len(executeEvent.Cells) != 1 {
+		return nil, errors.Errorf("Execute log event has %v cells; expected 1", len(executeEvent.Cells))
+	}
+
+	// Check that the selected cell in the full context matches the selected cell in the execute event.
+	// This as an attempt to catch data integrity / logging issues. LogEvents should include the SelectedIndex.
+	if s.GetFullContext().GetSelected() != executeEvent.SelectedIndex {
+		return nil, errors.Errorf("Selected cell in full context %v doesn't match selected cell in execute event; %v", s.GetFullContext().GetSelected(), executeEvent.SelectedIndex)
+	}
+
+	// Rebuild the context. For a LogExecuteEvent the FullContext will contain the entire notebook
+	// and the selectedID and selected cell should be the cell that is being executed. But we only want to use
+	// All the cells before the current cell
+
+	newContext := proto.Clone(s.GetFullContext()).(*v1alpha1.FullContext)
+	// Only the cells up to the executed cell should be included
+	newContext.Notebook.Cells = newContext.Notebook.Cells[:executeEvent.SelectedIndex]
+	// Set the selected cell to the last one in the notebook.
+	newContext.Selected = int32(len(newContext.Notebook.Cells) - 1)
+
+	example := &v1alpha1.EvalExample{
+		Id:            s.ContextId,
+		ExpectedCells: executeEvent.Cells,
+		FullContext:   newContext,
+	}
+
+	return example, nil
 }
