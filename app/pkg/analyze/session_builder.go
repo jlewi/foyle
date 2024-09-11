@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
@@ -27,7 +28,9 @@ func NewSessionBuilder(sessions *SessionsManager) (*sessionBuilder, error) {
 // n.b. processLogEntry doesn't return a error because we expect errors to be ignored and for processing to continue.
 // I'm not sure that's a good idea but we'll see.
 func (p *sessionBuilder) processLogEntry(entry *api.LogEntry) {
-	if entry.Function() == fnames.LogEvents {
+	// We need to use HasPrefix because the logging statement is nested inside an anonymous function so there
+	// will be a suffix like "func1"
+	if strings.HasPrefix(entry.Function(), fnames.LogEvents) {
 		// TODO(Jeremy): There is also Analyzer.processLogEvent
 		p.processLogEvent(entry)
 	}

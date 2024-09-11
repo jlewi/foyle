@@ -82,15 +82,14 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	// Read the record
 	sessRow, err := queries.GetSession(ctx, contextID)
 
-	var session *logspb.Session
+	// If the session doesn't exist then we do nothing because session is initializeed to empty session
+	session := &logspb.Session{
+		ContextId: contextID,
+	}
 	if err != nil {
 		if err != sql.ErrNoRows {
 			tx.Rollback()
 			return errors.Wrapf(err, "Failed to get session with id %v", contextID)
-		}
-		// If the session doesn't exist initialize to empty session
-		session = &logspb.Session{
-			ContextId: contextID,
 		}
 	} else {
 		// Deserialize the proto

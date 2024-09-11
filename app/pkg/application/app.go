@@ -386,7 +386,7 @@ func (a *App) SetupAnalyzer() (*analyze.Analyzer, error) {
 		return nil, errors.Wrapf(err, "Failed to open database: %v", a.Config.GetSessionsDB())
 	}
 
-	manager, err := analyze.NewSessionsManager(*a.Config)
+	manager, err := analyze.NewSessionsManager(db)
 	if err != nil {
 		return nil, err
 	}
