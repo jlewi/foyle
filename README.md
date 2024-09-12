@@ -6,6 +6,16 @@ runme:
 
 # Foyle
 
+## Quickstart
+
+Follow the [Getting Started Guide](https://foyle.io/docs/getting-started/)
+
+## Docs
+
+Documentation is available at [https://foyle.io](https://foyle.io)
+
+## Overview
+
 Foyle is a project aimed at building agents to help software developers
 deploy and operate software. The key premise of foyle is that better data
 is the key to building better agents. To enable that foyle aims to change
