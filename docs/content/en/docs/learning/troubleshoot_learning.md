@@ -1,4 +1,8 @@
-# Troubleshoot Learning
+---
+title: "Troubleshoot Learning"
+description: "How to troubleshoot and monitor learning"
+weight: 1
+---
 
 ## What You'll Learn
 
@@ -43,12 +47,12 @@ To get the cell ID for a given cell
 2. Find code block containing your cell
 3. Your cell will contain metadata which contains the ID e.g.
 
-```
+````
 ```bash {"id":"01J6DG428ER427GJNTKC15G6JM"}
 CELLID=01J6DFZ9V3R29TCDEY2AYA8XTV
 curl http://localhost:8080/api/blocklogs/${CELLID} | jq .
 ```
-```
+````
 
 ## Did Block Logs Get Created
 
