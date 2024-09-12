@@ -375,7 +375,6 @@ func (a *Analyzer) setLogFileOffset(path string, offset int64) {
 	if err := os.Rename(tempFile, a.logOffsetsFile); err != nil {
 		log.Error(err, "Failed to rename watermarks file", "tempFile", tempFile, "logOffsetsFile", a.logOffsetsFile)
 	}
-	log.V(logs.Debug).Info("Wrote watermarks", "logOffsetsFile", a.logOffsetsFile)
 }
 
 func (a *Analyzer) Shutdown(ctx context.Context) error {
