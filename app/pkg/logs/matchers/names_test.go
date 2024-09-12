@@ -1,4 +1,4 @@
-package fnames
+package matchers
 
 import (
 	"reflect"

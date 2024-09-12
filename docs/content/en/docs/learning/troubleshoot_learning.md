@@ -65,7 +65,29 @@ curl -X POST http://localhost:8877/api/foyle.logs.LogsService/GetBlockLog -H "Co
 * If this returns not found then no log was created for this cell and there is a problem with Log Processing
 * The correct output should look like the following
 
-* TODO(add an example of the output)
+```
+{
+  "blockLog": {
+    "id": "01J7KQPBYCT9VM2KFBY48JC7J0",
+    "genTraceId": "0376c6dc6309bcd5d61e7b56e41d6411",
+    "doc": {
+      ...
+    },
+    "generatedBlock": {
+      "kind": "CODE",
+      "language": "bash",
+      "contents": "jq -c 'select(.severity == \"error\" or .level == \"error\")' ${LASTLOG}",
+      "id": "01J7KQPBYCT9VM2KFBY48JC7J0"
+    },
+    "executedBlock": {
+      "kind": "CODE",
+      "contents": "CELLID=01J7KQPBYCT9VM2KFBY48JC7J0\ncurl -X POST http://localhost:8877/api/foyle.logs.LogsService/GetBlockLog -H \"Content-Type: application/json\" -d \"{\\\"id\\\": \\\"${CELLID}\\\"}\" | jq .",
+      "id": "01J7KQPBYCT9VM2KFBY48JC7J0"
+    },
+    "resourceVersion": "34d933d8-abe6-4ad3-b9cf-5a2392f34abb"
+  }
+}
+```
 
 * Notably the output should include the following fields
 
@@ -86,6 +108,9 @@ export LASTLOG=~/.foyle/logs/raw/$(ls -t ~/.foyle/logs/raw | head -n 1 )
 echo "Last log file: ${LASTLOG}"
 jq -c "select(.selectedCellId == \"01J7KQPBYCT9VM2KFBY48JC7J0\")" ${LASTLOG}
 ```
+
+* If there are no execution events then the cell was never executed
+* If you executed the cell but there are no log events then there is most likely a bug and please open an issue in [GitHub](https://github.com/jlewi/foyle/issues)
 
 ## Check the logs associated with that cell
 

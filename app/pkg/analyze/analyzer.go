@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
+
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"google.golang.org/protobuf/proto"
@@ -257,7 +259,7 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 				continue
 			}
 
-			if strings.HasSuffix(entry.Function(), "agent.(*Agent).LogEvents") {
+			if matchers.IsLogEvent(entry.Function()) {
 				a.processLogEvent(ctx, entry)
 				continue
 			}
