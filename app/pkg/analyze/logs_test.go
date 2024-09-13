@@ -28,23 +28,26 @@ func TestReadAnthropicLog(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fullPath := filepath.Join(cwd, "test_data", c.logFile)
-			result, err := readAnthropicLog(context.Background(), c.traceId, fullPath)
+			result, err := readLLMLog(context.Background(), c.traceId, fullPath)
 			if err != nil {
 				t.Errorf("Failed to read Anthropic request: %v", err)
 			}
 			if result == nil {
 				t.Fatalf("Request should not be nil")
 			}
-			if result.Request == nil {
+			if result.RequestHtml == "" {
 				t.Errorf("Request should not be nil")
 			}
-			if result.Response == nil {
+			if result.ResponseHtml == "" {
 				t.Errorf("Response should not be nil")
-			} else {
-				if result.Response.Model == "" {
-					t.Errorf("Model should not be empty")
-				}
 			}
+			if result.RequestJson == "" {
+				t.Errorf("Request should not be nil")
+			}
+			if result.ResponseJson == "" {
+				t.Errorf("Response should not be nil")
+			}
+			t.Fatalf("TODO need to update the code to verify response is actually read since its on a separate line.")
 		})
 	}
 }

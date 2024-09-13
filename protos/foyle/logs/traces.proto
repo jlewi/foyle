@@ -99,4 +99,9 @@ message GetLLMLogsResponse {
   string request_html = 1;
   // response_html is the html representation of the response
   string response_html = 2;
+
+  // The json representation of the request and response. The value will
+  // change depending on the LLM provider
+  string request_json = 3;
+  string response_json = 4;
 }

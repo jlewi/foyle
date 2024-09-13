@@ -3,6 +3,7 @@ package analyze
 import (
 	"context"
 	"encoding/json"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"io"
 	"os"
 	"strings"
@@ -24,61 +25,87 @@ type AnthropicLog struct {
 	Response *anthropic.MessagesResponse
 }
 
-// readAnthropicRequest reads an Anthropic request from a log file
-//
-// N.B. If there are multiple requests as part of the same trace then only the last request will be returned.
-// TODO(jeremy): Ideally we'd join the request with its response and return the one that succeeded. The reason
-// There might be multiple is because context exceeded length; in which case only one request which has been
-// sufficiently shortened will have an actual response.
-func readAnthropicLog(ctx context.Context, traceId string, logFile string) (*AnthropicLog, error) {
+// readLLMLog tries to fetch the raw LLM request/response from the log
+func readLLMLog(ctx context.Context, traceId string, logFile string) (*logspb.GetLLMLogsResponse, error) {
 	log := logs.FromContext(ctx)
 	file, err := os.Open(logFile)
+
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Wrapf(err, "Failed to open file %s", logFile))
 	}
 	d := json.NewDecoder(file)
 
-	aLog := &AnthropicLog{
-		TraceID: traceId,
-		LogFile: logFile,
-	}
-	req := &anthropic.MessagesRequest{}
-	resp := &anthropic.MessagesResponse{}
 	for {
 		entry := &api.LogEntry{}
 		if err := d.Decode(entry); err != nil {
 			if err == io.EOF {
-				return aLog, nil
+				return nil, nil
 			}
 			log.Error(err, "Failed to decode log entry")
 		}
 		if entry.TraceID() != traceId {
 			continue
 		}
-		if !strings.HasSuffix(entry.Function(), "anthropic.(*Completer).Complete") {
-			continue
-		}
-
-		reqBytes := entry.Request()
-		if reqBytes != nil {
-			if err := json.Unmarshal(reqBytes, req); err != nil {
-				// TODO(jeremy): Should we include the error in the response?
-				log.Error(err, "Failed to unmarshal request")
-			} else {
-				aLog.Request = req
-				req = &anthropic.MessagesRequest{}
+		if strings.HasSuffix(entry.Function(), "anthropic.(*Completer).Complete") {
+			aLog, err := entryToAnthropicLog(ctx, entry)
+			if err != nil {
+				return nil, err
 			}
-		}
-
-		respBytes := entry.Response()
-		if respBytes != nil {
-			if err := json.Unmarshal(respBytes, resp); err != nil {
-				// TODO(jeremy): Should we include the error in the response?
-				log.Error(err, "Failed to unmarshal response")
-			} else {
-				aLog.Response = resp
-				resp = &anthropic.MessagesResponse{}
+			if aLog == nil {
+				return nil, errors.Wrapf(err, "Failed to parse logEntry for LLM call for trace %s", traceId)
 			}
+
+			reqJson, err := json.Marshal(aLog.Request)
+			if err != nil {
+				log.Error(err, "Failed to marshal request")
+				reqJson = []byte("Failed to marshal request")
+			}
+
+			respJson, err := json.Marshal(aLog.Response)
+			if err != nil {
+				log.Error(err, "Failed to marshal response")
+				respJson = []byte("Failed to marshal response")
+			}
+
+			resp := &logspb.GetLLMLogsResponse{
+				RequestHtml:  renderAnthropicRequest(aLog.Request),
+				ResponseHtml: renderAnthropicResponse(aLog.Response),
+				RequestJson:  string(reqJson),
+				ResponseJson: string(respJson),
+			}
+			return resp, nil
 		}
 	}
+}
+
+// entryToAnthropicLog parses an Anthropic request log message
+//
+// N.B. If there are multiple requests as part of the same trace then only the last request will be returned.
+// TODO(jeremy): Ideally we'd join the request with its response and return the one that succeeded. The reason
+// There might be multiple is because context exceeded length; in which case only one request which has been
+// sufficiently shortened will have an actual response.
+func entryToAnthropicLog(ctx context.Context, entry *api.LogEntry) (*AnthropicLog, error) {
+	log := logs.FromContext(ctx)
+
+	aLog := &AnthropicLog{
+		Request:  &anthropic.MessagesRequest{},
+		Response: &anthropic.MessagesResponse{},
+	}
+	reqBytes := entry.Request()
+	if reqBytes != nil {
+		if err := json.Unmarshal(reqBytes, aLog.Request); err != nil {
+			// TODO(jeremy): Should we include the error in the response?
+			log.Error(err, "Failed to unmarshal request")
+		}
+	}
+
+	respBytes := entry.Response()
+	if respBytes != nil {
+		if err := json.Unmarshal(respBytes, aLog.Response); err != nil {
+			// TODO(jeremy): Should we include the error in the response?
+			log.Error(err, "Failed to unmarshal response")
+		}
+	}
+
+	return aLog, nil
 }
