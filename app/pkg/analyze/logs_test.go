@@ -2,6 +2,8 @@ package analyze
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/liushuangls/go-anthropic/v2"
 	"os"
 	"path/filepath"
 	"testing"
@@ -47,7 +49,14 @@ func TestReadAnthropicLog(t *testing.T) {
 			if result.ResponseJson == "" {
 				t.Errorf("Response should not be nil")
 			}
-			t.Fatalf("TODO need to update the code to verify response is actually read since its on a separate line.")
+			resp := &anthropic.MessagesResponse{}
+			if err := json.Unmarshal([]byte(result.ResponseJson), resp); err != nil {
+				t.Fatalf("Failed to unmarshal response: %v", err)
+			}
+
+			if resp.Model == "" {
+				t.Errorf("Model should be set")
+			}
 		})
 	}
 }

@@ -3,6 +3,7 @@ package analyze
 import (
 	"bytes"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 
@@ -32,6 +33,24 @@ type TemplateData struct {
 type Message struct {
 	Role    string
 	Content template.HTML
+}
+
+func renderAnthropicRequestJson(jsonValue string) (string, error) {
+	req := &anthropic.MessagesRequest{}
+	if err := json.Unmarshal([]byte(jsonValue), req); err != nil {
+		return "", nil
+	}
+
+	return renderAnthropicRequest(req), nil
+}
+
+func renderAnthropicResponseJson(jsonValue string) (string, error) {
+	res := &anthropic.MessagesResponse{}
+	if err := json.Unmarshal([]byte(jsonValue), res); err != nil {
+		return "", nil
+	}
+
+	return renderAnthropicResponse(res), nil
 }
 
 // renderAnthropicRequest returns a string containing the HTML representation of the request

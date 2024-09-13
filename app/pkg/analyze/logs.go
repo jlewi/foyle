@@ -3,6 +3,7 @@ package analyze
 import (
 	"context"
 	"encoding/json"
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"io"
 	"os"
@@ -35,6 +36,9 @@ func readLLMLog(ctx context.Context, traceId string, logFile string) (*logspb.Ge
 	}
 	d := json.NewDecoder(file)
 
+	resp := &logspb.GetLLMLogsResponse{}
+
+	provider := api.ModelProviderUnknown
 	for {
 		entry := &api.LogEntry{}
 		if err := d.Decode(entry); err != nil {
@@ -46,66 +50,58 @@ func readLLMLog(ctx context.Context, traceId string, logFile string) (*logspb.Ge
 		if entry.TraceID() != traceId {
 			continue
 		}
+		isMatch := false
 		if strings.HasSuffix(entry.Function(), "anthropic.(*Completer).Complete") {
-			aLog, err := entryToAnthropicLog(ctx, entry)
-			if err != nil {
-				return nil, err
-			}
-			if aLog == nil {
-				return nil, errors.Wrapf(err, "Failed to parse logEntry for LLM call for trace %s", traceId)
-			}
-
-			reqJson, err := json.Marshal(aLog.Request)
-			if err != nil {
-				log.Error(err, "Failed to marshal request")
-				reqJson = []byte("Failed to marshal request")
-			}
-
-			respJson, err := json.Marshal(aLog.Response)
-			if err != nil {
-				log.Error(err, "Failed to marshal response")
-				respJson = []byte("Failed to marshal response")
-			}
-
-			resp := &logspb.GetLLMLogsResponse{
-				RequestHtml:  renderAnthropicRequest(aLog.Request),
-				ResponseHtml: renderAnthropicResponse(aLog.Response),
-				RequestJson:  string(reqJson),
-				ResponseJson: string(respJson),
-			}
-			return resp, nil
+			provider = api.ModelProviderAnthropic
+			isMatch = true
 		}
-	}
-}
 
-// entryToAnthropicLog parses an Anthropic request log message
-//
-// N.B. If there are multiple requests as part of the same trace then only the last request will be returned.
-// TODO(jeremy): Ideally we'd join the request with its response and return the one that succeeded. The reason
-// There might be multiple is because context exceeded length; in which case only one request which has been
-// sufficiently shortened will have an actual response.
-func entryToAnthropicLog(ctx context.Context, entry *api.LogEntry) (*AnthropicLog, error) {
-	log := logs.FromContext(ctx)
+		if matchers.IsOAIComplete(entry.Function()) {
+			provider = api.ModelProviderOpenAI
+			isMatch = true
+		}
 
-	aLog := &AnthropicLog{
-		Request:  &anthropic.MessagesRequest{},
-		Response: &anthropic.MessagesResponse{},
-	}
-	reqBytes := entry.Request()
-	if reqBytes != nil {
-		if err := json.Unmarshal(reqBytes, aLog.Request); err != nil {
-			// TODO(jeremy): Should we include the error in the response?
-			log.Error(err, "Failed to unmarshal request")
+		if strings.HasSuffix(entry.Function(), "anthropic.(*Completer).Complete") {
+			provider = api.ModelProviderAnthropic
+			isMatch = true
+		}
+
+		// If tis not a matching request ignore it.
+		if !isMatch {
+			continue
+		}
+		if reqBytes := entry.Request(); reqBytes != nil {
+			resp.RequestJson = string(reqBytes)
+		}
+
+		if resBytes := entry.Response(); resBytes != nil {
+			resp.ResponseJson = string(resBytes)
+		}
+
+		// Since we have read the request and response less
+		// This isn't a great implementation because we will end up reading all the logs if for some reason
+		// The logs don't have the entries.
+		if resp.RequestJson != "" && resp.ResponseJson != "" {
+			break
 		}
 	}
 
-	respBytes := entry.Response()
-	if respBytes != nil {
-		if err := json.Unmarshal(respBytes, aLog.Response); err != nil {
-			// TODO(jeremy): Should we include the error in the response?
-			log.Error(err, "Failed to unmarshal response")
+	if provider == api.ModelProviderAnthropic && resp.ResponseJson != "" {
+		html, err := renderAnthropicRequestJson(resp.RequestJson)
+		if err != nil {
+			log.Error(err, "Failed to render request")
+
+		} else {
+			resp.RequestHtml = html
+		}
+
+		htmlResp, err := renderAnthropicResponseJson(resp.ResponseJson)
+		if err != nil {
+			log.Error(err, "Failed to render response")
+
+		} else {
+			resp.ResponseHtml = htmlResp
 		}
 	}
-
-	return aLog, nil
+	return resp, nil
 }
