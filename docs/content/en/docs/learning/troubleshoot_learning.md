@@ -1,7 +1,7 @@
 ---
 title: "Troubleshoot Learning"
 description: "How to troubleshoot and monitor learning"
-weight: 1
+weight: 2
 ---
 
 ## What You'll Learn

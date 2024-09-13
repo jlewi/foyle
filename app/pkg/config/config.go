@@ -38,6 +38,8 @@ const (
 	// https://github.com/stateful/vscode-runme/blob/f1cc965ab0c4cdffa9adb70922e2da792d7e23de/package.json#L849
 	// The value isn't 8080 because 8080 is over used and likely to conflict with other locally running services.
 	defaultHTTPPort = 8877
+
+	defaultRagEnabled = true
 )
 
 // Config represents the persistent configuration data for Foyle.
@@ -463,6 +465,8 @@ func setServerDefaults() {
 
 func setAgentDefaults() {
 	viper.SetDefault("agent.model", DefaultModel)
+	viper.SetDefault("agent.rag.enabled", defaultRagEnabled)
+	viper.SetDefault("agent.rag.maxResults", defaultMaxResults)
 }
 
 func DefaultConfigFile() string {
