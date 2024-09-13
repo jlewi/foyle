@@ -41,19 +41,25 @@ fi
 * **Note** There appears to be a bug right now in the HTML rendering causing a bunch of newlines to be introduced relative to what's in the actual markdown in the JSON request
 
 ```bash {"id":"01J7MM8TNZ2T1W6HN6BHJ2RN4C","interactive":"false"}
-jq '.requestHtml' /tmp/response.json
+jq -r '.responseHtml' /tmp/response.json > /tmp/response.html
+cat /tmp/response.html
 ```
 
 * To view the response
 
 ```bash {"id":"01J7MMCPDJHR3T4QER1G6ANCJD","interactive":"false"}
-jq '.responseHtml' /tmp/response.json
+jq -r '.responseHtml' /tmp/response.json > /tmp/response.html
+cat /tmp/response.html
 ```
 
 * To view the JSON versions of the actual requests and response 
 
 ```bash {"interactive":"false"}
 jq -r '.requestJson' /tmp/response.json | jq .
+```
+
+```bash {"id":"01J7PQKA6C670EWMDBBCEFKP0H"}
+jq -r '.responseJson' /tmp/response.json | jq '.messages[0].content[0].text'
 ```
 
 * You can print the raw markdown of the prompt as follows 
