@@ -90,7 +90,7 @@ message GetLLMLogsRequest {
   // Trace ID is the id of the trace
   string trace_id = 1;
   // log_file is the path to the logs to analyze to get the trace
-  // TODO(jeremy): Should we make this a glob?
+  // TODO(jeremy): We should deprecate this.
   string log_file = 2;
 }
 
