@@ -3,11 +3,12 @@ package analyze
 import (
 	"context"
 	"encoding/json"
-	"github.com/jlewi/foyle/app/pkg/logs/matchers"
-	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/api"

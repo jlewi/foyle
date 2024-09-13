@@ -1,11 +1,12 @@
 package matchers
 
 import (
-	"github.com/jlewi/foyle/app/pkg/oai"
 	"reflect"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/jlewi/foyle/app/pkg/oai"
 
 	"github.com/jlewi/foyle/app/pkg/agent"
 )

@@ -41,7 +41,9 @@ func TestRenderAnthropicRequest(t *testing.T) {
 			}
 
 			req := &anthropic.MessagesRequest{}
-			json.Unmarshal(data, req)
+			if err := json.Unmarshal(data, req); err != nil {
+				t.Fatalf("Failed to unmarshal request: %v", err)
+			}
 
 			result := renderAnthropicRequest(req)
 			if result == "" {

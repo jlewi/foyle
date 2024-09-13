@@ -3,10 +3,11 @@ package analyze
 import (
 	"context"
 	"encoding/json"
-	"github.com/liushuangls/go-anthropic/v2"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/liushuangls/go-anthropic/v2"
 )
 
 func TestReadAnthropicLog(t *testing.T) {
