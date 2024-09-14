@@ -1,13 +1,7 @@
 ---
-<<<<<<< HEAD
 title: "Troubleshoot Learning"
 description: "How to troubleshoot and monitor learning"
 weight: 2
-=======
-description: How to troubleshoot and monitor learning
-title: Troubleshoot Learning
-weight: 1
->>>>>>> 3c2606d (Update docs.)
 ---
 
 ## What You'll Learn
@@ -179,7 +173,7 @@ jq -c 'select(.severity == "error")' ${LASTLOG}
 
 Check to make sure blocks are being enqueued for learner processing
 
-```bash {"id":"01J7S4FKYKWCP68V2ABEVYRV5H"}
+```bash
 curl -s http://localhost:8877/metrics | grep learner_enqueued_total 
 ```
 
@@ -187,7 +181,7 @@ curl -s http://localhost:8877/metrics | grep learner_enqueued_total
 
 Check the metrics for post processing of blocks 
 
-```bash {"id":"01J7S4HMXDTH1PBXYFYYM3ZYZG"}
+```bash
 curl -s http://localhost:8877/metrics | grep learner_blocks_processed
 ```
 
