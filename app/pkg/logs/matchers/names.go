@@ -6,7 +6,7 @@ package matchers
 import "strings"
 
 const (
-	OAIComplete    = "github.com/jlewi/foyle/app/pkg/oai/completer.(*Completer).Complete"
+	OAIComplete    = "github.com/jlewi/foyle/app/pkg/oai.(*Completer).Complete"
 	LogEvents      = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).LogEvents"
 	StreamGenerate = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).StreamGenerate"
 )

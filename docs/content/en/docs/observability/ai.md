@@ -1,6 +1,8 @@
 ---
-
-## description: How to monitor the quality of AI outputs title: Monitoring AI Quality weight: 3
+description: How to monitor the quality of AI outputs
+title: Monitoring AI Quality
+weight: 1
+---
 
 ## What You'll Learn
 
