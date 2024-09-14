@@ -447,6 +447,12 @@ func (a *Analyzer) processLogEvent(ctx context.Context, entry *api.LogEntry) {
 		}); err != nil {
 			log.Error(err, "Failed to update block with execution", "blockId", bid)
 		}
+		// We need to enqueue the block for processing since it was executed.
+		if a.blockNotifier != nil {
+			if err := a.blockNotifier(bid); err != nil {
+				log.Error(err, "Error notifying block event", "blockId", bid)
+			}
+		}
 	case v1alpha1.LogEventType_ACCEPTED:
 		fallthrough
 	case v1alpha1.LogEventType_REJECTED:
@@ -637,11 +643,11 @@ func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 				return buildBlockLog(ctx, block, a.tracesDB)
 			})
 			if err != nil {
-				log.Error(err, "Error processing block", "block", blockItem.id)
+				log.Error(err, "Error processing block", "blockId", blockItem.id)
 			}
 			if a.blockNotifier != nil {
 				if err := a.blockNotifier(blockItem.id); err != nil {
-					log.Error(err, "Error notifying block event", "block", blockItem.id)
+					log.Error(err, "Error notifying block event", "blockId", blockItem.id)
 				}
 			}
 			if a.signalBlockDone != nil {
