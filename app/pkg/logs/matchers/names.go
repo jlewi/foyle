@@ -6,9 +6,16 @@ package matchers
 import "strings"
 
 const (
+	OAIComplete    = "github.com/jlewi/foyle/app/pkg/oai.(*Completer).Complete"
 	LogEvents      = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).LogEvents"
 	StreamGenerate = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).StreamGenerate"
 )
+
+type Matcher func(name string) bool
+
+func IsOAIComplete(name string) bool {
+	return strings.HasPrefix(name, OAIComplete)
+}
 
 func IsLogEvent(fname string) bool {
 	// We need to use HasPrefix because the logging statement is nested inside an anonymous function so there

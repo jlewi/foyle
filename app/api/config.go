@@ -7,6 +7,7 @@ const (
 	ModelProviderAnthropic ModelProvider = "anthropic"
 	ModelProviderOpenAI    ModelProvider = "openai"
 	ModelProviderDefault   ModelProvider = "openai"
+	ModelProviderUnknown   ModelProvider = "unknown"
 )
 
 type AgentConfig struct {

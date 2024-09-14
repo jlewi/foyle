@@ -81,7 +81,13 @@ func run() error {
 		return errors.Wrapf(err, "Error getting current working directory")
 	}
 
-	mdFiles, err := findMDFiles(context.Background(), cwd)
+	rootDir, err := filepath.Abs(filepath.Join(cwd, "..", ".."))
+	if err != nil {
+		return errors.Wrapf(err, "Error getting root directory")
+	}
+	docsDir := filepath.Join(rootDir, "docs", "content")
+
+	mdFiles, err := findMDFiles(context.Background(), docsDir)
 	if err != nil {
 		return errors.Wrapf(err, "Error finding markdown files")
 	}
@@ -95,7 +101,6 @@ func run() error {
 }
 
 func main() {
-	processFile(context.Background(), "/Users/jlewi/git_foyle/docs/content/en/docs/learning/troubleshoot_learning.md")
 	if err := run(); err != nil {
 		fmt.Println("Error processing markdown: %+v", err)
 		os.Exit(1)

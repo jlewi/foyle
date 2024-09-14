@@ -1,8 +1,10 @@
 package analyze
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/liushuangls/go-anthropic/v2"
@@ -12,35 +14,38 @@ import (
 
 func TestRenderAnthropicRequest(t *testing.T) {
 	type testCase struct {
-		name    string
-		request *anthropic.MessagesRequest
+		name  string
+		fname string
 	}
 
 	tests := []testCase{
 		{
-			name: "basic",
-			request: &anthropic.MessagesRequest{
-				Model:       "test",
-				MaxTokens:   10,
-				Temperature: proto.Float32(0.5),
-				System:      "This is the system message",
-				Messages: []anthropic.Message{
-					{
-						Role: "User",
-						Content: []anthropic.MessageContent{
-							{
-								Text: proto.String("# md heading\n * item 1 \n * item 2"),
-							},
-						},
-					},
-				},
-			},
+			name:  "basic",
+			fname: "anthropic_request.json",
 		},
 	}
 
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current working directory: %v", err)
+	}
+
+	testDataDir := filepath.Join(cwd, "test_data")
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := renderAnthropicRequest(test.request)
+
+			fname := filepath.Join(testDataDir, test.fname)
+			data, err := os.ReadFile(fname)
+			if err != nil {
+				t.Fatalf("Failed to read file %s: %v", fname, err)
+			}
+
+			req := &anthropic.MessagesRequest{}
+			if err := json.Unmarshal(data, req); err != nil {
+				t.Fatalf("Failed to unmarshal request: %v", err)
+			}
+
+			result := renderAnthropicRequest(req)
 			if result == "" {
 				t.Errorf("Request should not be empty")
 			}

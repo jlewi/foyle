@@ -7,6 +7,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+
 	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -24,61 +27,82 @@ type AnthropicLog struct {
 	Response *anthropic.MessagesResponse
 }
 
-// readAnthropicRequest reads an Anthropic request from a log file
-//
-// N.B. If there are multiple requests as part of the same trace then only the last request will be returned.
-// TODO(jeremy): Ideally we'd join the request with its response and return the one that succeeded. The reason
-// There might be multiple is because context exceeded length; in which case only one request which has been
-// sufficiently shortened will have an actual response.
-func readAnthropicLog(ctx context.Context, traceId string, logFile string) (*AnthropicLog, error) {
+// readLLMLog tries to fetch the raw LLM request/response from the log
+func readLLMLog(ctx context.Context, traceId string, logFile string) (*logspb.GetLLMLogsResponse, error) {
 	log := logs.FromContext(ctx)
 	file, err := os.Open(logFile)
+
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Wrapf(err, "Failed to open file %s", logFile))
 	}
 	d := json.NewDecoder(file)
 
-	aLog := &AnthropicLog{
-		TraceID: traceId,
-		LogFile: logFile,
-	}
-	req := &anthropic.MessagesRequest{}
-	resp := &anthropic.MessagesResponse{}
+	resp := &logspb.GetLLMLogsResponse{}
+
+	provider := api.ModelProviderUnknown
 	for {
 		entry := &api.LogEntry{}
 		if err := d.Decode(entry); err != nil {
 			if err == io.EOF {
-				return aLog, nil
+				return nil, nil
 			}
 			log.Error(err, "Failed to decode log entry")
 		}
 		if entry.TraceID() != traceId {
 			continue
 		}
-		if !strings.HasSuffix(entry.Function(), "anthropic.(*Completer).Complete") {
+		isMatch := false
+		if strings.HasSuffix(entry.Function(), "anthropic.(*Completer).Complete") {
+			provider = api.ModelProviderAnthropic
+			isMatch = true
+		}
+
+		if matchers.IsOAIComplete(entry.Function()) {
+			provider = api.ModelProviderOpenAI
+			isMatch = true
+		}
+
+		if strings.HasSuffix(entry.Function(), "anthropic.(*Completer).Complete") {
+			provider = api.ModelProviderAnthropic
+			isMatch = true
+		}
+
+		// If tis not a matching request ignore it.
+		if !isMatch {
 			continue
 		}
-
-		reqBytes := entry.Request()
-		if reqBytes != nil {
-			if err := json.Unmarshal(reqBytes, req); err != nil {
-				// TODO(jeremy): Should we include the error in the response?
-				log.Error(err, "Failed to unmarshal request")
-			} else {
-				aLog.Request = req
-				req = &anthropic.MessagesRequest{}
-			}
+		if reqBytes := entry.Request(); reqBytes != nil {
+			resp.RequestJson = string(reqBytes)
 		}
 
-		respBytes := entry.Response()
-		if respBytes != nil {
-			if err := json.Unmarshal(respBytes, resp); err != nil {
-				// TODO(jeremy): Should we include the error in the response?
-				log.Error(err, "Failed to unmarshal response")
-			} else {
-				aLog.Response = resp
-				resp = &anthropic.MessagesResponse{}
-			}
+		if resBytes := entry.Response(); resBytes != nil {
+			resp.ResponseJson = string(resBytes)
+		}
+
+		// Since we have read the request and response less
+		// This isn't a great implementation because we will end up reading all the logs if for some reason
+		// The logs don't have the entries.
+		if resp.RequestJson != "" && resp.ResponseJson != "" {
+			break
 		}
 	}
+
+	if provider == api.ModelProviderAnthropic && resp.ResponseJson != "" {
+		html, err := renderAnthropicRequestJson(resp.RequestJson)
+		if err != nil {
+			log.Error(err, "Failed to render request")
+
+		} else {
+			resp.RequestHtml = html
+		}
+
+		htmlResp, err := renderAnthropicResponseJson(resp.ResponseJson)
+		if err != nil {
+			log.Error(err, "Failed to render response")
+
+		} else {
+			resp.ResponseHtml = htmlResp
+		}
+	}
+	return resp, nil
 }

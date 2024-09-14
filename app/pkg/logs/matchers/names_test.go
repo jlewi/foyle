@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jlewi/foyle/app/pkg/oai"
+
 	"github.com/jlewi/foyle/app/pkg/agent"
 )
 
@@ -18,6 +20,7 @@ func GetFunctionNameFromFunc(f interface{}) string {
 	return name
 }
 
+// TODO(jeremy): We should probably migrate this to matchers.
 func Test_Names(t *testing.T) {
 	type testCases struct {
 		expected string
@@ -39,5 +42,31 @@ func Test_Names(t *testing.T) {
 		if got := GetFunctionNameFromFunc(c.input); got != c.expected {
 			t.Errorf("Expected %s, but got %s", c.expected, got)
 		}
+	}
+}
+
+func Test_Matchers(t *testing.T) {
+	type testCases struct {
+		name     string
+		Matcher  Matcher
+		input    interface{}
+		expected bool
+	}
+
+	cases := []testCases{
+		{
+			input:    (&oai.Completer{}).Complete,
+			Matcher:  IsOAIComplete,
+			name:     "IsOAIComplete",
+			expected: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := c.Matcher(GetFunctionNameFromFunc(c.input)); got != c.expected {
+				t.Errorf("Expected %v, but got %v", c.expected, got)
+			}
+		})
 	}
 }
