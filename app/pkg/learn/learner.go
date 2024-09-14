@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+
 	"github.com/jlewi/monogo/files"
 	"github.com/jlewi/monogo/helpers"
 
@@ -28,6 +31,21 @@ import (
 
 const (
 	fileSuffix = ".example.binpb"
+)
+
+var (
+	enqueuedCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "learner_enqueued_total",
+		Help: "Total number of enqueued blocks",
+	})
+
+	cellsProcessed = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "learner_blocks_processed",
+			Help: "Number of blocks processed by the learner",
+		},
+		[]string{"status"},
+	)
 )
 
 // Learner handles the learn loop to learn from past mistakes.
@@ -74,6 +92,7 @@ func (l *Learner) Enqueue(id string) error {
 		return errors.New("Queue is shutting down; can't enqueue anymore items")
 	}
 	l.queue.Add(id)
+	enqueuedCounter.Inc()
 	return nil
 }
 
@@ -130,16 +149,19 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 
 	if b.ExecutedBlock == nil {
 		// Skip unexecuted block
+		cellsProcessed.WithLabelValues("unexecuted").Inc()
 		return nil
 	}
 
 	if b.GeneratedBlock == nil {
 		// Block wasn't the result of AI generation
+		cellsProcessed.WithLabelValues("notgenerated").Inc()
 		return nil
 	}
 
 	if b.EvalMode {
 		log.V(logs.Debug).Info("Skipping block which was created as part of an eval", "id", b.GetId())
+		cellsProcessed.WithLabelValues("eval").Inc()
 		return nil
 	}
 
@@ -147,9 +169,11 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 	// Use the metric used for eval.
 	if strings.TrimSpace(b.ExecutedBlock.GetContents()) == strings.TrimSpace(b.GeneratedBlock.GetContents()) {
 		log.V(logs.Debug).Info("Skipping executed block which matches generated block", "id", b.GetId())
+		cellsProcessed.WithLabelValues("nochange").Inc()
 		return nil
 	}
 
+	cellsProcessed.WithLabelValues("learn").Inc()
 	expectedFiles := l.getExampleFiles(b.GetId())
 
 	log.Info("Found new training example", "blockId", b.GetId())
