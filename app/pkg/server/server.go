@@ -104,6 +104,8 @@ func (s *Server) createGinEngine() error {
 
 	// TODO(jeremy): Should we turn this into a protobuf service and use connect?
 	router.GET("/healthz", s.healthCheck)
+	// Add the Prometheus metrics endpoint
+	router.GET("/metrics", prometheusHandler())
 	router.NoRoute(func(c *gin.Context) {
 		log.Info("Request for not found path", "path", c.Request.URL.Path)
 		c.JSON(http.StatusNotFound, gin.H{"message": "Not found", "path": c.Request.URL.Path})
