@@ -1,7 +1,13 @@
 ---
+<<<<<<< HEAD
 title: "Troubleshoot Learning"
 description: "How to troubleshoot and monitor learning"
 weight: 2
+=======
+title: Troubleshoot Learning 
+description: How to troubleshoot and monitor learning 
+weight: 1
+>>>>>>> bcd1432 (Remove notifier fix docs.)
 ---
 
 ## What You'll Learn
