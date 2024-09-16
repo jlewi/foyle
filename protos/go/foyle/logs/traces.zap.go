@@ -7,11 +7,11 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	_ "google.golang.org/protobuf/types/known/structpb"
-	_ "google.golang.org/protobuf/types/known/timestamppb"
-	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
@@ -272,6 +272,12 @@ func (m *GetLLMLogsResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Object
 
 	keyName = "response_html" // field response_html = 2
 	enc.AddString(keyName, m.ResponseHtml)
+
+	keyName = "request_json" // field request_json = 3
+	enc.AddString(keyName, m.RequestJson)
+
+	keyName = "response_json" // field response_json = 4
+	enc.AddString(keyName, m.ResponseJson)
 
 	return nil
 }

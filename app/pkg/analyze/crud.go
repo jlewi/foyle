@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"context"
+	"sort"
 
 	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -54,26 +55,35 @@ func (h *CrudHandler) GetTrace(ctx context.Context, request *connect.Request[log
 }
 
 func (h *CrudHandler) GetLLMLogs(ctx context.Context, request *connect.Request[logspb.GetLLMLogsRequest]) (*connect.Response[logspb.GetLLMLogsResponse], error) {
+	log := logs.FromContext(ctx)
 	getReq := request.Msg
 	if getReq.GetTraceId() == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("No traceID provided"))
 	}
 
-	if getReq.GetLogFile() == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("No LogFile provided"))
-	}
-
-	log, err := readAnthropicLog(ctx, getReq.GetTraceId(), getReq.GetLogFile())
+	logFiles, err := findLogFiles(ctx, h.cfg.GetLogDir())
 	if err != nil {
-		// Assume its a not found error.
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to get prompt for trace id %s; logFile: %s", getReq.GetTraceId(), getReq.GetLogFile()))
+		log.Error(err, "Failed to find log files")
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "Failed to find log files"))
 	}
 
-	resp := &logspb.GetLLMLogsResponse{}
-	resp.RequestHtml = renderAnthropicRequest(log.Request)
-	resp.ResponseHtml = renderAnthropicResponse(log.Response)
+	// Sort the slice in descending order
+	sort.Slice(logFiles, func(i, j int) bool {
+		return logFiles[i] > logFiles[j]
+	})
 
-	return connect.NewResponse(resp), nil
+	// We loop over all the logFiles until we find it which is not efficient.
+	for _, logFile := range logFiles {
+		resp, err := readLLMLog(ctx, getReq.GetTraceId(), logFile)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to get LLM call log for trace id %s; logFile: %s", getReq.GetTraceId(), getReq.GetLogFile()))
+		}
+		if resp != nil {
+			return connect.NewResponse(resp), nil
+		}
+	}
+
+	return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("No log file found for traceID %v", getReq.GetTraceId()))
 }
 
 func (h *CrudHandler) GetBlockLog(ctx context.Context, request *connect.Request[logspb.GetBlockLogRequest]) (*connect.Response[logspb.GetBlockLogResponse], error) {

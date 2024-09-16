@@ -1,6 +1,6 @@
 -- name: ListSessions :many
 SELECT * FROM sessions
-ORDER BY startTime;
+ORDER BY startTime desc limit 25;
 
 -- name: GetSession :one
 SELECT * FROM sessions

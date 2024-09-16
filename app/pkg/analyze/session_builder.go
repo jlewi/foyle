@@ -67,6 +67,7 @@ func (p *sessionBuilder) processLogEvent(entry *api.LogEntry) {
 
 		if event.Type == v1alpha1.LogEventType_SESSION_START {
 			s.StartTime = timestamppb.New(entry.Time())
+			event.GetCells()
 		} else if event.Type == v1alpha1.LogEventType_SESSION_END {
 			s.EndTime = timestamppb.New(entry.Time())
 		}

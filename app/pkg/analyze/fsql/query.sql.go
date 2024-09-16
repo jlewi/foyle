@@ -29,7 +29,7 @@ func (q *Queries) GetSession(ctx context.Context, contextid string) (Session, er
 
 const listSessions = `-- name: ListSessions :many
 SELECT contextid, starttime, endtime, proto FROM sessions
-ORDER BY startTime
+ORDER BY startTime desc limit 25
 `
 
 func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {

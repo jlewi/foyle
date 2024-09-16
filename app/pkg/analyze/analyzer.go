@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
+
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"google.golang.org/protobuf/proto"
@@ -65,7 +67,7 @@ type Analyzer struct {
 
 	watcher *fsnotify.Watcher
 
-	blockNotifier PostBlockEvent
+	learnNotifier PostBlockEvent
 
 	handleLogFileIsDone sync.WaitGroup
 	handleBlocksIsDone  sync.WaitGroup
@@ -146,10 +148,10 @@ type blockItem struct {
 type PostBlockEvent func(id string) error
 
 // Run runs the analyzer; continually processing logs.
-// blockNotifier is an optional function that will be called when a block is updated.
+// learnNotifier is an optional function that will be called when a block is updated.
 // This should be non blocking.
-func (a *Analyzer) Run(ctx context.Context, logDirs []string, blockNotifier PostBlockEvent) error {
-	a.blockNotifier = blockNotifier
+func (a *Analyzer) Run(ctx context.Context, logDirs []string, learnNotifier PostBlockEvent) error {
+	a.learnNotifier = learnNotifier
 	// Find all the current files
 	jsonFiles, err := findLogFilesInDirs(ctx, logDirs)
 	if err != nil {
@@ -268,7 +270,7 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 			// Add the entry to a session if it should be.
 			a.sessBuilder.processLogEntry(entry)
 
-			if strings.HasSuffix(entry.Function(), "agent.(*Agent).LogEvents") {
+			if matchers.IsLogEvent(entry.Function()) {
 				a.processLogEvent(ctx, entry)
 				continue
 			}
@@ -455,6 +457,12 @@ func (a *Analyzer) processLogEvent(ctx context.Context, entry *api.LogEntry) {
 			return nil
 		}); err != nil {
 			log.Error(err, "Failed to update block with execution", "blockId", bid)
+		}
+		// We need to enqueue the block for processing since it was executed.
+		if a.learnNotifier != nil {
+			if err := a.learnNotifier(bid); err != nil {
+				log.Error(err, "Error notifying block event", "blockId", bid)
+			}
 		}
 	case v1alpha1.LogEventType_ACCEPTED:
 		fallthrough
@@ -646,12 +654,7 @@ func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 				return buildBlockLog(ctx, block, a.tracesDB)
 			})
 			if err != nil {
-				log.Error(err, "Error processing block", "block", blockItem.id)
-			}
-			if a.blockNotifier != nil {
-				if err := a.blockNotifier(blockItem.id); err != nil {
-					log.Error(err, "Error notifying block event", "block", blockItem.id)
-				}
+				log.Error(err, "Error processing block", "blockId", blockItem.id)
 			}
 			if a.signalBlockDone != nil {
 				a.signalBlockDone <- blockItem.id

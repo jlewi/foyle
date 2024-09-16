@@ -33,6 +33,12 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// SessionsServiceGetSessionProcedure is the fully-qualified name of the SessionsService's
+	// GetSession RPC.
+	SessionsServiceGetSessionProcedure = "/foyle.logs.SessionsService/GetSession"
+	// SessionsServiceListSessionsProcedure is the fully-qualified name of the SessionsService's
+	// ListSessions RPC.
+	SessionsServiceListSessionsProcedure = "/foyle.logs.SessionsService/ListSessions"
 	// SessionsServiceDumpExamplesProcedure is the fully-qualified name of the SessionsService's
 	// DumpExamples RPC.
 	SessionsServiceDumpExamplesProcedure = "/foyle.logs.SessionsService/DumpExamples"
@@ -41,11 +47,17 @@ const (
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
 	sessionsServiceServiceDescriptor            = logs.File_foyle_logs_sessions_proto.Services().ByName("SessionsService")
+	sessionsServiceGetSessionMethodDescriptor   = sessionsServiceServiceDescriptor.Methods().ByName("GetSession")
+	sessionsServiceListSessionsMethodDescriptor = sessionsServiceServiceDescriptor.Methods().ByName("ListSessions")
 	sessionsServiceDumpExamplesMethodDescriptor = sessionsServiceServiceDescriptor.Methods().ByName("DumpExamples")
 )
 
 // SessionsServiceClient is a client for the foyle.logs.SessionsService service.
 type SessionsServiceClient interface {
+	// GetSession returns a session
+	GetSession(context.Context, *connect.Request[logs.GetSessionRequest]) (*connect.Response[logs.GetSessionResponse], error)
+	// ListSessions returns a list of sessions
+	ListSessions(context.Context, *connect.Request[logs.ListSessionsRequest]) (*connect.Response[logs.ListSessionsResponse], error)
 	// DumpExamples from the sessions
 	DumpExamples(context.Context, *connect.Request[logs.DumpExamplesRequest]) (*connect.Response[logs.DumpExamplesResponse], error)
 }
@@ -60,6 +72,18 @@ type SessionsServiceClient interface {
 func NewSessionsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) SessionsServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
 	return &sessionsServiceClient{
+		getSession: connect.NewClient[logs.GetSessionRequest, logs.GetSessionResponse](
+			httpClient,
+			baseURL+SessionsServiceGetSessionProcedure,
+			connect.WithSchema(sessionsServiceGetSessionMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listSessions: connect.NewClient[logs.ListSessionsRequest, logs.ListSessionsResponse](
+			httpClient,
+			baseURL+SessionsServiceListSessionsProcedure,
+			connect.WithSchema(sessionsServiceListSessionsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		dumpExamples: connect.NewClient[logs.DumpExamplesRequest, logs.DumpExamplesResponse](
 			httpClient,
 			baseURL+SessionsServiceDumpExamplesProcedure,
@@ -71,7 +95,19 @@ func NewSessionsServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // sessionsServiceClient implements SessionsServiceClient.
 type sessionsServiceClient struct {
+	getSession   *connect.Client[logs.GetSessionRequest, logs.GetSessionResponse]
+	listSessions *connect.Client[logs.ListSessionsRequest, logs.ListSessionsResponse]
 	dumpExamples *connect.Client[logs.DumpExamplesRequest, logs.DumpExamplesResponse]
+}
+
+// GetSession calls foyle.logs.SessionsService.GetSession.
+func (c *sessionsServiceClient) GetSession(ctx context.Context, req *connect.Request[logs.GetSessionRequest]) (*connect.Response[logs.GetSessionResponse], error) {
+	return c.getSession.CallUnary(ctx, req)
+}
+
+// ListSessions calls foyle.logs.SessionsService.ListSessions.
+func (c *sessionsServiceClient) ListSessions(ctx context.Context, req *connect.Request[logs.ListSessionsRequest]) (*connect.Response[logs.ListSessionsResponse], error) {
+	return c.listSessions.CallUnary(ctx, req)
 }
 
 // DumpExamples calls foyle.logs.SessionsService.DumpExamples.
@@ -81,6 +117,10 @@ func (c *sessionsServiceClient) DumpExamples(ctx context.Context, req *connect.R
 
 // SessionsServiceHandler is an implementation of the foyle.logs.SessionsService service.
 type SessionsServiceHandler interface {
+	// GetSession returns a session
+	GetSession(context.Context, *connect.Request[logs.GetSessionRequest]) (*connect.Response[logs.GetSessionResponse], error)
+	// ListSessions returns a list of sessions
+	ListSessions(context.Context, *connect.Request[logs.ListSessionsRequest]) (*connect.Response[logs.ListSessionsResponse], error)
 	// DumpExamples from the sessions
 	DumpExamples(context.Context, *connect.Request[logs.DumpExamplesRequest]) (*connect.Response[logs.DumpExamplesResponse], error)
 }
@@ -91,6 +131,18 @@ type SessionsServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewSessionsServiceHandler(svc SessionsServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	sessionsServiceGetSessionHandler := connect.NewUnaryHandler(
+		SessionsServiceGetSessionProcedure,
+		svc.GetSession,
+		connect.WithSchema(sessionsServiceGetSessionMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	sessionsServiceListSessionsHandler := connect.NewUnaryHandler(
+		SessionsServiceListSessionsProcedure,
+		svc.ListSessions,
+		connect.WithSchema(sessionsServiceListSessionsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	sessionsServiceDumpExamplesHandler := connect.NewUnaryHandler(
 		SessionsServiceDumpExamplesProcedure,
 		svc.DumpExamples,
@@ -99,6 +151,10 @@ func NewSessionsServiceHandler(svc SessionsServiceHandler, opts ...connect.Handl
 	)
 	return "/foyle.logs.SessionsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case SessionsServiceGetSessionProcedure:
+			sessionsServiceGetSessionHandler.ServeHTTP(w, r)
+		case SessionsServiceListSessionsProcedure:
+			sessionsServiceListSessionsHandler.ServeHTTP(w, r)
 		case SessionsServiceDumpExamplesProcedure:
 			sessionsServiceDumpExamplesHandler.ServeHTTP(w, r)
 		default:
@@ -109,6 +165,14 @@ func NewSessionsServiceHandler(svc SessionsServiceHandler, opts ...connect.Handl
 
 // UnimplementedSessionsServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedSessionsServiceHandler struct{}
+
+func (UnimplementedSessionsServiceHandler) GetSession(context.Context, *connect.Request[logs.GetSessionRequest]) (*connect.Response[logs.GetSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("foyle.logs.SessionsService.GetSession is not implemented"))
+}
+
+func (UnimplementedSessionsServiceHandler) ListSessions(context.Context, *connect.Request[logs.ListSessionsRequest]) (*connect.Response[logs.ListSessionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("foyle.logs.SessionsService.ListSessions is not implemented"))
+}
 
 func (UnimplementedSessionsServiceHandler) DumpExamples(context.Context, *connect.Request[logs.DumpExamplesRequest]) (*connect.Response[logs.DumpExamplesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("foyle.logs.SessionsService.DumpExamples is not implemented"))

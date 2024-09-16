@@ -140,6 +140,48 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	return nil
 }
 
+func (m *SessionsManager) GetSession(ctx context.Context, request *connect.Request[logspb.GetSessionRequest]) (*connect.Response[logspb.GetSessionResponse], error) {
+	log := logs.FromContext(ctx)
+
+	if request.Msg.GetContextId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("contextId must be non-empty"))
+	}
+
+	session, err := m.Get(ctx, request.Msg.GetContextId())
+	if err != nil {
+		log.Error(err, "Failed to get session", "contextId", request.Msg.GetContextId())
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to get session"))
+	}
+
+	return connect.NewResponse(&logspb.GetSessionResponse{
+		Session: session,
+	}), nil
+}
+
+func (m *SessionsManager) ListSessions(ctx context.Context, request *connect.Request[logspb.ListSessionsRequest]) (*connect.Response[logspb.ListSessionsResponse], error) {
+	log := logs.FromContext(ctx)
+	queries := m.queries
+	dbSessions, err := queries.ListSessions(ctx)
+	if err != nil {
+		log.Error(err, "Failed to list sessions")
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to  list sessions"))
+	}
+
+	resp := &logspb.ListSessionsResponse{
+		Sessions: make([]*logspb.Session, 0, len(dbSessions)),
+	}
+	for _, s := range dbSessions {
+		sess := &logspb.Session{}
+		if err := proto.Unmarshal(s.Proto, sess); err != nil {
+			log.Error(err, "Failed to deserialize session", "contextId", s.Contextid)
+			continue
+		}
+		resp.Sessions = append(resp.Sessions, sess)
+	}
+
+	return connect.NewResponse(resp), nil
+}
+
 func (m *SessionsManager) DumpExamples(ctx context.Context, request *connect.Request[logspb.DumpExamplesRequest]) (*connect.Response[logspb.DumpExamplesResponse], error) {
 	log := logs.FromContext(ctx)
 	output := request.Msg.Output
