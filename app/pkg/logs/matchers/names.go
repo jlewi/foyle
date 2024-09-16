@@ -22,3 +22,7 @@ func IsLogEvent(fname string) bool {
 	// will be a suffix like "func1"
 	return strings.HasPrefix(fname, LogEvents)
 }
+
+func IsStreamGenerate(fname string) bool {
+	return strings.HasPrefix(fname, StreamGenerate)
+}

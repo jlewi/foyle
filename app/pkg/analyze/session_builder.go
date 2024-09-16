@@ -2,11 +2,9 @@ package analyze
 
 import (
 	"context"
-	"strings"
-
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
-	"github.com/jlewi/foyle/app/pkg/fnames"
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
@@ -30,12 +28,12 @@ func NewSessionBuilder(sessions *SessionsManager) (*sessionBuilder, error) {
 func (p *sessionBuilder) processLogEntry(entry *api.LogEntry) {
 	// We need to use HasPrefix because the logging statement is nested inside an anonymous function so there
 	// will be a suffix like "func1"
-	if strings.HasPrefix(entry.Function(), fnames.LogEvents) {
+	if matchers.IsLogEvent(entry.Function()) {
 		// TODO(Jeremy): There is also Analyzer.processLogEvent
 		p.processLogEvent(entry)
 	}
 
-	if entry.Function() == fnames.StreamGenerate {
+	if matchers.IsStreamGenerate(entry.Function()) {
 		p.processStreamGenerate(entry)
 	}
 }
