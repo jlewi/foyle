@@ -4,7 +4,7 @@ description: Building an Eval Dataset
 weight: 11
 author: "[Jeremy Lewi](https://lewi.us/about)"
 date: 2024-09-06
-status: Being Drafted
+status: Published
 ---
 
 ## Objective
@@ -13,8 +13,8 @@ status: Being Drafted
 
 ## TL;DR
 
-An evaluation dataset is critical for being able to evaluate quickly. Right now
-cost is a major concern because Ghost Cells use a lot of tokens due to the naive
+An evaluation dataset is critical for being able to iterate quickly. Right now
+cost is a major concern because Ghost Cells use a lot of tokens due to a naive
 implementation. There are a number of experiments we'd like to run to see if 
 we can reduce cost without significantly impacting quality.
 
@@ -50,17 +50,11 @@ significantly. When we do evaluation we need to take into account this learning.
 Since we are building the evaluation dataset from actual notebooks/prompts there is an ordering to the 
 examples. During evaluation we can replay the sessions in the same order they occured. We can then let
 Foyle adaptively build up its learned examples just as it does in production. Replaying the examples
-in order ensures we don't polute evaluation by using knowledge of the furture to predict the past.
-
+in order ensures we don't pollute evaluation by using knowledge of the furture to predict the past.
 
 ## LLM As Judge
 
 Lots of code cells don't contain single binary invocations but small minny programs. Therefore, the similarity
 metric proposed in [TN003](/tn003_learning_eval.md/) won't work. We can use LLM as judge to decide whether
 the predicted and actual command are equivalent. 
-
-
-
-## Deduplication?
-
 
