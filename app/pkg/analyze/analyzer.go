@@ -459,6 +459,8 @@ func (a *Analyzer) processLogEvent(ctx context.Context, entry *api.LogEntry) {
 			log.Error(err, "Failed to update block with execution", "blockId", bid)
 		}
 		// We need to enqueue the block for processing since it was executed.
+		// The learner will decide whether the blockLog has all the information it needs otherwise it will
+		// disregard the block item and wait for further events.
 		if a.learnNotifier != nil {
 			if err := a.learnNotifier(bid); err != nil {
 				log.Error(err, "Error notifying block event", "blockId", bid)
@@ -655,6 +657,14 @@ func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 			})
 			if err != nil {
 				log.Error(err, "Error processing block", "blockId", blockItem.id)
+			}
+			// We need to enqueue the block for processing since it was executed.
+			// The learner will decide whether the blockLog has all the information it needs otherwise it will
+			// disregard the block item and wait for further events.
+			if a.learnNotifier != nil {
+				if err := a.learnNotifier(blockItem.id); err != nil {
+					log.Error(err, "Error notifying block event", "blockId", blockItem.id)
+				}
 			}
 			if a.signalBlockDone != nil {
 				a.signalBlockDone <- blockItem.id
