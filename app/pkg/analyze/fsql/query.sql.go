@@ -34,8 +34,54 @@ SELECT contextid, starttime, endtime, selectedid, selectedkind, proto FROM sessi
 ORDER BY startTime desc limit 25
 `
 
+// TODO(jeremy): How would we paginate this? Since contextIds are ULIDs we could rely on them being lexicographically
+// ordered and use the last contextId as the start of the next page.
 func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 	rows, err := q.db.QueryContext(ctx, listSessions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Session
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.Contextid,
+			&i.Starttime,
+			&i.Endtime,
+			&i.Selectedid,
+			&i.Selectedkind,
+			&i.Proto,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSessionsForExamples = `-- name: ListSessionsForExamples :many
+SELECT contextid, starttime, endtime, selectedid, selectedkind, proto FROM sessions
+WHERE (?1 = '' OR contextId < ?1) and selectedKind = 'CELL_KIND_CODE'
+ORDER BY contextId DESC
+    LIMIT ?2
+`
+
+type ListSessionsForExamplesParams struct {
+	Cursor   interface{}
+	PageSize int64
+}
+
+// This queries for sessions that we will use for Examples.
+// - This should be sessions that have a selectedKind of Code
+func (q *Queries) ListSessionsForExamples(ctx context.Context, arg ListSessionsForExamplesParams) ([]Session, error) {
+	rows, err := q.db.QueryContext(ctx, listSessionsForExamples, arg.Cursor, arg.PageSize)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"os"
 	"path/filepath"
 
@@ -206,49 +207,62 @@ func (m *SessionsManager) DumpExamples(ctx context.Context, request *connect.Req
 	}
 
 	// List all the sessions
-	// TODO(jeremy): We probably need to implement pagination when the number of sessions gets large.
-	// We could do that by using the contextId as a pagination token and returning the next N sessions after that token.
-	// and ordering by sessions
-	sessions, err := m.queries.ListSessions(ctx)
-	if err != nil {
-		log.Error(err, "Failed to list sessions")
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to list sessions"))
+	params := fsql.ListSessionsForExamplesParams{
+		Cursor:   "",
+		PageSize: 100,
 	}
-
 	numExamples := 0
-	for _, s := range sessions {
-		session := &logspb.Session{}
-		if err := proto.Unmarshal(s.Proto, session); err != nil {
-			log.Error(err, "Failed to deserialize session", "contextId", s.Contextid)
-			continue
-		}
-		example, err := getExampleFromSession(session)
+	numSessions := 0
+	for {
+		sessions, err := m.queries.ListSessionsForExamples(ctx, params)
 		if err != nil {
-			log.Error(err, "Failed to get example from session", "contextId", s.Contextid)
-			continue
+			log.Error(err, "Failed to list sessions")
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to list sessions"))
 		}
-		if example == nil {
-			continue
+		if len(sessions) == 0 {
+			// No more results
+			resp := connect.NewResponse(&logspb.DumpExamplesResponse{
+				NumExamples: int32(numExamples),
+				NumSessions: int32(numSessions),
+			})
+			return resp, nil
+
 		}
 
-		b, err := proto.Marshal(example)
-		if err != nil {
-			log.Error(err, "Failed to marshal example", "contextId", s.Contextid)
-			continue
+		numSessions += len(sessions)
+		for _, s := range sessions {
+			session := &logspb.Session{}
+			if err := proto.Unmarshal(s.Proto, session); err != nil {
+				log.Error(err, "Failed to deserialize session", "contextId", s.Contextid)
+				continue
+			}
+			example, err := getExampleFromSession(session)
+			if err != nil {
+				log.Error(err, "Failed to get example from session", "contextId", s.Contextid)
+				continue
+			}
+			if example == nil {
+				continue
+			}
+
+			b, err := proto.Marshal(example)
+			if err != nil {
+				log.Error(err, "Failed to marshal example", "contextId", s.Contextid)
+				continue
+			}
+
+			filename := filepath.Join(output, fmt.Sprintf("%v.evalexample.binpb", example.GetId()))
+
+			if err := os.WriteFile(filename, b, 0644); err != nil {
+				log.Error(err, "Failed to write example to file", "filename", filename, "exampleId", example.GetId())
+			}
+			numExamples += 1
 		}
 
-		filename := filepath.Join(output, fmt.Sprintf("%v.evalexample.binpb", example.GetId()))
-
-		if err := os.WriteFile(filename, b, 0644); err != nil {
-			log.Error(err, "Failed to write example to file", "filename", filename, "exampleId", example.GetId())
-		}
-		numExamples += 1
+		// Update params
+		params.Cursor = sessions[len(sessions)-1].Contextid
 	}
-	resp := connect.NewResponse(&logspb.DumpExamplesResponse{
-		NumExamples: int32(numExamples),
-		NumSessions: int32(len(sessions)),
-	})
-	return resp, nil
+	return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to paginate thrugh sessions"))
 }
 
 // protoToRow converts from the proto representation of a session to the database row representation.
@@ -313,10 +327,6 @@ func getExampleFromSession(s *logspb.Session) (*v1alpha1.EvalExample, error) {
 		return nil, nil
 	}
 
-	if len(executeEvent.Cells) != 1 {
-		return nil, errors.Errorf("Execute log event has %v cells; expected 1", len(executeEvent.Cells))
-	}
-
 	// Check that the selected cell in the full context matches the selected cell in the execute event.
 	// This as an attempt to catch data integrity / logging issues. LogEvents should include the SelectedIndex.
 	if s.GetFullContext().GetSelected() != executeEvent.SelectedIndex {
@@ -333,9 +343,19 @@ func getExampleFromSession(s *logspb.Session) (*v1alpha1.EvalExample, error) {
 	// Set the selected cell to the last one in the notebook.
 	newContext.Selected = int32(len(newContext.Notebook.Cells) - 1)
 
+	// We need to get the actual cell that was executed from the execute event because the context won't be up todate.
+	// The executedCell should be the last one in the event. Some additional context might be sent
+	executedCell := executeEvent.Cells[len(executeEvent.Cells)-1]
+	expectedCells := []*parserv1.Cell{executedCell}
+
+	// Ensure data integrity by checking the
+	if converters.GetCellID(executedCell) != executeEvent.SelectedId {
+		return nil, errors.Errorf("The execute event is for cell id %s; but the last cell in the event has cell id %s", executeEvent.SelectedId, converters.GetCellID(executedCell))
+	}
+
 	example := &v1alpha1.EvalExample{
 		Id:            s.ContextId,
-		ExpectedCells: executeEvent.Cells,
+		ExpectedCells: expectedCells,
 		FullContext:   newContext,
 	}
 
