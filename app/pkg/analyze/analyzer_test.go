@@ -166,6 +166,22 @@ func Test_BuildBlockLog(t *testing.T) {
 	}
 }
 
+type fakeNotifier struct {
+	counts map[string]int
+}
+
+func (f *fakeNotifier) PostBlockEvent(blockID string) error {
+	if f.counts == nil {
+		f.counts = make(map[string]int)
+	}
+	if _, ok := f.counts[blockID]; !ok {
+		f.counts[blockID] = 0
+
+	}
+	f.counts[blockID] += 1
+	return nil
+}
+
 func Test_Analyzer(t *testing.T) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -255,7 +271,8 @@ func Test_Analyzer(t *testing.T) {
 	a.signalFileDone = fileProcessed
 	a.signalBlockDone = blockProccessed
 
-	if err := a.Run(context.Background(), []string{rawDir}, nil); err != nil {
+	fakeNotifier := &fakeNotifier{}
+	if err := a.Run(context.Background(), []string{rawDir}, fakeNotifier.PostBlockEvent); err != nil {
 		t.Fatalf("Analyze failed: %v", err)
 	}
 
@@ -280,12 +297,13 @@ func Test_Analyzer(t *testing.T) {
 	}
 
 	// Signal should be triggered  once for the blocklog.
-	waitForBlock(t, "23706965-8e3b-440d-ba1a-1e1cc035fbd4", 1, blockProccessed)
+	expectedBlockID := "23706965-8e3b-440d-ba1a-1e1cc035fbd4"
+	waitForBlock(t, expectedBlockID, 1, blockProccessed)
 
 	// This is a block that was generated via the AI and then executed so run some additional checks
 	block := &logspb.BlockLog{}
-	if err := dbutil.GetProto(blocksDB, "23706965-8e3b-440d-ba1a-1e1cc035fbd4", block); err != nil {
-		t.Fatalf("Failed to find block with ID: 23706965-8e3b-440d-ba1a-1e1cc035fbd4; error %+v", err)
+	if err := dbutil.GetProto(blocksDB, expectedBlockID, block); err != nil {
+		t.Fatalf("Failed to find block with ID: %s; error %+v", expectedBlockID, err)
 	}
 	if block.GenTraceId == "" {
 		t.Errorf("Expected GenTraceID to be set")
@@ -299,6 +317,11 @@ func Test_Analyzer(t *testing.T) {
 	}
 	if block.ExecutedBlock == nil {
 		t.Errorf("Expected ExecutedBlock to be set")
+	}
+
+	// Check the block notifier was called twice; once after the generated block and once after the executed block
+	if fakeNotifier.counts[expectedBlockID] != 2 {
+		t.Errorf("Expected block notifier to be called twice but got %d", fakeNotifier.counts[expectedBlockID])
 	}
 
 	// Now append some logs to the logFile and see that they get processed
