@@ -11,7 +11,7 @@ import (
 )
 
 const getSession = `-- name: GetSession :one
-SELECT contextid, starttime, endtime, proto FROM sessions
+SELECT contextid, starttime, endtime, selectedid, selectedkind, proto FROM sessions
 WHERE contextID = ?
 `
 
@@ -22,13 +22,15 @@ func (q *Queries) GetSession(ctx context.Context, contextid string) (Session, er
 		&i.Contextid,
 		&i.Starttime,
 		&i.Endtime,
+		&i.Selectedid,
+		&i.Selectedkind,
 		&i.Proto,
 	)
 	return i, err
 }
 
 const listSessions = `-- name: ListSessions :many
-SELECT contextid, starttime, endtime, proto FROM sessions
+SELECT contextid, starttime, endtime, selectedid, selectedkind, proto FROM sessions
 ORDER BY startTime desc limit 25
 `
 
@@ -45,6 +47,8 @@ func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 			&i.Contextid,
 			&i.Starttime,
 			&i.Endtime,
+			&i.Selectedid,
+			&i.Selectedkind,
 			&i.Proto,
 		); err != nil {
 			return nil, err
@@ -62,16 +66,18 @@ func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 
 const updateSession = `-- name: UpdateSession :exec
 INSERT OR REPLACE INTO sessions 
-(contextID, startTime, endTime, proto)
+(contextID, startTime, endTime, selectedId, selectedKind, proto)
 VALUES 
-(?, ?, ?, ?)
+(?, ?, ?, ?, ?, ?)
 `
 
 type UpdateSessionParams struct {
-	Contextid string
-	Starttime time.Time
-	Endtime   time.Time
-	Proto     []byte
+	Contextid    string
+	Starttime    time.Time
+	Endtime      time.Time
+	Selectedid   string
+	Selectedkind string
+	Proto        []byte
 }
 
 func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) error {
@@ -79,6 +85,8 @@ func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) er
 		arg.Contextid,
 		arg.Starttime,
 		arg.Endtime,
+		arg.Selectedid,
+		arg.Selectedkind,
 		arg.Proto,
 	)
 	return err

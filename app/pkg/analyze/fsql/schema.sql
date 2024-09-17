@@ -5,5 +5,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- protobufs can't have null timestamps so no point allowing nulls
     startTime TIMESTAMP NOT NULL,
     endTime TIMESTAMP NOT NULL,
+    -- The selectedId is the id of the cell that is selected in the session.
+    selectedID VARCHAR(255) NOT NULL,
+    -- SelectedKind is the kind of the selected cell; i.e. Markdown or Code.
+    selectedKind VARCHAR(255) NOT NULL,
     proto BLOB
 );

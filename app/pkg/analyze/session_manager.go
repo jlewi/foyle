@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/jlewi/foyle/app/pkg/logs"
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"os"
 	"path/filepath"
@@ -122,10 +123,12 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	}
 
 	update := fsql.UpdateSessionParams{
-		Contextid: contextID,
-		Proto:     newRow.Proto,
-		Starttime: newRow.Starttime,
-		Endtime:   newRow.Endtime,
+		Contextid:    contextID,
+		Proto:        newRow.Proto,
+		Starttime:    newRow.Starttime,
+		Endtime:      newRow.Endtime,
+		Selectedid:   newRow.Selectedid,
+		Selectedkind: newRow.Selectedkind,
 	}
 
 	if err := queries.UpdateSession(ctx, update); err != nil {
@@ -250,17 +253,34 @@ func (m *SessionsManager) DumpExamples(ctx context.Context, request *connect.Req
 
 // protoToRow converts from the proto representation of a session to the database row representation.
 func protoToRow(session *logspb.Session) (*fsql.Session, error) {
+	log := logs.NewLogger()
 	protoBytes, err := proto.Marshal(session)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to serialize session")
 	}
 
+	selectedId := ""
+	selectedKind := ""
+	if session.GetFullContext().GetNotebook() != nil {
+		cells := session.GetFullContext().GetNotebook().GetCells()
+		if session.GetFullContext().GetSelected() >= int32(len(cells)) {
+			log.Error(errors.New("Selected cell index is out of bounds"), "Selected cell index is out of bounds", "contextId", session.GetContextId(), "selected", session.GetFullContext().GetSelected(), "numCells", len(cells))
+		} else {
+			cell := cells[session.GetFullContext().GetSelected()]
+			selectedId = converters.GetCellID(cell)
+			selectedKind = cell.Kind.String()
+		}
+
+	}
+
 	// TODO: How do we deal with the end/starttime? In sqlc should we specify the type as timestamp?
 	return &fsql.Session{
-		Contextid: session.ContextId,
-		Starttime: session.StartTime.AsTime(),
-		Endtime:   session.EndTime.AsTime(),
-		Proto:     protoBytes,
+		Contextid:    session.ContextId,
+		Starttime:    session.StartTime.AsTime(),
+		Endtime:      session.EndTime.AsTime(),
+		Proto:        protoBytes,
+		Selectedid:   selectedId,
+		Selectedkind: selectedKind,
 	}, nil
 }
 

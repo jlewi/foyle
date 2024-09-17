@@ -3,6 +3,7 @@ package analyze
 import (
 	"context"
 	"database/sql"
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
 	"testing"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jlewi/foyle/app/api"
 	config "github.com/jlewi/foyle/app/pkg/config"
-	"github.com/jlewi/foyle/app/pkg/fnames"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
@@ -81,7 +81,7 @@ func Test_ProcessLogEvent(t *testing.T) {
 
 	// Create a log entry for the LogEvent
 	entry := &api.LogEntry{
-		"function":  fnames.LogEvents,
+		"function":  matchers.LogEvents,
 		"message":   "LogEvent",
 		"eventId":   event.GetEventId(),
 		"contextId": event.GetContextId(),
@@ -136,7 +136,7 @@ func Test_ProcessStreamGeneerate(t *testing.T) {
 	}
 	// Create a log entry for the LogEvent
 	entry := &api.LogEntry{
-		"function":  fnames.StreamGenerate,
+		"function":  matchers.StreamGenerate,
 		"context":   logs.ZapProto("context", fullContext).Interface,
 		"contextId": contextId,
 	}

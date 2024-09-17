@@ -4,7 +4,10 @@ import (
 	"connectrpc.com/connect"
 	"context"
 	"database/sql"
+	"github.com/jlewi/foyle/app/pkg/analyze/fsql"
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+	"google.golang.org/protobuf/proto"
 	"path/filepath"
 	"testing"
 	"time"
@@ -81,6 +84,9 @@ var (
 					{
 						Kind:  parserv1.CellKind_CELL_KIND_CODE,
 						Value: "This should not be the answer",
+						Metadata: map[string]string{
+							converters.RunmeIdField: "0123345-id",
+						},
 					},
 					{
 						Kind:  parserv1.CellKind_CELL_KIND_MARKUP,
@@ -189,4 +195,45 @@ func Test_DumpExamples(t *testing.T) {
 		t.Fatalf("Expected 1 example but got %v", resp.Msg.GetNumExamples())
 	}
 	t.Logf("Dumped examples to: %v", request.GetOutput())
+}
+
+func Test_protoToRow(t *testing.T) {
+
+	type testCase struct {
+		name     string
+		session  *logspb.Session
+		expected *fsql.Session
+	}
+
+	sess1Bytes, err := proto.Marshal(session1)
+	if err != nil {
+		t.Fatalf("Error marshalling session1: %v", err)
+	}
+	cases := []testCase{
+		{
+			name:    "Basic",
+			session: session1,
+			expected: &fsql.Session{
+				Contextid:    "1",
+				Starttime:    session1.GetStartTime().AsTime(),
+				Endtime:      session1.GetEndTime().AsTime(),
+				Selectedid:   "0123345-id",
+				Selectedkind: "CELL_KIND_CODE",
+				Proto:        sess1Bytes,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual, err := protoToRow(c.session)
+			if err != nil {
+				t.Fatalf("Error converting session to row: %v", err)
+			}
+			comparer := cmpopts.IgnoreUnexported(fsql.Session{}, time.Time{})
+			if d := cmp.Diff(actual, c.expected, comparer); d != "" {
+				t.Fatalf("Unexpected diff between expected and actual session:\n%v", d)
+			}
+		})
+	}
 }
