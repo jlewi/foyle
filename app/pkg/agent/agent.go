@@ -380,6 +380,12 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 				return
 			}
 
+			// If we don't want to trigger we continue waiting for the next request but we don't abort
+			// That's because the client will just try to reconnect right now if the stream is aborted.
+			if !shouldTrigger(doc, selectedCell) {
+				continue
+			}
+
 			log.Info("Received request", zap.Object("request", req))
 			// Serialize the doc and make it available for processing
 			func() {
@@ -576,4 +582,16 @@ func (s *streamState) getContextID() string {
 	s.contextLock.RLock()
 	defer s.contextLock.RUnlock()
 	return s.contextID
+}
+
+// shouldTrigger returns true if the agent should trigger a completion for the current document.
+func shouldTrigger(doc *v1alpha1.Doc, selectedIndex int32) bool {
+	// We should trigger if the last cell is a code cell
+	if len(doc.Blocks) == 0 {
+		return false
+	}
+	// N.B. This is a bit of a hack to reduce costs because we are using so many tokens.
+	// For now only trigger completion if the selected cell is a markup cell.
+	selectedCell := doc.Blocks[selectedIndex]
+	return selectedCell.GetKind() == v1alpha1.BlockKind_MARKUP
 }
