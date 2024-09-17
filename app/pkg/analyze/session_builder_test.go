@@ -3,9 +3,10 @@ package analyze
 import (
 	"context"
 	"database/sql"
-	"github.com/jlewi/foyle/app/pkg/logs/matchers"
 	"testing"
 	"time"
+
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

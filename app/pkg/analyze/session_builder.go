@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"context"
+
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/logs/matchers"

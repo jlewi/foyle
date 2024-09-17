@@ -1,16 +1,17 @@
 package analyze
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"database/sql"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/analyze/fsql"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"google.golang.org/protobuf/proto"
-	"path/filepath"
-	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -175,13 +176,18 @@ func Test_DumpExamples(t *testing.T) {
 	}
 	manager, err := NewSessionsManager(db)
 
+	if err != nil {
+		t.Fatalf("Error creating SessionsManager: %v", err)
+	}
 	// Write some sessions to the database
-	manager.Update(context.Background(), session1.ContextId, func(s *logspb.Session) error {
+	if err := manager.Update(context.Background(), session1.ContextId, func(s *logspb.Session) error {
 		s.FullContext = session1.FullContext
 		s.LogEvents = session1.LogEvents
 		s.ContextId = session1.ContextId
 		return nil
-	})
+	}); err != nil {
+		t.Fatalf("Error writing sessions to the DB: %v", err)
+	}
 
 	request := &logspb.DumpExamplesRequest{
 		Output: filepath.Join(dir.Name, "examples"),

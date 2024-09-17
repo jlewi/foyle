@@ -1,17 +1,18 @@
 package analyze
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"os"
+	"path/filepath"
+
+	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	"os"
-	"path/filepath"
 
 	"github.com/jlewi/foyle/app/pkg/analyze/fsql"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
@@ -77,9 +78,11 @@ func (db *SessionsManager) Get(ctx context.Context, contextID string) (*logspb.S
 // inserted if the updateFunc returns nil. If the session already exists then the session is passed to updateFunc
 // and the updated value is then written to the database
 func (db *SessionsManager) Update(ctx context.Context, contextID string, updateFunc SessionUpdater) error {
+	log := logs.FromContext(ctx)
 	if contextID == "" {
 		return errors.WithStack(errors.New("contextID must be non-empty"))
 	}
+	log = log.WithValues("contextId", contextID)
 
 	tx, err := db.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
@@ -96,30 +99,40 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	}
 	if err != nil {
 		if err != sql.ErrNoRows {
-			tx.Rollback()
+			if txErr := tx.Rollback(); txErr != nil {
+				log.Error(txErr, "Failed to rollback transaction")
+			}
 			return errors.Wrapf(err, "Failed to get session with id %v", contextID)
 		}
 	} else {
 		// Deserialize the proto
 		if err := proto.Unmarshal(sessRow.Proto, session); err != nil {
-			tx.Rollback()
+			if txErr := tx.Rollback(); txErr != nil {
+				log.Error(txErr, "Failed to rollback transaction")
+			}
 			return errors.Wrapf(err, "Failed to deserialize session")
 		}
 	}
 
 	if err := updateFunc(session); err != nil {
-		tx.Rollback()
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Error(txErr, "Failed to rollback transaction")
+		}
 		return errors.Wrapf(err, "Failed to update session")
 	}
 
 	newRow, err := protoToRow(session)
 	if err != nil {
-		tx.Rollback()
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Error(txErr, "Failed to rollback transaction")
+		}
 		return errors.Wrapf(err, "Failed to convert session proto to table row")
 	}
 
 	if newRow.Contextid != contextID {
-		tx.Rollback()
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Error(txErr, "Failed to rollback transaction")
+		}
 		return errors.WithStack(errors.Errorf("contextID in session doesn't match contextID. Update was called with contextID: %v but session has contextID: %v", contextID, newRow.Contextid))
 	}
 
@@ -133,7 +146,9 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	}
 
 	if err := queries.UpdateSession(ctx, update); err != nil {
-		tx.Rollback()
+		if txErr := tx.Rollback(); txErr != nil {
+			log.Error(txErr, "Failed to rollback transaction")
+		}
 		return errors.Wrapf(err, "Failed to update session")
 	}
 
@@ -262,7 +277,6 @@ func (m *SessionsManager) DumpExamples(ctx context.Context, request *connect.Req
 		// Update params
 		params.Cursor = sessions[len(sessions)-1].Contextid
 	}
-	return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to paginate thrugh sessions"))
 }
 
 // protoToRow converts from the proto representation of a session to the database row representation.
