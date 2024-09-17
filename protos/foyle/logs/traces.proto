@@ -16,8 +16,8 @@ option go_package = "github.com/jlewi/foyle/protos/go/foyle/logs;logspb";
 
 message Trace {
   string id = 1;
-  google.protobuf.Timestamp  start_time = 2;
   google.protobuf.Timestamp    end_time = 3;
+  google.protobuf.Timestamp  start_time = 2;
 
   // TODO(jeremy): Should these really be spans?
   oneof data {

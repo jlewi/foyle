@@ -330,7 +330,9 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					if req.GetFullContext() == nil {
 						return status.Errorf(codes.InvalidArgument, "First request must have a full context")
 					}
-					log.Info("Received full context", "context", req.GetFullContext())
+					// n.b. we need to use ZapProto because GetFullContext contains RunMe protos that don't have
+					// zap marshler interface defined.
+					log.Info("Received full context", "contextId", req.GetContextId(), logs.ZapProto("context", req.GetFullContext()))
 					if req.GetFullContext().GetNotebookUri() == "" {
 						return status.Errorf(codes.InvalidArgument, "First request must have a notebookUri")
 					}

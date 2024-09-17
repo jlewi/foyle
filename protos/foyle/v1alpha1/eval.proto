@@ -1,7 +1,9 @@
 syntax = "proto3";
 
+import "foyle/v1alpha1/agent.proto";
 import "foyle/v1alpha1/doc.proto";
 import "foyle/v1alpha1/trainer.proto";
+import "runme/parser/v1/parser.proto";
 
 import "google/protobuf/struct.proto";
 
@@ -90,6 +92,16 @@ message AssertionTableRequest {
   string database = 1;
 }
 
+// EvalExample is a datapoint for evaluation
+message EvalExample {
+  string id = 1;
+  // FullContext is the context used as input
+  FullContext full_context = 2;
+
+  // Expected cells is the expected value for generation
+  repeated runme.parser.v1.Cell expected_cells = 3;
+}
+
 message AssertionTableResponse {
   repeated AssertionRow rows = 1;
 }
@@ -98,3 +110,4 @@ service EvalService {
   rpc List(EvalResultListRequest) returns (EvalResultListResponse) {}
   rpc AssertionTable(AssertionTableRequest) returns (AssertionTableResponse) {}
 }
+

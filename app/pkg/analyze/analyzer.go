@@ -78,10 +78,12 @@ type Analyzer struct {
 	// Only used during testing to allow the test to tell when the log file processing is done.
 	signalFileDone  chan<- string
 	signalBlockDone chan<- string
+
+	sessBuilder *sessionBuilder
 }
 
 // NewAnalyzer creates a new Analyzer.
-func NewAnalyzer(logOffsetsFile string, rawLogsDB *dbutil.LockingDB[*logspb.LogEntries], tracesDB *pebble.DB, blocksDB *dbutil.LockingDB[*logspb.BlockLog]) (*Analyzer, error) {
+func NewAnalyzer(logOffsetsFile string, rawLogsDB *dbutil.LockingDB[*logspb.LogEntries], tracesDB *pebble.DB, blocksDB *dbutil.LockingDB[*logspb.BlockLog], sessions *SessionsManager) (*Analyzer, error) {
 	logOffsets, err := initOffsets(logOffsetsFile)
 	if err != nil {
 		return nil, err
@@ -97,6 +99,11 @@ func NewAnalyzer(logOffsetsFile string, rawLogsDB *dbutil.LockingDB[*logspb.LogE
 	// forget so we will basically max out the retry limit at the max delay.
 	fileQueue := workqueue.NewRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 30*time.Second))
 
+	sessBuilder, err := NewSessionBuilder(sessions)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to create session builder")
+	}
+
 	return &Analyzer{
 		logOffsetsFile: logOffsetsFile,
 		rawLogsDB:      rawLogsDB,
@@ -105,6 +112,7 @@ func NewAnalyzer(logOffsetsFile string, rawLogsDB *dbutil.LockingDB[*logspb.LogE
 		queue:          fileQueue,
 		blockQueue:     workqueue.NewDelayingQueue(),
 		logFileOffsets: logOffsets,
+		sessBuilder:    sessBuilder,
 	}, nil
 }
 
@@ -258,6 +266,9 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 				log.Error(err, "Error decoding log entry", "path", path, "line", line)
 				continue
 			}
+
+			// Add the entry to a session if it should be.
+			a.sessBuilder.processLogEntry(entry)
 
 			if matchers.IsLogEvent(entry.Function()) {
 				a.processLogEvent(ctx, entry)

@@ -58,11 +58,12 @@ type Server struct {
 	agent            *agent.Agent
 	executor         *executor.Executor
 	logsCrud         *analyze.CrudHandler
+	sessManager      *analyze.SessionsManager
 	shutdownComplete chan bool
 }
 
 // NewServer creates a new server
-func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent, tracesDB *pebble.DB, analyzer *analyze.Analyzer) (*Server, error) {
+func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent, tracesDB *pebble.DB, analyzer *analyze.Analyzer, sessManager *analyze.SessionsManager) (*Server, error) {
 	e, err := executor.NewExecutor(config)
 	if err != nil {
 		return nil, err
@@ -77,10 +78,11 @@ func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent, tr
 		return nil, err
 	}
 	s := &Server{
-		config:   config,
-		executor: e,
-		agent:    agent,
-		logsCrud: logsCrud,
+		config:      config,
+		executor:    e,
+		agent:       agent,
+		logsCrud:    logsCrud,
+		sessManager: sessManager,
 	}
 
 	if err := s.createGinEngine(); err != nil {
@@ -146,6 +148,10 @@ func (s *Server) createGinEngine() error {
 	logsSvcPath, logsSvcHandler := logspbconnect.NewLogsServiceHandler(s.logsCrud, connect.WithInterceptors(otelInterceptor))
 	log.Info("Setting up logs service", "path", apiPrefix+"/"+logsSvcPath)
 	router.Any(apiPrefix+"/"+logsSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, logsSvcHandler)))
+
+	sessSvcPath, sessSvcHandler := logspbconnect.NewSessionsServiceHandler(s.sessManager, connect.WithInterceptors(otelInterceptor))
+	log.Info("Setting up sessions service", "path", apiPrefix+"/"+sessSvcPath)
+	router.Any(apiPrefix+"/"+sessSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, sessSvcHandler)))
 
 	cSvc, err := docs.NewConvertersService()
 	if err != nil {

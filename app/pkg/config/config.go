@@ -239,6 +239,10 @@ func (c *Config) GetTracesDBDir() string {
 	return filepath.Join(c.GetLogDir(), "traces")
 }
 
+func (c *Config) GetSessionsDB() string {
+	return filepath.Join(c.GetLogDir(), "sessions.sqllite3")
+}
+
 func (c *Config) GetTrainingDirs() []string {
 	if c.Learner == nil {
 		return []string{}
@@ -471,4 +475,20 @@ func setAgentDefaults() {
 
 func DefaultConfigFile() string {
 	return binHome() + "/config.yaml"
+}
+
+// NewWithTempDir initializes an empty configuration in a temporary directory.
+// It is intended solely for use in tests where we want to use a temporary directory.
+func NewWithTempDir() (*Config, error) {
+	dir, err := os.MkdirTemp("", "foyleConfig")
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create temporary directory")
+	}
+	return &Config{
+		APIVersion: "v1alpha1",
+		Kind:       "Config",
+		Logging: Logging{
+			LogDir: dir,
+		},
+	}, nil
 }

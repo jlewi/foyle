@@ -60,6 +60,12 @@ func Test_Matchers(t *testing.T) {
 			name:     "IsOAIComplete",
 			expected: true,
 		},
+		{
+			input:    (&agent.Agent{}).StreamGenerate,
+			Matcher:  IsStreamGenerate,
+			name:     "IsStreamGenerate",
+			expected: true,
+		},
 	}
 
 	for _, c := range cases {

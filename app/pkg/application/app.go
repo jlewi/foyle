@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -77,6 +78,9 @@ type App struct {
 	vectorizer         llms.Vectorizer
 	completer          llms.Completer
 	inMemoryExamplesDB *learn.InMemoryExampleDB
+
+	sessionsDB      *sql.DB
+	sessionsManager *analyze.SessionsManager
 }
 
 // NewApp creates a new application. You should call one more setup/Load functions to properly set it up.
@@ -376,7 +380,20 @@ func (a *App) SetupAnalyzer() (*analyze.Analyzer, error) {
 		return nil, errors.New("Config is nil; call LoadConfig first")
 	}
 
-	analyzer, err := analyze.NewAnalyzer(a.Config.GetLogOffsetsFile(), a.LockingLogEntriesDB, a.TracesDB, a.LockingBlocksDB)
+	db, err := sql.Open(analyze.SQLLiteDriver, a.Config.GetSessionsDB())
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to open database: %v", a.Config.GetSessionsDB())
+	}
+
+	manager, err := analyze.NewSessionsManager(db)
+	if err != nil {
+		return nil, err
+	}
+	a.sessionsManager = manager
+	a.sessionsDB = db
+
+	analyzer, err := analyze.NewAnalyzer(a.Config.GetLogOffsetsFile(), a.LockingLogEntriesDB, a.TracesDB, a.LockingBlocksDB, manager)
 	if err != nil {
 		return nil, err
 	}
@@ -501,7 +518,7 @@ func (a *App) Serve() error {
 		return err
 	}
 
-	s, err := server.NewServer(*a.Config, a.blocksDB, agent, a.TracesDB, a.analyzer)
+	s, err := server.NewServer(*a.Config, a.blocksDB, agent, a.TracesDB, a.analyzer, a.sessionsManager)
 
 	if err != nil {
 		return err
@@ -664,6 +681,13 @@ func (a *App) Shutdown() error {
 		log.Info("Closing blocks database")
 		if err := a.blocksDB.Close(); err != nil {
 			log.Error(err, "Error closing blocks database")
+		}
+	}
+
+	if a.sessionsDB != nil {
+		log.Info("Closing sessions database")
+		if err := a.sessionsDB.Close(); err != nil {
+			log.Error(err, "Error closing sessions database")
 		}
 	}
 

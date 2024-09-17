@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+import "foyle/v1alpha1/agent.proto";
+import "foyle/v1alpha1/trainer.proto";
+import "foyle/logs/blocks.proto";
+import "runme/runner/v1/runner.proto";
+import "google/protobuf/timestamp.proto";
+
+package foyle.logs;
+
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/logs;logspb";
+
+// Session is a series of events in the logs
+message Session {
+  // context_id is the unique id for the context
+  string context_id = 1;
+
+  google.protobuf.Timestamp    start_time = 2;
+  google.protobuf.Timestamp    end_time = 3;
+
+  // Log events associated with the session.
+  repeated LogEvent log_events = 4;
+
+  // FullContext is the full context of the session
+  FullContext full_context = 5;
+}
+
+service SessionsService {
+  // GetSession returns a session
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse) {}
+
+  // ListSessions returns a list of sessions
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {}
+
+  // DumpExamples from the sessions
+  rpc DumpExamples(DumpExamplesRequest) returns (DumpExamplesResponse) {}
+}
+
+message GetSessionRequest {
+  // The id of the session
+  string context_id = 1;
+}
+
+message GetSessionResponse {
+  // The session
+  Session session = 1;
+}
+
+message ListSessionsRequest {
+}
+
+message ListSessionsResponse {
+  // Sessions
+  repeated Session sessions = 1;
+}
+
+message DumpExamplesRequest {
+  // The directory where the examples will be stored
+  string output = 1;
+}
+
+message DumpExamplesResponse {
+  // The number of examples generated
+  int32 num_examples = 1;
+  // Number of sessions processed
+  int32 num_sessions = 2;
+}

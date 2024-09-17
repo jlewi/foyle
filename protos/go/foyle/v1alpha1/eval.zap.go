@@ -7,6 +7,7 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	_ "google.golang.org/protobuf/types/known/structpb"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 )
@@ -190,6 +191,42 @@ func (m *AssertionTableRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.Obj
 
 	keyName = "database" // field database = 1
 	enc.AddString(keyName, m.Database)
+
+	return nil
+}
+
+func (m *EvalExample) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "id" // field id = 1
+	enc.AddString(keyName, m.Id)
+
+	keyName = "full_context" // field full_context = 2
+	if m.FullContext != nil {
+		var vv interface{} = m.FullContext
+		if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+			enc.AddObject(keyName, marshaler)
+		}
+	}
+
+	keyName = "expected_cells" // field expected_cells = 3
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.ExpectedCells {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
 
 	return nil
 }
