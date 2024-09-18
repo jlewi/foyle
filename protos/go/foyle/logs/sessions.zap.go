@@ -7,9 +7,9 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
 	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
-	_ "google.golang.org/protobuf/types/known/timestamppb"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
@@ -61,6 +61,21 @@ func (m *Session) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) er
 			enc.AddObject(keyName, marshaler)
 		}
 	}
+
+	keyName = "total_input_tokens" // field total_input_tokens = 6
+	enc.AddInt32(keyName, m.TotalInputTokens)
+
+	keyName = "total_output_tokens" // field total_output_tokens = 7
+	enc.AddInt32(keyName, m.TotalOutputTokens)
+
+	keyName = "generate_trace_ids" // field generate_trace_ids = 8
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.GenerateTraceIds {
+			_ = rv
+			aenc.AppendString(rv)
+		}
+		return nil
+	}))
 
 	return nil
 }

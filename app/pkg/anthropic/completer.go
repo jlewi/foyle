@@ -89,6 +89,13 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 	)
 
 	log.Info("Anthropic:CreateMessages response", "resp", resp)
+	usage := api.LLMUsage{
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
+		Model:        c.config.GetModel(),
+		Provider:     string(api.ModelProviderAnthropic),
+	}
+	logs.LogLLMUsage(ctx, usage)
 
 	blocks, err := c.parseResponse(ctx, &resp)
 	if err != nil {

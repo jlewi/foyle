@@ -18,6 +18,6 @@ WHERE contextID = ?;
 
 -- name: UpdateSession :exec
 INSERT OR REPLACE INTO sessions 
-(contextID, startTime, endTime, selectedId, selectedKind, proto)
+(contextID, startTime, endTime, selectedId, selectedKind, total_input_tokens, total_output_tokens, proto)
 VALUES 
-(?, ?, ?, ?, ?, ?);
+(?, ?, ?, ?, ?, ?, ?, ?);

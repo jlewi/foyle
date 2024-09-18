@@ -23,6 +23,14 @@ message Session {
 
   // FullContext is the full context of the session
   FullContext full_context = 5;
+
+  // Total number of input and output tokens for this session.
+  // This will be aggregated across all the completion events
+  int32 total_input_tokens = 6;
+  int32 total_output_tokens = 7;
+
+  // GenerateTraceIds is a list of the trace ids corresponding to completion requests for this session
+  repeated string generate_trace_ids = 8;
 }
 
 service SessionsService {

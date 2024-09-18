@@ -137,12 +137,13 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	}
 
 	update := fsql.UpdateSessionParams{
-		Contextid:    contextID,
-		Proto:        newRow.Proto,
-		Starttime:    newRow.Starttime,
-		Endtime:      newRow.Endtime,
-		Selectedid:   newRow.Selectedid,
-		Selectedkind: newRow.Selectedkind,
+		Contextid:        contextID,
+		Proto:            newRow.Proto,
+		Starttime:        newRow.Starttime,
+		Endtime:          newRow.Endtime,
+		Selectedid:       newRow.Selectedid,
+		Selectedkind:     newRow.Selectedkind,
+		TotalInputTokens: newRow.TotalInputTokens,
 	}
 
 	if err := queries.UpdateSession(ctx, update); err != nil {
@@ -298,17 +299,18 @@ func protoToRow(session *logspb.Session) (*fsql.Session, error) {
 			selectedId = converters.GetCellID(cell)
 			selectedKind = cell.Kind.String()
 		}
-
 	}
 
 	// TODO: How do we deal with the end/starttime? In sqlc should we specify the type as timestamp?
 	return &fsql.Session{
-		Contextid:    session.ContextId,
-		Starttime:    session.StartTime.AsTime(),
-		Endtime:      session.EndTime.AsTime(),
-		Proto:        protoBytes,
-		Selectedid:   selectedId,
-		Selectedkind: selectedKind,
+		Contextid:         session.ContextId,
+		Starttime:         session.StartTime.AsTime(),
+		Endtime:           session.EndTime.AsTime(),
+		Proto:             protoBytes,
+		Selectedid:        selectedId,
+		Selectedkind:      selectedKind,
+		TotalInputTokens:  int64(session.TotalInputTokens),
+		TotalOutputTokens: int64(session.TotalOutputTokens),
 	}, nil
 }
 

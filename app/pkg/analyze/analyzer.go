@@ -678,7 +678,7 @@ func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 func buildBlockLog(ctx context.Context, block *logspb.BlockLog, tracesDB *pebble.DB) error {
 	log := logs.FromContext(ctx)
 	log = log.WithValues("blockId", block.Id)
-	log.Info("Building block log", "block", block)
+	log.Info("Building block log")
 
 	if block.Id == "" {
 		return errors.WithStack(errors.New("Block ID is required"))

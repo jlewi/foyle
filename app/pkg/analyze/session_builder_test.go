@@ -3,6 +3,7 @@ package analyze
 import (
 	"context"
 	"database/sql"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"testing"
 	"time"
 
@@ -113,7 +114,7 @@ func Test_ProcessLogEvent(t *testing.T) {
 	}
 }
 
-func Test_ProcessStreamGeneerate(t *testing.T) {
+func Test_ProcessStreamGenerate(t *testing.T) {
 	tuple, err := setup()
 	if err != nil {
 		t.Fatalf("Setup failed: %+v", err)
@@ -154,5 +155,58 @@ func Test_ProcessStreamGeneerate(t *testing.T) {
 
 	if d := cmp.Diff(fullContext, s.GetFullContext(), opts); d != "" {
 		t.Errorf("Unexpected diff in full context:\n%v", d)
+	}
+}
+
+func Test_processLLMUsage(t *testing.T) {
+	type testCase struct {
+		name     string
+		usage    *api.LLMUsage
+		session  *logspb.Session
+		expected *logspb.Session
+	}
+
+	cases := []testCase{
+		{
+			name: "empty",
+			usage: &api.LLMUsage{
+				InputTokens:  10,
+				OutputTokens: 20,
+			},
+			session: &logspb.Session{},
+			expected: &logspb.Session{
+				TotalInputTokens:  10,
+				TotalOutputTokens: 20,
+			},
+		},
+		{
+			name: "sum",
+			usage: &api.LLMUsage{
+				InputTokens:  10,
+				OutputTokens: 20,
+			},
+			session: &logspb.Session{
+				TotalInputTokens:  10,
+				TotalOutputTokens: 20,
+			},
+			expected: &logspb.Session{
+				TotalInputTokens:  20,
+				TotalOutputTokens: 40,
+			},
+		},
+	}
+
+	opts := cmpopts.IgnoreUnexported(logspb.Session{})
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if err := updateSessionFromUsage(*c.usage, c.session); err != nil {
+				t.Fatalf("Failed to update session: %v", err)
+			}
+
+			if d := cmp.Diff(c.expected, c.session, opts); d != "" {
+				t.Errorf("Unexpected diff in session:\n%v", d)
+			}
+		})
 	}
 }

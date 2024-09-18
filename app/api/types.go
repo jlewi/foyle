@@ -90,6 +90,33 @@ func (L *LogEntry) GetProto(field string, msg proto.Message) bool {
 	return true
 }
 
+// GetStruct gets the field as the specified GoStruct.
+// Returns false if the field was not present or the field was not the supplied proto message.
+func (L *LogEntry) GetStruct(field string, s interface{}) bool {
+	v, ok := (*L)[field]
+	if !ok {
+		return false
+	}
+	obj, ok := v.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	b, err := json.Marshal(obj)
+	if err != nil {
+		log := zapr.NewLogger(zap.L())
+		log.Error(err, "Failed to marshal request")
+		return false
+	}
+
+	if err := json.Unmarshal(b, s); err != nil {
+		log := zapr.NewLogger(zap.L())
+		log.Error(err, "Failed to unmarshal request")
+		return false
+	}
+
+	return true
+}
+
 func (L *LogEntry) Request() []byte {
 	// Different field names can be quest for the request.
 	// Foyle uses "request" and RunMe uses "req"
