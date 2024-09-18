@@ -67,6 +67,9 @@ type Config struct {
 
 	Replicate *ReplicateConfig `json:"replicate,omitempty" yaml:"replicate,omitempty"`
 	Anthropic *AnthropicConfig `json:"anthropic,omitempty" yaml:"anthropic,omitempty"`
+
+	// TODO(jeremy): We should make the ConfigFile a private field to make it easier to overload e.g. in testing.
+	// GetConfig should set it to viper. Then in getters like GetExampleDirs we don't need to reference viper.
 }
 
 type LearnerConfig struct {
@@ -244,11 +247,11 @@ func (c *Config) GetSessionsDB() string {
 }
 
 func (c *Config) GetTrainingDirs() []string {
-	if c.Learner == nil {
-		return []string{}
+	dirs := make([]string, 0)
+	if c.Learner != nil {
+		dirs = append(dirs, c.Learner.ExampleDirs...)
 	}
 
-	dirs := c.Learner.ExampleDirs
 	// If dirs isn't set default to a local training directory
 	if len(dirs) == 0 {
 		dirs = []string{filepath.Join(c.GetConfigDir(), "training")}

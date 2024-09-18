@@ -178,6 +178,12 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 
 	log.Info("Found new training example", "blockId", b.GetId())
 
+	if len(expectedFiles) == 0 {
+		cellsProcessed.WithLabelValues("noExampleFiles").Inc()
+		log.Error(err, "No training files found", "id", b.GetId())
+		return errors.Wrapf(err, "No training files found for example %s", b.GetId())
+	}
+
 	// TODO(jeremy): Should we take into account execution status when looking for mistakes?
 
 	// Deep copy the original message
