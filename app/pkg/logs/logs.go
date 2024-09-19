@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/jlewi/foyle/app/api"
+
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -59,4 +61,12 @@ func ZapProto(key string, pb proto.Message) zap.Field {
 	}
 
 	return zap.Any(key, reqObj)
+}
+
+// LogLLMUsage logs the usage of the LLM model
+// The purpose of this utility function is to create a standard log message independent of the model being used.
+// This simplifies post-processing
+func LogLLMUsage(ctx context.Context, usage api.LLMUsage) {
+	log := FromContext(ctx)
+	log.Info("LLM usage", "usage", usage)
 }

@@ -9,10 +9,13 @@ import (
 )
 
 type Session struct {
-	Contextid    string
-	Starttime    time.Time
-	Endtime      time.Time
-	Selectedid   string
-	Selectedkind string
-	Proto        []byte
+	Contextid         string
+	Starttime         time.Time
+	Endtime           time.Time
+	Selectedid        string
+	Selectedkind      string
+	TotalInputTokens  int64
+	TotalOutputTokens int64
+	NumGenerateTraces int64
+	Proto             []byte
 }

@@ -23,6 +23,14 @@ func IsLogEvent(fname string) bool {
 	return strings.HasPrefix(fname, LogEvents)
 }
 
+func IsLLMUsage(fname string) bool {
+	return strings.HasPrefix(fname, "github.com/jlewi/foyle/app/pkg/logs.LogLLMUsage")
+}
+
+func IsGenerate(fname string) bool {
+	return strings.HasPrefix(fname, "github.com/jlewi/foyle/app/pkg/agent.(*Agent).Generate")
+}
+
 func IsStreamGenerate(fname string) bool {
 	return strings.HasPrefix(fname, StreamGenerate)
 }

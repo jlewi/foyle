@@ -215,6 +215,15 @@ func Test_protoToRow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling session1: %v", err)
 	}
+
+	// Test all fields other than full notebook
+	sess2 := &logspb.Session{
+		ContextId:         "2",
+		TotalOutputTokens: 10,
+		TotalInputTokens:  11,
+		GenerateTraceIds:  []string{"1", "2"},
+	}
+
 	cases := []testCase{
 		{
 			name:    "Basic",
@@ -228,6 +237,18 @@ func Test_protoToRow(t *testing.T) {
 				Proto:        sess1Bytes,
 			},
 		},
+		{
+			name:    "tokens",
+			session: sess2,
+			expected: &fsql.Session{
+				Contextid:         "2",
+				Starttime:         sess2.GetStartTime().AsTime(),
+				Endtime:           sess2.GetEndTime().AsTime(),
+				TotalInputTokens:  11,
+				TotalOutputTokens: 10,
+				NumGenerateTraces: 2,
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -235,6 +256,14 @@ func Test_protoToRow(t *testing.T) {
 			actual, err := protoToRow(c.session)
 			if err != nil {
 				t.Fatalf("Error converting session to row: %v", err)
+			}
+			// Compute the expected serialized proto
+			if c.expected.Proto == nil {
+				b, err := proto.Marshal(c.session)
+				if err != nil {
+					t.Fatalf("Error marshalling session: %v", err)
+				}
+				c.expected.Proto = b
 			}
 			comparer := cmpopts.IgnoreUnexported(fsql.Session{}, time.Time{})
 			if d := cmp.Diff(actual, c.expected, comparer); d != "" {

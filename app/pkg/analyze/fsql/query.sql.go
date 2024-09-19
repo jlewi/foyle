@@ -11,7 +11,7 @@ import (
 )
 
 const getSession = `-- name: GetSession :one
-SELECT contextid, starttime, endtime, selectedid, selectedkind, proto FROM sessions
+SELECT contextid, starttime, endtime, selectedid, selectedkind, total_input_tokens, total_output_tokens, num_generate_traces, proto FROM sessions
 WHERE contextID = ?
 `
 
@@ -24,13 +24,16 @@ func (q *Queries) GetSession(ctx context.Context, contextid string) (Session, er
 		&i.Endtime,
 		&i.Selectedid,
 		&i.Selectedkind,
+		&i.TotalInputTokens,
+		&i.TotalOutputTokens,
+		&i.NumGenerateTraces,
 		&i.Proto,
 	)
 	return i, err
 }
 
 const listSessions = `-- name: ListSessions :many
-SELECT contextid, starttime, endtime, selectedid, selectedkind, proto FROM sessions
+SELECT contextid, starttime, endtime, selectedid, selectedkind, total_input_tokens, total_output_tokens, num_generate_traces, proto FROM sessions
 ORDER BY startTime desc limit 25
 `
 
@@ -51,6 +54,9 @@ func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 			&i.Endtime,
 			&i.Selectedid,
 			&i.Selectedkind,
+			&i.TotalInputTokens,
+			&i.TotalOutputTokens,
+			&i.NumGenerateTraces,
 			&i.Proto,
 		); err != nil {
 			return nil, err
@@ -67,7 +73,7 @@ func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 }
 
 const listSessionsForExamples = `-- name: ListSessionsForExamples :many
-SELECT contextid, starttime, endtime, selectedid, selectedkind, proto FROM sessions
+SELECT contextid, starttime, endtime, selectedid, selectedkind, total_input_tokens, total_output_tokens, num_generate_traces, proto FROM sessions
 WHERE (?1 = '' OR contextId < ?1) and selectedKind = 'CELL_KIND_CODE'
 ORDER BY contextId DESC
     LIMIT ?2
@@ -95,6 +101,9 @@ func (q *Queries) ListSessionsForExamples(ctx context.Context, arg ListSessionsF
 			&i.Endtime,
 			&i.Selectedid,
 			&i.Selectedkind,
+			&i.TotalInputTokens,
+			&i.TotalOutputTokens,
+			&i.NumGenerateTraces,
 			&i.Proto,
 		); err != nil {
 			return nil, err
@@ -112,18 +121,21 @@ func (q *Queries) ListSessionsForExamples(ctx context.Context, arg ListSessionsF
 
 const updateSession = `-- name: UpdateSession :exec
 INSERT OR REPLACE INTO sessions 
-(contextID, startTime, endTime, selectedId, selectedKind, proto)
+(contextID, startTime, endTime, selectedId, selectedKind, total_input_tokens, total_output_tokens, num_generate_traces, proto)
 VALUES 
-(?, ?, ?, ?, ?, ?)
+(?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type UpdateSessionParams struct {
-	Contextid    string
-	Starttime    time.Time
-	Endtime      time.Time
-	Selectedid   string
-	Selectedkind string
-	Proto        []byte
+	Contextid         string
+	Starttime         time.Time
+	Endtime           time.Time
+	Selectedid        string
+	Selectedkind      string
+	TotalInputTokens  int64
+	TotalOutputTokens int64
+	NumGenerateTraces int64
+	Proto             []byte
 }
 
 func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) error {
@@ -133,6 +145,9 @@ func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) er
 		arg.Endtime,
 		arg.Selectedid,
 		arg.Selectedkind,
+		arg.TotalInputTokens,
+		arg.TotalOutputTokens,
+		arg.NumGenerateTraces,
 		arg.Proto,
 	)
 	return err

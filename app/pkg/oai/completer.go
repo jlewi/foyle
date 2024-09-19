@@ -76,7 +76,14 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 	}
 
 	log.Info("OpenAI:CreateChatCompletion response", "resp", resp)
+	usage := api.LLMUsage{
+		InputTokens:  resp.Usage.PromptTokens,
+		OutputTokens: resp.Usage.CompletionTokens,
+		Model:        c.config.GetModel(),
+		Provider:     string(api.ModelProviderOpenAI),
+	}
 
+	logs.LogLLMUsage(ctx, usage)
 	stopReason := ""
 	if len(resp.Choices) > 0 {
 		stopReason = string(resp.Choices[0].FinishReason)

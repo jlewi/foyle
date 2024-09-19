@@ -293,3 +293,50 @@ func setupAndRunServer(addr string, a *Agent) error {
 	log.Info("Server stopped")
 	return nil
 }
+
+func Test_ShouldTrigger(t *testing.T) {
+	type testCase struct {
+		name          string
+		doc           *v1alpha1.Doc
+		selectedIndex int32
+		expected      bool
+	}
+
+	cases := []testCase{
+		{
+			name: "markupcell",
+			doc: &v1alpha1.Doc{
+				Blocks: []*v1alpha1.Block{
+					{
+						Contents: "Use gcloud to list all the cloud build jobs in project foyle",
+						Kind:     v1alpha1.BlockKind_MARKUP,
+					},
+				},
+			},
+			selectedIndex: 0,
+			expected:      true,
+		},
+		{
+			name: "codecell",
+			doc: &v1alpha1.Doc{
+				Blocks: []*v1alpha1.Block{
+					{
+						Contents: "Use gcloud to list all the cloud build jobs in project foyle",
+						Kind:     v1alpha1.BlockKind_CODE,
+					},
+				},
+			},
+			selectedIndex: 0,
+			expected:      false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := shouldTrigger(c.doc, c.selectedIndex)
+			if actual != c.expected {
+				t.Fatalf("Expected %v but got %v", c.expected, actual)
+			}
+		})
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/jlewi/foyle/app/pkg/oai"
 
 	"github.com/jlewi/foyle/app/pkg/agent"
+	"github.com/jlewi/foyle/app/pkg/logs"
 )
 
 func GetFunctionNameFromFunc(f interface{}) string {
@@ -32,6 +33,7 @@ func Test_Names(t *testing.T) {
 			expected: LogEvents,
 			input:    (&agent.Agent{}).LogEvents,
 		},
+
 		{
 			expected: StreamGenerate,
 			input:    (&agent.Agent{}).StreamGenerate,
@@ -61,9 +63,21 @@ func Test_Matchers(t *testing.T) {
 			expected: true,
 		},
 		{
+			input:    (&agent.Agent{}).Generate,
+			Matcher:  IsGenerate,
+			name:     "IsGenerate",
+			expected: true,
+		},
+		{
 			input:    (&agent.Agent{}).StreamGenerate,
 			Matcher:  IsStreamGenerate,
 			name:     "IsStreamGenerate",
+			expected: true,
+		},
+		{
+			input:    logs.LogLLMUsage,
+			Matcher:  IsLLMUsage,
+			name:     "IsLLMUsage",
 			expected: true,
 		},
 	}

@@ -38,14 +38,12 @@ import (
 
 const (
 	maxTries = 3
-	// MaxDocChars is an upper limit for the number of characters to include in prompts to avoid hitting
-	// OpenAI's context length limits. This can be an upper bound because if we get a context length exceeded
-	// error the code will automatically try to shrink the document even further.
+	// MaxDocChars is an upper limit for the number of characters to include in prompts.
+	// We set the limit based on the cost of input tokens.
 	// We use the heuristic 1 token ~ 2 characters
-	// We are currently using GPT3.5 which has a context window of 16385 tokens.
+	// For details of how we came up with this see
 	// (https://platform.openai.com/docs/models/gpt-3-5-turbo)
-	// If we use 50% of that's 16000 characters.
-	MaxDocChars = 16000
+	MaxDocChars = 1110
 	temperature = 0.9
 )
 
@@ -380,6 +378,12 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 				return
 			}
 
+			// If we don't want to trigger we continue waiting for the next request but we don't abort
+			// That's because the client will just try to reconnect right now if the stream is aborted.
+			if !shouldTrigger(doc, selectedCell) {
+				continue
+			}
+
 			log.Info("Received request", zap.Object("request", req))
 			// Serialize the doc and make it available for processing
 			func() {
@@ -576,4 +580,16 @@ func (s *streamState) getContextID() string {
 	s.contextLock.RLock()
 	defer s.contextLock.RUnlock()
 	return s.contextID
+}
+
+// shouldTrigger returns true if the agent should trigger a completion for the current document.
+func shouldTrigger(doc *v1alpha1.Doc, selectedIndex int32) bool {
+	// We should trigger if the last cell is a code cell
+	if len(doc.Blocks) == 0 {
+		return false
+	}
+	// N.B. This is a bit of a hack to reduce costs because we are using so many tokens.
+	// For now only trigger completion if the selected cell is a markup cell.
+	selectedCell := doc.Blocks[selectedIndex]
+	return selectedCell.GetKind() == v1alpha1.BlockKind_MARKUP
 }
