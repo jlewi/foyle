@@ -2,8 +2,9 @@ package analyze
 
 import (
 	"context"
-	"google.golang.org/protobuf/proto"
 	"time"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/api"

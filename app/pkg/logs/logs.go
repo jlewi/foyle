@@ -3,6 +3,7 @@ package logs
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/jlewi/foyle/app/api"
 
 	"google.golang.org/protobuf/encoding/protojson"

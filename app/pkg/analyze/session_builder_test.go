@@ -3,9 +3,10 @@ package analyze
 import (
 	"context"
 	"database/sql"
-	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"testing"
 	"time"
+
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/jlewi/foyle/app/pkg/logs/matchers"
 

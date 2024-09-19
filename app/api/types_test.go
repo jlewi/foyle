@@ -2,12 +2,13 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/go-logr/zapr"
-	"github.com/google/go-cmp/cmp"
-	"go.uber.org/zap"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/go-logr/zapr"
+	"github.com/google/go-cmp/cmp"
+	"go.uber.org/zap"
 )
 
 func Test_Deserialize(t *testing.T) {
