@@ -64,7 +64,7 @@ So cost is dominated by input tokens.
 
 We can use the query below to show the token usage and cost per session.
 
-```bash {"id":"01J83S0YFZHH0KPP0KA0X2EZP9"}
+```bash
 sqlite3 -header /Users/jlewi/.foyle/logs/sessions.sqllite3 "
 SELECT 
     contextid,
