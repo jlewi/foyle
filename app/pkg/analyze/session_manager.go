@@ -137,13 +137,15 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	}
 
 	update := fsql.UpdateSessionParams{
-		Contextid:        contextID,
-		Proto:            newRow.Proto,
-		Starttime:        newRow.Starttime,
-		Endtime:          newRow.Endtime,
-		Selectedid:       newRow.Selectedid,
-		Selectedkind:     newRow.Selectedkind,
-		TotalInputTokens: newRow.TotalInputTokens,
+		Contextid:         contextID,
+		Proto:             newRow.Proto,
+		Starttime:         newRow.Starttime,
+		Endtime:           newRow.Endtime,
+		Selectedid:        newRow.Selectedid,
+		Selectedkind:      newRow.Selectedkind,
+		TotalInputTokens:  newRow.TotalInputTokens,
+		TotalOutputTokens: newRow.TotalOutputTokens,
+		NumGenerateTraces: newRow.NumGenerateTraces,
 	}
 
 	if err := queries.UpdateSession(ctx, update); err != nil {
@@ -311,6 +313,7 @@ func protoToRow(session *logspb.Session) (*fsql.Session, error) {
 		Selectedkind:      selectedKind,
 		TotalInputTokens:  int64(session.TotalInputTokens),
 		TotalOutputTokens: int64(session.TotalOutputTokens),
+		NumGenerateTraces: int64(len(session.GenerateTraceIds)),
 	}, nil
 }
 

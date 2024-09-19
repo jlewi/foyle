@@ -221,6 +221,7 @@ func Test_protoToRow(t *testing.T) {
 		ContextId:         "2",
 		TotalOutputTokens: 10,
 		TotalInputTokens:  11,
+		GenerateTraceIds:  []string{"1", "2"},
 	}
 
 	cases := []testCase{
@@ -245,6 +246,7 @@ func Test_protoToRow(t *testing.T) {
 				Endtime:           sess2.GetEndTime().AsTime(),
 				TotalInputTokens:  11,
 				TotalOutputTokens: 10,
+				NumGenerateTraces: 2,
 			},
 		},
 	}

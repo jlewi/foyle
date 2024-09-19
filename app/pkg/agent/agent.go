@@ -38,14 +38,12 @@ import (
 
 const (
 	maxTries = 3
-	// MaxDocChars is an upper limit for the number of characters to include in prompts to avoid hitting
-	// OpenAI's context length limits. This can be an upper bound because if we get a context length exceeded
-	// error the code will automatically try to shrink the document even further.
+	// MaxDocChars is an upper limit for the number of characters to include in prompts.
+	// We set the limit based on the cost of input tokens.
 	// We use the heuristic 1 token ~ 2 characters
-	// We are currently using GPT3.5 which has a context window of 16385 tokens.
+	// For details of how we came up with this see
 	// (https://platform.openai.com/docs/models/gpt-3-5-turbo)
-	// If we use 50% of that's 16000 characters.
-	MaxDocChars = 16000
+	MaxDocChars = 1110
 	temperature = 0.9
 )
 

@@ -33,6 +33,7 @@ func Test_Names(t *testing.T) {
 			expected: LogEvents,
 			input:    (&agent.Agent{}).LogEvents,
 		},
+
 		{
 			expected: StreamGenerate,
 			input:    (&agent.Agent{}).StreamGenerate,
@@ -59,6 +60,12 @@ func Test_Matchers(t *testing.T) {
 			input:    (&oai.Completer{}).Complete,
 			Matcher:  IsOAIComplete,
 			name:     "IsOAIComplete",
+			expected: true,
+		},
+		{
+			input:    (&agent.Agent{}).Generate,
+			Matcher:  IsGenerate,
+			name:     "IsGenerate",
 			expected: true,
 		},
 		{

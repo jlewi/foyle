@@ -16,5 +16,6 @@ type Session struct {
 	Selectedkind      string
 	TotalInputTokens  int64
 	TotalOutputTokens int64
+	NumGenerateTraces int64
 	Proto             []byte
 }

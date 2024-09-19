@@ -39,6 +39,11 @@ func (p *sessionBuilder) processLogEntry(entry *api.LogEntry) {
 	if matchers.IsLLMUsage(entry.Function()) {
 		p.processLLMUsage(entry)
 	}
+
+	if matchers.IsGenerate(entry.Function()) {
+		p.processGenerate(entry)
+	}
+
 	if matchers.IsStreamGenerate(entry.Function()) {
 		p.processStreamGenerate(entry)
 	}
@@ -87,6 +92,33 @@ func (p *sessionBuilder) processLLMUsage(entry *api.LogEntry) {
 
 	if err := p.sessions.Update(context.Background(), contextId, updateFunc); err != nil {
 		log.Error(err, "Failed to update session", "usage", usage)
+	}
+}
+
+func (p *sessionBuilder) processGenerate(entry *api.LogEntry) {
+	log := zapr.NewLogger(zap.L())
+	contextId, ok := entry.GetString("contextId")
+	if !ok {
+		return
+	}
+
+	traceId := entry.TraceID()
+	if traceId == "" {
+		log.Error(errors.New("Failed to handle Agent.Generate log entry"), "Agent.Generate is missing traceId", "entry", entry)
+		return
+
+	}
+
+	updateFunc := func(s *logspb.Session) error {
+		if s.GenerateTraceIds == nil {
+			s.GenerateTraceIds = make([]string, 0, 5)
+		}
+		s.GenerateTraceIds = append(s.GenerateTraceIds, traceId)
+		return nil
+	}
+
+	if err := p.sessions.Update(context.Background(), contextId, updateFunc); err != nil {
+		log.Error(err, "Failed to update session", "contextId", contextId)
 	}
 }
 
