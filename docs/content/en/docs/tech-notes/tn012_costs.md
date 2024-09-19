@@ -4,22 +4,25 @@ date: 2024-09-17T00:00:00Z
 description: Why Does Foyle Cost So Much
 status: Published
 title: TN012 Why Does Foyle Cost So Much
-weight: 11
+weight: 12
 ---
 
 ## Objective
 
 * Understand Why Foyle Costs So Much
+* Figure out how to reduce the costs
 
 ## TL;DR
 
-Since enabling Ghost Cells, Foyle has been using a lot of tokens.
+Since enabling Ghost and upgrading to Sonnet 3.5 and GPT40 Cells, Foyle has been using a lot of tokens.
 
 We need to understand why and see if we can reduce the cost without significantly impacting quality. In particular,
 there are two different drivers of our input tokens
 
 * How many completions we generate for a particular context (e.g. as a user types)
 * How much context we include in each completion
+
+Analysis indicates that we are including way too much context in our LLM requests and can reduce it by 10x to make the costs more manageable. An initial target is to spend ~\$.01 per session. Right now sessions are costing beteen \$0.10 and \$0.30.
 
 ## Background
 
@@ -34,11 +37,11 @@ The basic interaction in Foyle is as follows:
 2. A user starts editing the cell
 3. As the user edits the cell (e.g. types text), Foyle generates suggested cells to insert based on the current context of the cell.
 
-   * The suggested cells are inserted as a Ghost Cell
+   * The suggested cells are inserted as ghost cells
 
 4. User switches to a different cell
 
-We refer to the sequence of events as above as a session. Each session is associated with a cell that the user is editing.
+We refer to the sequence of events above as a session. Each session is associated with a cell that the user is editing.
 The session starts when the user activates that cell and the session ends when the user switches to a different cell.
 
 ## How Much Does Claude Cost
@@ -46,7 +49,7 @@ The session starts when the user activates that cell and the session ends when t
 The graph below shows my usage of Claude over the past month.
 
 ![Claude Usage](claude_usage.png)
-Figure 1. My Claude usage over the past month. The usage is predominantly from Foyle although there some other minor usages (e.g. with Continue.dev). This is for Sonnet 3.5 which is \$3 per 1M input tokens and \$15 per 1M output tokens.
+Figure 1. My Claude usage over the past month. The usage is predominantly from Foyle although there are some other minor usages (e.g. with Continue.dev). This is for Sonnet 3.5 which is \$3 per 1M input tokens and \$15 per 1M output tokens.
 
 Figure 1. Shows my Claude usage. The cost breakdown is as follows.
 
@@ -92,48 +95,46 @@ ORDER BY contextId DESC;
 
 Table 1. Results of measuring token usage and cost per session on some of my recent queries.
 
-
 The results in Table 1. indicate that the bigger win is likely to come from reducing the amount of context and thus
 token usage rather than reducing the number of completions generated. Based on table 1 it looks like we could at best
 reduce the number of LLM calls by 2x-4x. For comparison, it looks like input token is typically 100x our output tokens.
 Since we ask the model to generate a single code block (although it may generate more), we can use the output tokens as a rough estimate of the number of tokens in a typical cell. This suggests we are using ~10-100 cells of context for each completion. This is
 likely way more than we need.
 
-## Discussion 
+## Discussion
 
 ### Long Documents
 
-I think the outliers in the results in Table 1, e.g. `01J83RZGPCJ7FJKNQ2G2CV7JZV` which cost \$.36
+I think the outliers in the results in Table 1, e.g. `01J83RZGPCJ7FJKNQ2G2CV7JZV` which cost \$.36,
 can be explained by long documents. I use a given markdown document to take running notes on a topic.
-So the length of the document can grow quite long leading to a lot of context being sent to Claude. 
+So the length of the document can grow quite long leading to a lot of context being sent to Claude.
 
-In some cases, earlier portions of the document are highly relevant for example
+In some cases, earlier portions of the document are highly relevant. Consider the following sequence of actions:
 
 * I come up with a logging query to observe some part of the system
 * The result shows something surprising
 * I run a bunch of commands to investigate whats happening
 * I want to rerun the logging query
 
-In this case, the cell containing the earlier query can provide useful context.
+In this case, the cell containing the earlier query can provide useful context for the current query. 
 
-However, in Foyle since learning happens online, relying on learning to index the earlier cell(s) and retrieve the relevant ones might
+Including large portions of the document may not be the most token efficient way to make that context available to the model. In Foyle since learning happens online, relying on learning to index the earlier cell(s) and retrieve the relevant ones might
 be a more cost effective mechanism than relying on a huge context window.
 
 ### How much context should we use?
 
 If we set a budget for sessions than we can use that to put a cap on the number of input tokens.
 
-Lets assume we want to spend ~ \$.01 on input tokens per session. This suggestions we should use ~3333 input tokens per session.
+Lets assume we want to spend ~ \$.01 on input tokens per session. This suggests we should use ~3333 input tokens per session.
 
 If we assume ~6 completions per session then we should use a max of ~555 input tokens per completion.
 
 We currently limit the context based on characters to [16000](https://github.com/jlewi/foyle/blob/5f30c461b1f178474d23e08a5bca073ca93724f8/app/pkg/agent/agent.go#L48) which should be ~8000 tokens (assuming 1 token = 2 characters)
 
-
 ### num_generate_traces with outliers
 
-A cell with a really high number of completions (e.g. 24) is likely to be a cell that a user spends a long time writing. 
-For me at least, this cells tend to correspond to cells where I'm "thinking" and not necessarily expressing intents 
+A cell with a really high number of completions (e.g. 24) is likely to be a cell that a user spends a long time writing.
+For me at least, these cells tend to correspond to cells where I'm writing exposition and not necessarily expressing intents
 that should be turned into commands. So in the future we might want to consider how to detect this and limit completion generation in those
 calls.
 
@@ -143,9 +144,6 @@ Right now our algorithm for deciding when to initiate a new completion in a sess
 have changed then we generate a new completion as soon as the current running completion finishes. Reducing input tokens will likely
 make generations faster. So by reducing input tokens we might increase the average number of completions per session which might
 offset some of the cost reductions due to fewer input tokens.
-
-
-
 
 ## Appendix: Curious Result - Number Of Session Starts
 
