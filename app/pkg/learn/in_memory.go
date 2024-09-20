@@ -209,12 +209,8 @@ func (db *InMemoryExampleDB) loadExamples(ctx context.Context) error {
 			db.examples = make([]*v1alpha1.Example, 0, len(matches))
 		}
 
-		// We intentionally initialize an initial matrix which is too small so that during the initial load
-		// grow will be triggered. Since we grow by a factor of two we should end up with an overallocated matrix
-		// This means that by default the matrix should contain extra rows that haven't been populated with examples
-		// yet. This way we can verify that doesn't trip up rag
 		if db.embeddings == nil {
-			db.embeddings = mat.NewDense(int(float32(len(matches))/1.5), oai.SmallEmbeddingsDims, nil)
+			db.embeddings = mat.NewDense(initialNumberOfRows(len(matches)), oai.SmallEmbeddingsDims, nil)
 		}
 
 		// Load the examples.
@@ -227,6 +223,19 @@ func (db *InMemoryExampleDB) loadExamples(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func initialNumberOfRows(numExamples int) int {
+	// We intentionally initialize an initial matrix which is too small so that during the initial load
+	// grow will be triggered. Since we grow by a factor of two we should end up with an overallocated matrix
+	// This means that by default the matrix should contain extra rows that haven't been populated with examples
+	// yet. This way we can verify that doesn't trip up rag
+	size := int(float32(numExamples) / 1.5)
+	// If size is < 1 we end up initializing an empty matrix which will cause a panic
+	if size < 1 {
+		size = 1
+	}
+	return size
 }
 
 func (db *InMemoryExampleDB) Shutdown(ctx context.Context) error {
