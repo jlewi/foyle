@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jlewi/monogo/helpers"
 	"io"
 	"net/http"
 	"os"
@@ -380,7 +381,13 @@ func (a *App) SetupAnalyzer() (*analyze.Analyzer, error) {
 		return nil, errors.New("Config is nil; call LoadConfig first")
 	}
 
-	db, err := sql.Open(analyze.SQLLiteDriver, a.Config.GetSessionsDB())
+	// If the directory doesn't exit opening the SQLLite database will fail.
+	sessionsDBFile := a.Config.GetSessionsDB()
+	dbDir := filepath.Dir(sessionsDBFile)
+	if err := os.MkdirAll(dbDir, helpers.UserGroupAllPerm); err != nil {
+		return nil, errors.Wrapf(err, "Failed to create directory: %v", dbDir)
+	}
+	db, err := sql.Open(analyze.SQLLiteDriver, sessionsDBFile)
 
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to open database: %v", a.Config.GetSessionsDB())

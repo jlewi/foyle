@@ -3,6 +3,8 @@ package analyze
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -40,7 +42,14 @@ func setup() (testTuple, error) {
 		return testTuple{}, errors.Wrapf(err, "failed to create config")
 	}
 
-	db, err := sql.Open(SQLLiteDriver, cfg.GetSessionsDB())
+	// If the directory doesn't exit opening the SQLLite database will fail.
+	sessionsDBFile := cfg.GetSessionsDB()
+	dbDir := filepath.Dir(sessionsDBFile)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		return testTuple{}, errors.Wrapf(err, "Failed to create directory: %v", dbDir)
+	}
+
+	db, err := sql.Open(SQLLiteDriver, sessionsDBFile)
 	if err != nil {
 		return testTuple{}, errors.Wrapf(err, "Failed to open database")
 	}
