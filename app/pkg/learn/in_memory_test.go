@@ -254,3 +254,38 @@ func Test_UpdateExample(t *testing.T) {
 		})
 	}
 }
+
+func Test_initialNumberOfRows(t *testing.T) {
+	type testCase struct {
+		name        string
+		numExamples int
+		expected    int
+	}
+
+	cases := []testCase{
+		{
+			name:        "edge-case-1",
+			numExamples: 1,
+			expected:    1,
+		},
+		{
+			name:        "small",
+			numExamples: 10,
+			expected:    6,
+		},
+		{
+			name:        "large",
+			numExamples: 100,
+			expected:    66,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := initialNumberOfRows(c.numExamples)
+			if actual != c.expected {
+				t.Errorf("Expected %v but got %v", c.expected, actual)
+			}
+		})
+	}
+}
