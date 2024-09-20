@@ -409,6 +409,10 @@ func (s *Server) Run() error {
 	trapInterrupt(s)
 
 	log := zapr.NewLogger(zap.L())
+
+	if s.config.Server.HttpPort <= 0 {
+		return errors.New("HTTP port must be a positive integer")
+	}
 	address := fmt.Sprintf("%s:%d", s.config.Server.BindAddress, s.config.Server.HttpPort)
 	log.Info("Starting http server", "address", address)
 

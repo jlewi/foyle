@@ -388,8 +388,8 @@ func InitViperInstance(v *viper.Viper, cmd *cobra.Command) error {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv() // read in environment variables that match
 
-	setAgentDefaults()
-	setServerDefaults()
+	setAgentDefaults(v)
+	setServerDefaults(v)
 
 	// We need to attach to the command line flag if it was specified.
 	keyToflagName := map[string]string{
@@ -440,7 +440,7 @@ func (c *Config) APIBaseURL() string {
 
 // GetConfig returns a configuration created from the viper configuration.
 func GetConfig() *Config {
-	if globalV != nil {
+	if globalV == nil {
 		// TODO(jeremy): Using a global variable to pass state between InitViper and GetConfig is wonky.
 		// It might be better to combine InitViper and GetConfig into a single command that returns a config object.
 		// This would also make viper an implementation detail of the config.
@@ -504,23 +504,23 @@ func (c *Config) Write(cfgFile string) error {
 	return yaml.NewEncoder(f).Encode(c)
 }
 
-func setServerDefaults() {
-	viper.SetDefault("server.bindAddress", "0.0.0.0")
-	viper.SetDefault("server.httpPort", defaultHTTPPort)
+func setServerDefaults(v *viper.Viper) {
+	v.SetDefault("server.bindAddress", "0.0.0.0")
+	v.SetDefault("server.httpPort", defaultHTTPPort)
 	// gRPC typically uses 50051. If we use that as the default we might end up conflicting with other gRPC services
 	// running by default.
-	viper.SetDefault("server.grpcPort", 9080)
+	v.SetDefault("server.grpcPort", 9080)
 
 	// See https://blog.cloudflare.com/the-complete-guide-to-golang-net-http-timeouts
 	// If we start using really slow models we may need to bump these to avoid timeouts.
-	viper.SetDefault("server.httpMaxWriteTimeout", 1*time.Minute)
-	viper.SetDefault("server.httpMaxReadTimeout", 1*time.Minute)
+	v.SetDefault("server.httpMaxWriteTimeout", 1*time.Minute)
+	v.SetDefault("server.httpMaxReadTimeout", 1*time.Minute)
 }
 
-func setAgentDefaults() {
-	viper.SetDefault("agent.model", DefaultModel)
-	viper.SetDefault("agent.rag.enabled", defaultRagEnabled)
-	viper.SetDefault("agent.rag.maxResults", defaultMaxResults)
+func setAgentDefaults(v *viper.Viper) {
+	v.SetDefault("agent.model", DefaultModel)
+	v.SetDefault("agent.rag.enabled", defaultRagEnabled)
+	v.SetDefault("agent.rag.maxResults", defaultMaxResults)
 }
 
 func DefaultConfigFile() string {
