@@ -42,10 +42,16 @@ const (
 	defaultRagEnabled = true
 )
 
+var (
+	// globalV is the global instance of viper
+	globalV *viper.Viper
+)
+
 // Config represents the persistent configuration data for Foyle.
 //
 // Currently, the format of the data on disk and in memory is identical. In the future, we may modify this to simplify
-// changes to the disk format and to store in-memory values that should not be written to disk.
+// changes to the disk format and to store in-memory values that should not be written to disk. Could that be achieved
+// by embedding it in a different struct which contains values that shouldn't be serialized?
 type Config struct {
 	APIVersion string `json:"apiVersion" yaml:"apiVersion" yamltags:"required"`
 	Kind       string `json:"kind" yaml:"kind" yamltags:"required"`
@@ -68,8 +74,8 @@ type Config struct {
 	Replicate *ReplicateConfig `json:"replicate,omitempty" yaml:"replicate,omitempty"`
 	Anthropic *AnthropicConfig `json:"anthropic,omitempty" yaml:"anthropic,omitempty"`
 
-	// TODO(jeremy): We should make the ConfigFile a private field to make it easier to overload e.g. in testing.
-	// GetConfig should set it to viper. Then in getters like GetExampleDirs we don't need to reference viper.
+	// configFile is the configuration file used. It is
+	configFile string
 }
 
 type LearnerConfig struct {
@@ -266,9 +272,17 @@ func (c *Config) GetLogLevel() string {
 	return c.Logging.Level
 }
 
+// GetConfigFile returns the configuration file
+func (c *Config) GetConfigFile() string {
+	if c.configFile == "" {
+		c.configFile = DefaultConfigFile()
+	}
+	return c.configFile
+}
+
 // GetConfigDir returns the configuration directory
 func (c *Config) GetConfigDir() string {
-	configFile := viper.ConfigFileUsed()
+	configFile := c.GetConfigFile()
 	if configFile != "" {
 		return filepath.Dir(configFile)
 	}
@@ -291,7 +305,7 @@ func (c *Config) GetAssetsDir() string {
 
 func (c *Config) UseRAG() bool {
 	if c.Agent == nil || c.Agent.RAG == nil {
-		return false
+		return defaultRagEnabled
 	}
 	return c.Agent.RAG.Enabled
 }
@@ -347,16 +361,32 @@ func (c *Config) DeepCopy() Config {
 // The results are stored in viper. To retrieve a configuration, use the GetConfig function.
 // The function accepts a cmd parameter which allows binding to command flags.
 func InitViper(cmd *cobra.Command) error {
+	// N.B. we need to set globalV because the subsequent call GetConfig will use that viper instance.
+	// Would it make sense to combine InitViper and Get into one command that returns a config object?
+	globalV = viper.New()
+	return InitViperInstance(globalV, cmd)
+}
+
+// InitViperInstance function is responsible for reading the configuration file and environment variables, if they are set.
+// The results are stored in viper. To retrieve a configuration, use the GetConfig function.
+// The function accepts a cmd parameter which allows binding to command flags.
+func InitViperInstance(v *viper.Viper, cmd *cobra.Command) error {
 	// Ref https://github.com/spf13/viper#establishing-defaults
-	viper.SetEnvPrefix(appName)
-	// name of config file (without extension)
-	viper.SetConfigName("config")
-	// make home directory the first search path
-	viper.AddConfigPath("$HOME/." + appName)
+	v.SetEnvPrefix(appName)
+
+	if v.ConfigFileUsed() == "" {
+		// If ConfigFile isn't already set then configure the search parameters.
+		// The most likely scenario for it already being set is tests.
+
+		// name of config file (without extension)
+		v.SetConfigName("config")
+		// make home directory the first search path
+		v.AddConfigPath("$HOME/." + appName)
+	}
 
 	// Without the replacer overriding with environment variables doesn't work
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv() // read in environment variables that match
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv() // read in environment variables that match
 
 	setAgentDefaults()
 	setServerDefaults()
@@ -369,7 +399,7 @@ func InitViper(cmd *cobra.Command) error {
 
 	if cmd != nil {
 		for key, flag := range keyToflagName {
-			if err := viper.BindPFlag(key, cmd.Flags().Lookup(flag)); err != nil {
+			if err := v.BindPFlag(key, cmd.Flags().Lookup(flag)); err != nil {
 				return err
 			}
 		}
@@ -377,12 +407,12 @@ func InitViper(cmd *cobra.Command) error {
 
 	// Ensure the path for the config file path is set
 	// Required since we use viper to persist the location of the config file so can save to it.
-	cfgFile := viper.GetString(ConfigFlagName)
+	cfgFile := v.GetString(ConfigFlagName)
 	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
+		v.SetConfigFile(cfgFile)
 	}
 
-	if err := viper.ReadInConfig(); err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log := zapr.NewLogger(zap.L())
 			log.Error(err, "config file not found", "file", cfgFile)
@@ -410,14 +440,31 @@ func (c *Config) APIBaseURL() string {
 
 // GetConfig returns a configuration created from the viper configuration.
 func GetConfig() *Config {
+	if globalV != nil {
+		// TODO(jeremy): Using a global variable to pass state between InitViper and GetConfig is wonky.
+		// It might be better to combine InitViper and GetConfig into a single command that returns a config object.
+		// This would also make viper an implementation detail of the config.
+		panic("globalV is nil; was InitViper called before calling GetConfig?")
+	}
+	// We do this as a way to load the configuration while still allowing values to be overwritten by viper
+	cfg, err := getConfigFromViper(globalV)
+	if err != nil {
+		panic(err)
+	}
+	return cfg
+}
+
+func getConfigFromViper(v *viper.Viper) (*Config, error) {
 	// We do this as a way to load the configuration while still allowing values to be overwritten by viper
 	cfg := &Config{}
 
-	if err := viper.Unmarshal(cfg); err != nil {
-		panic(fmt.Errorf("failed to unmarshal configuration; error %v", err))
+	if err := v.Unmarshal(cfg); err != nil {
+		return cfg, fmt.Errorf("failed to unmarshal configuration; error %v", err)
 	}
 
-	return cfg
+	// Set the configFileUsed
+	cfg.configFile = v.ConfigFileUsed()
+	return cfg, nil
 }
 
 func binHome() string {
@@ -490,8 +537,7 @@ func NewWithTempDir() (*Config, error) {
 	return &Config{
 		APIVersion: "v1alpha1",
 		Kind:       "Config",
-		Logging: Logging{
-			LogDir: dir,
-		},
+		// ConfigDir will end up being set based on the directory of the configfile.
+		configFile: filepath.Join(dir, "config.yaml"),
 	}, nil
 }
