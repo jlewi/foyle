@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/go-logr/zapr"
-	"github.com/jlewi/foyle/app/pkg/docs"
 	"go.uber.org/zap"
 
 	"connectrpc.com/connect"
@@ -139,12 +138,12 @@ func toAssertionRow(result *v1alpha1.EvalResult) (*v1alpha1.AssertionRow, error)
 	log := zapr.NewLogger(zap.L())
 
 	row := &v1alpha1.AssertionRow{
-		Id:          result.Example.GetId(),
-		ExampleFile: result.GetExampleFile(),
+		Id: result.Example.GetId(),
+		// ExampleFile: result.GetExampleFile(),
 	}
 
-	row.DocMd = docs.DocToMarkdown(result.GetExample().GetQuery())
-	row.AnswerMd = docs.BlocksToMarkdown(result.GetActual())
+	//row.DocMd = docs.DocToMarkdown(result.GetExample().GetQuery())
+	//row.AnswerMd = docs.BlocksToMarkdown(result.GetActual())
 
 	for _, a := range result.GetAssertions() {
 		switch a.Name {

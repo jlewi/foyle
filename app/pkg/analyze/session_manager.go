@@ -283,6 +283,10 @@ func (m *SessionsManager) DumpExamples(ctx context.Context, request *connect.Req
 }
 
 // protoToRow converts from the proto representation of a session to the database row representation.
+//
+// TODO(jeremy): I think it would be better to make the return type fsql.UpdateSessionParams. Right now the only
+// place this function gets called is in the Update method and the returned value is immediately converted to
+// fsql.UpdateSessionParams.
 func protoToRow(session *logspb.Session) (*fsql.Session, error) {
 	log := logs.NewLogger()
 	protoBytes, err := proto.Marshal(session)
@@ -303,7 +307,6 @@ func protoToRow(session *logspb.Session) (*fsql.Session, error) {
 		}
 	}
 
-	// TODO: How do we deal with the end/starttime? In sqlc should we specify the type as timestamp?
 	return &fsql.Session{
 		Contextid:         session.ContextId,
 		Starttime:         session.StartTime.AsTime(),

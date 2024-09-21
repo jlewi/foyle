@@ -24,6 +24,9 @@ type DistanceResult struct {
 	Normalized float32
 }
 
+// TODO(jeremy): Should we delete the distance code? I don't think it is useful as a metric given that code cells
+// are often mini programs that violate the assumptions of the distance metric.
+
 // Distance computes the distance between two instructions
 //
 // For details refer to tn003_learning_eval.md.

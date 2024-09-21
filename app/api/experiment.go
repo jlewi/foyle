@@ -13,6 +13,9 @@ type Experiment struct {
 }
 
 type ExperimentSpec struct {
+	// AgentAddress is the address of the agent to use to generate completions
+	AgentAddress string `json:"agentAddress" yaml:"agentAddress"`
+	
 	// EvalDir is the directory containing the evaluation the evaluation input
 	EvalDir string `json:"evalDir" yaml:"evalDir"`
 
