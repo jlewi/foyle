@@ -1,9 +1,13 @@
 package eval
 
 import (
+	"connectrpc.com/connect"
 	"context"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	"os"
 	"path/filepath"
+	"sort"
+	"time"
 
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
@@ -86,7 +90,8 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 		return err
 	}
 
-	// List all the files
+	// Find all the binary protobuf files in the eval directory.
+	// This should contain EvalExample protos.
 	files, err := listEvalFiles(ctx, experiment.Spec.EvalDir)
 	if err != nil {
 		return err
@@ -94,21 +99,39 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 
 	log.Info("Found eval files", "numFiles", len(files))
 
-	// Now iterate over the DB and figure out which files haven't  been loaded into the db.
+	// 1. Get the last eval example id that was processed.
+	// lastExample, err := getIDOfLastExample(edb)
 
-	unloadedFiles, err := findUnloadedFiles(ctx, db, files)
-	if err != nil {
-		return err
-	}
-	log.Info("Found unloaded files", "numFiles", len(unloadedFiles))
+	// Default the time of the lastProcessedEval example to some time in the future.
+	// This way all examples should be before it and get reprocessed
+	lastProcessedTime := time.Now().Add(24 * time.Hour * 365 * 10)
 
-	// We need to load the evaluation data into the database.
-	if err := loadMarkdownAnswerFiles(ctx, db, unloadedFiles); err != nil {
-		return err
+	// Make sure the files are in sorted order because the filename should contain the ULID.
+	// The files should be named ${SESSION_ID}.evalexample.binpb
+
+	// Loop over the eval examples and load them
+	examples := make([]*v1alpha1.EvalExample, 0, len(files))
+	for _, exampleFile := range files {
+		b, err := os.ReadFile(exampleFile)
+		if err != nil {
+			// TODO(jeremy): We should probably store the error in the DB.
+			log.Error(err, "Failed to read file", "file", exampleFile)
+			continue
+		}
+
+		example := &v1alpha1.EvalExample{}
+		if err := proto.Unmarshal(b, example); err != nil {
+			log.Error(err, "Failed to unmarshal example", "file", exampleFile)
+			continue
+		}
+		examples = append(examples, example)
 	}
+
+	// Now sort the examples in time order so we can process them in the same order they actually occurred
+	sortEvalExamplesInTime(examples)
 
 	// Now generate predictions for any results that are missing them.
-	if err := e.reconcilePredictions(ctx, db, agent); err != nil {
+	if err := e.processExamples(ctx, db, agent); err != nil {
 		return err
 	}
 
@@ -171,32 +194,46 @@ func (e *Evaluator) setupAgent(ctx context.Context, agentConfig api.AgentConfig)
 	return agent, nil
 }
 
-// TODO(jeremy): We should use reconcilePredictions which uses the client to generate the predictions.
-func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, agent *agent.Agent) error {
-	olog := logs.FromContext(ctx)
-	iter, err := db.NewIterWithContext(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer iter.Close()
+func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time) error {
+	oLog := logs.FromContext(ctx)
 
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-		if key == nil {
-			break
+	// TODO(jeremy): where should this actually be created and set
+	var client v1alpha1connect.AIServiceClient
+
+	// Where do we set this
+	var manager *ResultsManager
+
+	// Now iterate over the examples and process them.
+	for _, example := range examples {
+		log := oLog.WithValues("exampleId", example.GetId())
+
+		if example.Time.AsTime().Before(lastProcessedTime) {
+			log.V(logs.Debug).Info("Skipping example; already processed")
+			continue
 		}
 
-		log := olog.WithValues("id", string(key))
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
+		request := &v1alpha1.GenerateCellsRequest{
+			Notebook: example.GetFullContext().GetNotebook(),
 		}
 
 		result := &v1alpha1.EvalResult{}
-		if err := proto.Unmarshal(value, result); err != nil {
-			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
+
+		resp, err := client.GenerateCells(ctx, connect.NewRequest(request))
+		if err != nil {
+			log.Error(err, "Failed to generate cells")
+			result.Error = err.Error()
+			uErr := manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
+				result.Error = err.Error()
+				return nil
+			})
+			if uErr != nil {
+				log.Error(uErr, "Failed to update result")
+			}
+			continue
 		}
 
+		// Left off editing here
+		
 		if len(result.GetActual()) > 0 {
 			log.Info("Skipping; already have answer", "path", result.ExampleFile)
 			// We have the answer so we don't need to generate it.
@@ -232,16 +269,16 @@ func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, age
 	return nil
 }
 
-func updateResult(ctx context.Context, id string, result *v1alpha1.EvalResult, db *pebble.DB) error {
-	b, err := proto.Marshal(result)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to marshal result")
-	}
-	if err := db.Set([]byte(id), b, nil); err != nil {
-		return errors.Wrapf(err, "Failed to write result to DB")
-	}
-	return nil
-}
+//func updateResult(ctx context.Context, id string, result *v1alpha1.EvalResult, db *pebble.DB) error {
+//	b, err := proto.Marshal(result)
+//	if err != nil {
+//		return errors.Wrapf(err, "Failed to marshal result")
+//	}
+//	if err := db.Set([]byte(id), b, nil); err != nil {
+//		return errors.Wrapf(err, "Failed to write result to DB")
+//	}
+//	return nil
+//}
 
 func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error {
 	olog := logs.FromContext(ctx)
@@ -533,50 +570,50 @@ func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experi
 	return nil
 }
 
-func findUnloadedFiles(ctx context.Context, db *pebble.DB, files []string) ([]string, error) {
-	unprocessed := map[string]bool{}
+//func findUnloadedFiles(ctx context.Context, db *pebble.DB, files []string) ([]string, error) {
+//	unprocessed := map[string]bool{}
+//
+//	iter, err := db.NewIterWithContext(ctx, nil)
+//	if err != nil {
+//		return nil, err
+//	}
+//	defer iter.Close()
+//
+//	for _, file := range files {
+//		unprocessed[file] = true
+//	}
+//
+//	// Iterate over the files in the DB and remove them from the list of files to load.
+//	for iter.First(); iter.Valid(); iter.Next() {
+//		key := iter.Key()
+//		if key == nil {
+//			break
+//		}
+//
+//		value, err := iter.ValueAndErr()
+//		if err != nil {
+//			// Should we ignore the error?
+//			return nil, errors.Wrapf(err, "Failed to read value for key %s", string(key))
+//		}
+//
+//		result := &v1alpha1.EvalResult{}
+//		if err := proto.Unmarshal(value, result); err != nil {
+//			return nil, errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
+//		}
+//
+//		delete(unprocessed, result.ExampleFile)
+//
+//	}
+//
+//	toProcess := make([]string, 0, len(unprocessed))
+//	for file := range unprocessed {
+//		toProcess = append(toProcess, file)
+//	}
+//
+//	return toProcess, nil
+//}
 
-	iter, err := db.NewIterWithContext(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer iter.Close()
-
-	for _, file := range files {
-		unprocessed[file] = true
-	}
-
-	// Iterate over the files in the DB and remove them from the list of files to load.
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-		if key == nil {
-			break
-		}
-
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			// Should we ignore the error?
-			return nil, errors.Wrapf(err, "Failed to read value for key %s", string(key))
-		}
-
-		result := &v1alpha1.EvalResult{}
-		if err := proto.Unmarshal(value, result); err != nil {
-			return nil, errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
-		}
-
-		delete(unprocessed, result.ExampleFile)
-
-	}
-
-	toProcess := make([]string, 0, len(unprocessed))
-	for file := range unprocessed {
-		toProcess = append(toProcess, file)
-	}
-
-	return toProcess, nil
-}
-
-// listEvalFiles returns a list of the all the markdown files in the eval directory.
+// listEvalFiles returns a list of the all the binary protobuf files in the directory evalDir.
 func listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
 	examples := make([]string, 0, 100)
 	err := filepath.Walk(evalDir, func(path string, info os.FileInfo, err error) error {
@@ -584,7 +621,7 @@ func listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
 			return nil
 		}
 
-		if filepath.Ext(path) != ".md" {
+		if filepath.Ext(path) != ".binpb" {
 			return nil
 		}
 
@@ -597,71 +634,82 @@ func listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
 
 // loadMarkdownFiles loads a bunch of markdown files representing evaluation data and converts them into example
 // protos. The final block in the markdown file is treated as the answer.
-func loadMarkdownAnswerFiles(ctx context.Context, db *pebble.DB, files []string) error {
-	oLog := logs.FromContext(ctx)
+//func loadMarkdownAnswerFiles(ctx context.Context, db *pebble.DB, files []string) error {
+//	oLog := logs.FromContext(ctx)
+//
+//	allErrors := &helpers.ListOfErrors{}
+//	for _, path := range files {
+//		log := oLog.WithValues("path", path)
+//		log.Info("Processing file")
+//
+//		contents, err := os.ReadFile(path)
+//		if err != nil {
+//			log.Error(err, "Failed to read file")
+//			allErrors.AddCause(err)
+//			// Keep going
+//			continue
+//		}
+//
+//		doc := &v1alpha1.Doc{}
+//
+//		blocks, err := docs.MarkdownToBlocks(string(contents))
+//		if err != nil {
+//			log.Error(err, "Failed to convert markdown to blocks")
+//			allErrors.AddCause(err)
+//			// Keep going
+//			continue
+//		}
+//
+//		doc.Blocks = blocks
+//
+//		if len(doc.GetBlocks()) < 2 {
+//			log.Info("Skipping doc; too few blocks; at least two are required")
+//			continue
+//		}
+//
+//		answer := doc.GetBlocks()[len(doc.GetBlocks())-1]
+//		doc.Blocks = doc.Blocks[:len(doc.GetBlocks())-1]
+//		if answer.Kind != v1alpha1.BlockKind_CODE {
+//			log.Info("Skipping doc; last block must be code")
+//			continue
+//		}
+//
+//		// We generate a stable ID for the example by hashing the contents of the document.
+//		example := &v1alpha1.Example{
+//			Query:  doc,
+//			Answer: []*v1alpha1.Block{answer},
+//		}
+//		example.Id = HashExample(example)
+//
+//		result := &v1alpha1.EvalResult{
+//			Example:     example,
+//			ExampleFile: path,
+//			// initialize distance to a negative value so we can tell when it hasn't been computed
+//			Distance: uninitializedDistance,
+//		}
+//
+//		if err := dbutil.SetProto(db, example.GetId(), result); err != nil {
+//			log.Error(err, "Failed to write result to DB")
+//			allErrors.AddCause(err)
+//			// Keep going
+//			continue
+//		}
+//	}
+//
+//	if len(allErrors.Causes) > 0 {
+//		return allErrors
+//	}
+//
+//	return nil
+//}
 
-	allErrors := &helpers.ListOfErrors{}
-	for _, path := range files {
-		log := oLog.WithValues("path", path)
-		log.Info("Processing file")
+func sortEvalExamplesInTime(examples []*v1alpha1.EvalExample) {
+	sort.Slice(examples, func(i, j int) bool {
+		// Convert the Time field to time.Time objects
+		timeI := examples[i].Time.AsTime()
+		timeJ := examples[j].Time.AsTime()
 
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			log.Error(err, "Failed to read file")
-			allErrors.AddCause(err)
-			// Keep going
-			continue
-		}
-
-		doc := &v1alpha1.Doc{}
-
-		blocks, err := docs.MarkdownToBlocks(string(contents))
-		if err != nil {
-			log.Error(err, "Failed to convert markdown to blocks")
-			allErrors.AddCause(err)
-			// Keep going
-			continue
-		}
-
-		doc.Blocks = blocks
-
-		if len(doc.GetBlocks()) < 2 {
-			log.Info("Skipping doc; too few blocks; at least two are required")
-			continue
-		}
-
-		answer := doc.GetBlocks()[len(doc.GetBlocks())-1]
-		doc.Blocks = doc.Blocks[:len(doc.GetBlocks())-1]
-		if answer.Kind != v1alpha1.BlockKind_CODE {
-			log.Info("Skipping doc; last block must be code")
-			continue
-		}
-
-		// We generate a stable ID for the example by hashing the contents of the document.
-		example := &v1alpha1.Example{
-			Query:  doc,
-			Answer: []*v1alpha1.Block{answer},
-		}
-		example.Id = HashExample(example)
-
-		result := &v1alpha1.EvalResult{
-			Example:     example,
-			ExampleFile: path,
-			// initialize distance to a negative value so we can tell when it hasn't been computed
-			Distance: uninitializedDistance,
-		}
-
-		if err := dbutil.SetProto(db, example.GetId(), result); err != nil {
-			log.Error(err, "Failed to write result to DB")
-			allErrors.AddCause(err)
-			// Keep going
-			continue
-		}
-	}
-
-	if len(allErrors.Causes) > 0 {
-		return allErrors
-	}
-
-	return nil
+		// Compare the times
+		return timeI.Before(timeJ)
+	})
 }
