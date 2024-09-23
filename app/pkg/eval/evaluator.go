@@ -3,7 +3,10 @@ package eval
 import (
 	"connectrpc.com/connect"
 	"context"
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
+	"github.com/jlewi/foyle/app/pkg/runme/ulid"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"os"
 	"path/filepath"
 	"sort"
@@ -62,17 +65,22 @@ func (e *Evaluator) ReconcileNode(ctx context.Context, node *yaml.RNode) error {
 
 func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) error {
 	log := logs.FromContext(ctx).WithValues("experiment", experiment.Metadata.Name)
-	log.Info("Opening database", "database", experiment.Spec.DBDir)
-	db, err := pebble.Open(experiment.Spec.DBDir, &pebble.Options{})
-	if err != nil {
-		return err
-	}
-	defer helpers.DeferIgnoreError(db.Close)
-
-	if experiment.Spec.Agent == nil {
-		return errors.New("Agent is required")
-	}
+	//log.Info("Opening database", "database", experiment.Spec.DBDir)
+	//db, err := pebble.Open(experiment.Spec.DBDir, &pebble.Options{})
+	//if err != nil {
+	//	return err
+	//}
+	//defer helpers.DeferIgnoreError(db.Close)
+	//
+	//if experiment.Spec.Agent == nil {
+	//	return errors.New("Agent is required")
+	//}
 	aiClient := newAIServiceClient(experiment.Spec.AgentAddress)
+
+	manager, err := openResultsManager(experiment.Spec.OutputDB)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to open results manager from file %s", experiment.Spec.OutputDB)
+	}
 
 	// Find all the binary protobuf files in the eval directory.
 	// This should contain EvalExample protos.
@@ -86,9 +94,9 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	// 1. Get the last eval example id that was processed.
 	// lastExample, err := getIDOfLastExample(edb)
 
-	// Default the time of the lastProcessedEval example to some time in the future.
-	// This way all examples should be before it and get reprocessed
-	lastProcessedTime := time.Now().Add(24 * time.Hour * 365 * 10)
+	// Default the time of the lastProcessedEval example to some time in the past.
+	// This way all examples should be after it and get reprocessed
+	lastProcessedTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	// Make sure the files are in sorted order because the filename should contain the ULID.
 	// The files should be named ${SESSION_ID}.evalexample.binpb
@@ -115,7 +123,7 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	sortEvalExamplesInTime(examples)
 
 	// Now generate predictions for any results that are missing them.
-	if err := e.processExamples(ctx, examples, lastProcessedTime, aiClient); err != nil {
+	if err := e.processExamples(ctx, examples, lastProcessedTime, aiClient, manager); err != nil {
 		return err
 	}
 
@@ -127,18 +135,15 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	}
 	defer helpers.DeferIgnoreError(tracesDB.Close)
 
-	if err := e.reconcileBestRAGResult(ctx, db, tracesDB); err != nil {
+	if err := e.reconcileBestRAGResult(ctx, nil, tracesDB); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time, client v1alpha1connect.AIServiceClient) error {
+func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time, client v1alpha1connect.AIServiceClient, manager *ResultsManager) error {
 	oLog := logs.FromContext(ctx)
-
-	// Where do we set this
-	var manager *ResultsManager
 
 	// Now iterate over the examples and process them.
 	for _, example := range examples {
@@ -147,6 +152,25 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 		if example.Time.AsTime().Before(lastProcessedTime) {
 			log.V(logs.Debug).Info("Skipping example; already processed")
 			continue
+		}
+
+		sessionID := ulid.GenerateID()
+
+		//selectedCell := example.GetFullContext().GetNotebook().GetCells()[example.GetFullContext().GetSelected()]
+		//// We need to send a LOG event to the agent to simulate the cells being executed.
+		//
+		logEventReq := &v1alpha1.LogEventsRequest{}
+		logEventReq.Events = append(logEventReq.Events, &v1alpha1.LogEvent{
+			Type:          v1alpha1.LogEventType_SESSION_START,
+			ContextId:     sessionID,
+			SelectedIndex: example.GetFullContext().GetSelected(),
+		})
+
+		_, err := client.LogEvents(ctx, connect.NewRequest(logEventReq))
+		if err != nil {
+			log.Error(err, "Failed to log events")
+			// For now abort on error to see what's going on.
+			return errors.Wrapf(err, "Failed to log events")
 		}
 
 		request := &v1alpha1.GenerateCellsRequest{
@@ -182,6 +206,34 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 		// get it?
 		// result.GenTraceId = resp.Msg.GetTraceId()
 
+		// We need to send a LOG event to the agent to simulate the cells being executed.
+		executeEventReq := &v1alpha1.LogEventsRequest{}
+
+		for _, cell := range resp.Msg.GetCells() {
+
+			if cell.Kind != parserv1.CellKind_CELL_KIND_CODE {
+				continue
+			}
+
+			executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+				Type: v1alpha1.LogEventType_SESSION_START,
+			})
+
+			executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+				Type: v1alpha1.LogEventType_EXECUTE,
+				Cells: []*parserv1.Cell{
+					cell,
+				},
+				SelectedIndex: 0,
+				SelectedId:    converters.GetCellID(cell),
+			})
+		}
+
+		if _, err := client.LogEvents(ctx, connect.NewRequest(executeEventReq)); err != nil {
+			log.Error(err, "Failed to log events")
+			// For now abort on error to see what's going on.
+			return errors.Wrapf(err, "Failed to log events")
+		}
 	}
 	return nil
 }

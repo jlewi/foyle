@@ -3,6 +3,7 @@ package logsviewer
 import (
 	"context"
 	"fmt"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"net/http"
 	"strings"
 
@@ -191,9 +192,11 @@ func (c *EvalResultsTable) Render() app.UI {
 			}
 			row := app.Tr().Class(rowStyle).Body(
 				app.Td().Text(resultSet.data[i].GetExample().GetId()),
-				app.Td().Text(resultSet.data[i].GetExampleFile()),
-				app.Td().Text(resultSet.data[i].GetDistance()),
-				app.Td().Text(resultSet.data[i].GetNormalizedDistance()),
+				// TODO(jeremy): These fields were removed as part of refactoring how we do evaluation. Can we just
+				// delete the code? Do other things need to be updated?
+				//app.Td().Text(resultSet.data[i].GetExampleFile()),
+				//app.Td().Text(resultSet.data[i].GetDistance()),
+				//app.Td().Text(resultSet.data[i].GetNormalizedDistance()),
 			)
 
 			// For each row we add a click handler to display the corresponding example.
@@ -251,7 +254,7 @@ func (m *evalView) handleSetEvalView(ctx app.Context, action app.Action) {
 			m.HTMLContent = "No evaluation result is currently selected"
 			break
 		}
-		value, err := docToHTML(current.Example.Query)
+		value, err := nbToHTML(current.Example.FullContext.Notebook)
 		if err == nil {
 			m.HTMLContent = value
 		} else {
@@ -264,10 +267,11 @@ func (m *evalView) handleSetEvalView(ctx app.Context, action app.Action) {
 			m.HTMLContent = "No evaluation result is currently selected"
 			break
 		}
-		doc := &v1alpha1.Doc{
-			Blocks: current.Actual,
+
+		nb := &parserv1.Notebook{
+			Cells: current.ActualCells,
 		}
-		value, err := docToHTML(doc)
+		value, err := nbToHTML(nb)
 		if err == nil {
 			m.HTMLContent = value
 		} else {
@@ -280,10 +284,10 @@ func (m *evalView) handleSetEvalView(ctx app.Context, action app.Action) {
 			m.HTMLContent = "No evaluation result is currently selected"
 			break
 		}
-		doc := &v1alpha1.Doc{
-			Blocks: current.Example.Answer,
+		nb := &parserv1.Notebook{
+			Cells: current.Example.ExpectedCells,
 		}
-		value, err := docToHTML(doc)
+		value, err := nbToHTML(nb)
 		if err == nil {
 			m.HTMLContent = value
 		} else {

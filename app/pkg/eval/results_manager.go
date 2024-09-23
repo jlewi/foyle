@@ -3,11 +3,16 @@ package eval
 import (
 	"context"
 	"database/sql"
+	_ "embed"
+	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/analyze/fsql"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
+	"os"
+	"path/filepath"
 )
 
 // ResultsManager manages the database containing the evaluation results
@@ -19,30 +24,70 @@ type ResultsManager struct {
 // EvalResultUpdater is a function that updates an evaluation result.
 type EvalResultUpdater func(result *v1alpha1.EvalResult) error
 
+func openResultsManager(dbFile string) (*ResultsManager, error) {
+	dbDir := filepath.Dir(dbFile)
+	if err := os.MkdirAll(dbDir, helpers.UserGroupAllPerm); err != nil {
+		return nil, errors.Wrapf(err, "Failed to create directory: %v", dbDir)
+	}
+	db, err := sql.Open(analyze.SQLLiteDriver, dbFile)
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to open database: %v", dbFile)
+	}
+
+	manager, err := NewResultsManager(db)
+	if err != nil {
+		return nil, err
+	}
+	return manager, nil
+}
+
+func NewResultsManager(db *sql.DB) (*ResultsManager, error) {
+	// create tables
+	// TODO(jeremy): This creates the analyzer and ResultsManager table because we don't separate the DDL statements.
+	// We might want to refactor to support that.
+	if _, err := db.ExecContext(context.TODO(), analyze.GetDDL()); err != nil {
+		return nil, err
+	}
+
+	// Create the dbtx from the actual database
+	queries := fsql.New(db)
+
+	return &ResultsManager{
+		queries: queries,
+		db:      db,
+	}, nil
+}
+
 // Update updates an evaluation result. Update performs a read-modify-write operation on the results with the given id.
 // The updateFunc is called with the example to be updated. The updateFunc should modify the session in place.
 // If the updateFunc returns an error then the example is not updated.
 // If the given id doesn't exist then an empty Session is passed to updateFunc and the result will be
 // inserted if the updateFunc returns nil. If the session result exists then the result is passed to updateFunc
 // and the updated value is then written to the database
-func (db *ResultsManager) Update(ctx context.Context, id string, updateFunc EvalResultUpdater) error {
+func (m *ResultsManager) Update(ctx context.Context, id string, updateFunc EvalResultUpdater) error {
 	log := logs.FromContext(ctx)
 	if id == "" {
 		return errors.WithStack(errors.New("id must be non-empty"))
 	}
 	log = log.WithValues("exampleId", id)
 
-	tx, err := db.db.BeginTx(ctx, &sql.TxOptions{})
+	tx, err := m.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "Failed to start transaction")
 	}
 
-	queries := db.queries.WithTx(tx)
+	queries := m.queries.WithTx(tx)
 	// Read the record
 	row, err := queries.GetResult(ctx, id)
 
 	// If the session doesn't exist then we do nothing because session is initializeed to empty session
-	rowPb := &v1alpha1.EvalResult{}
+	rowPb := &v1alpha1.EvalResult{
+		// Initialize the id.
+		Example: &v1alpha1.EvalExample{
+			Id: id,
+		},
+	}
 	if err != nil {
 		if err != sql.ErrNoRows {
 			if txErr := tx.Rollback(); txErr != nil {

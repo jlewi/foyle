@@ -2,13 +2,12 @@ package eval
 
 import (
 	"context"
+	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/jlewi/foyle/app/api"
-	"github.com/pkg/errors"
-
 	"github.com/jlewi/foyle/app/pkg/config"
 	"go.uber.org/zap"
 )
@@ -18,7 +17,8 @@ func Test_Evaluator(t *testing.T) {
 		t.Skipf("Test is skipped in GitHub actions")
 	}
 
-	t.Fatalf("Evaluator test needs to be updated per https://github.com/jlewi/foyle/issues/140")
+	// This test assumes you have already started an agent with the appropriate configuration that you
+	// want to evaluate.
 
 	log, err := zap.NewDevelopmentConfig().Build()
 	if err != nil {
@@ -42,7 +42,7 @@ func Test_Evaluator(t *testing.T) {
 	}
 
 	if err := e.Reconcile(context.Background(), *experiment); err != nil {
-		t.Fatalf("Error reconciling; %v", err)
+		t.Fatalf("Error reconciling; %+v", err)
 	}
 }
 
@@ -85,28 +85,26 @@ func Test_Evaluator(t *testing.T) {
 //}
 
 func experimentForTesting() (*api.Experiment, error) {
-	cwd, err := os.Getwd()
+	//cwd, err := os.Getwd()
+	//if err != nil {
+	//	return nil, errors.Wrapf(err, "Error getting working directory")
+	//}
+	//evalDir, err := filepath.Abs(filepath.Join(cwd, "..", "..", "..", "data", "eval"))
+	//if err != nil {
+	//	return nil, errors.Wrapf(err, "Error getting eval directory")
+	//}
+
+	oDir, err := os.MkdirTemp("", "testOutput")
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error getting working directory")
-	}
-	evalDir, err := filepath.Abs(filepath.Join(cwd, "..", "..", "..", "data", "eval"))
-	if err != nil {
-		return nil, errors.Wrapf(err, "Error getting eval directory")
+		return nil, errors.Wrapf(err, "Error creating temp directory")
 	}
 
 	return &api.Experiment{
 		Spec: api.ExperimentSpec{
-			EvalDir:   evalDir,
-			DBDir:     "/tmp/foyle/eval",
-			SheetID:   "1O0thD-p9DBF4G_shGMniivBB3pdaYifgSzWXBxELKqE",
-			SheetName: "Results",
-			Agent: &api.AgentConfig{
-				Model: config.DefaultModel,
-				// No need to test RAG as part of testing evaluation.
-				RAG: &api.RAGConfig{
-					Enabled: false,
-				},
-			},
+			// EvalDir is the directory containing the eval example protos
+			EvalDir:      "/Users/jlewi/tmp/examples-for-testing",
+			AgentAddress: "http://localhost:10777/api",
+			OutputDB:     filepath.Join(oDir, "results.sqlite"),
 		},
 	}, nil
 }

@@ -28,6 +28,13 @@ const (
 	SQLLiteDriver = "sqlite"
 )
 
+// GetDDL return the DDL for the database.
+// This is a hack because the DDL statements for the sessions and eval results tables are in the same file and package.
+// The Evaluator needs to be able to get the DDL in order to create the eval results table. We should clean this up
+func GetDDL() string {
+	return ddl
+}
+
 // SessionUpdater is a function that updates a session.
 type SessionUpdater func(session *logspb.Session) error
 
@@ -39,6 +46,7 @@ type SessionsManager struct {
 
 func NewSessionsManager(db *sql.DB) (*SessionsManager, error) {
 	// create tables
+	// TODO(jeremy): I think this creates the evalresults table as well because we don't separate the DDL statements.
 	if _, err := db.ExecContext(context.TODO(), ddl); err != nil {
 		return nil, err
 	}
@@ -379,6 +387,7 @@ func getExampleFromSession(s *logspb.Session) (*v1alpha1.EvalExample, error) {
 		Id:            s.ContextId,
 		ExpectedCells: expectedCells,
 		FullContext:   newContext,
+		Time:          s.GetStartTime(),
 	}
 
 	return example, nil
