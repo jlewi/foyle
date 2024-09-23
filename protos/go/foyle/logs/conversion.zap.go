@@ -7,9 +7,9 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
+	_ "google.golang.org/protobuf/types/known/structpb"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
 	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	_ "google.golang.org/protobuf/types/known/structpb"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 )
 

@@ -80,6 +80,12 @@ func (m *EvalResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 		return nil
 	}))
 
+	keyName = "cells_match_result" // field cells_match_result = 12
+	enc.AddString(keyName, m.CellsMatchResult.String())
+
+	keyName = "judge_explanation" // field judge_explanation = 13
+	enc.AddString(keyName, m.JudgeExplanation)
+
 	return nil
 }
 

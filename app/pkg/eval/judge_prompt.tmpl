@@ -1,0 +1,22 @@
+You will be given code blocks containing two bash programs. Your task is to decide whether the two programs
+are equivalent. Emit the output as a JSON dictionary with two fields `equivalent` and `reason`. The `equivalent` field
+should be a boolen which is true if the programs are equivalent and false otherwise. The `reason` field should be a
+string with a human-readable explanation of why the programs are equivalent or not.
+
+When deciding whether the programs are equivalent you should apply the following rules
+
+* When comparing two CLI invocations ignore the order of the arguments. For example `ls -l -a` is equivalent to `ls -a -l`.
+* When comparing two CLI invocations if one invocation uses the long form of an argument and the other uses the short form
+  then the two invocations are not equivalent. For example `ls -l` is not equivalent to `ls --long`.
+* If two CLI invocations use different binaries but are functionally similar then they are not equivalent. For example
+  `ls -l` is not equivalent to `cat -n`.
+
+<program1>
+{{.Expected}}
+</program1>
+
+<program2>
+{{.Actual}}
+</program2>
+
+Are these two programs equivalent?

@@ -22,6 +22,12 @@ enum AssertResult {
   SKIPPED = 3;
 }
 
+enum CellsMatchResult {
+  UNKNOWN_CellsMatchResult = 0;
+  MATCH = 1;
+  MISMATCH = 2;
+}
+
 // EvalResult represents an evaluation result
 message EvalResult {
   // Example is the answer and expected result
@@ -41,6 +47,14 @@ message EvalResult {
   RAGResult best_rag_result = 9;
 
   repeated Assertion assertions = 10;
+
+
+  // cells_match_result is the LLM judge's evaluation of whether the actual and expected response match
+  // We use an enum so we can encode unknown
+  CellsMatchResult cells_match_result = 12;
+
+  // Explanation given by the LLM judge
+  string judge_explanation = 13;
 
   // Removed fields
   // example_file is the file containing the example
@@ -111,6 +125,7 @@ message EvalExample {
   // Expected cells is the expected value for generation
   repeated runme.parser.v1.Cell expected_cells = 3;
 }
+
 
 message AssertionTableResponse {
   repeated AssertionRow rows = 1;

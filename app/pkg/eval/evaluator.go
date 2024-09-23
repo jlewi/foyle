@@ -289,7 +289,9 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 //}
 
 func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, db *pebble.DB, traces *pebble.DB) error {
-	return errors.New("This code needs to be updated to work with the new protos and the new DB schema")
+	log := logs.FromContext(ctx)
+	log.Info("Code to identify best RAG result needs to be updated")
+	return nil
 	//olog := logs.FromContext(ctx)
 	//iter, err := db.NewIterWithContext(ctx, nil)
 	//if err != nil {
