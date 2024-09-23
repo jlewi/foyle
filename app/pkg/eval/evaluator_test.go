@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"github.com/go-logr/zapr"
 	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
@@ -93,18 +94,21 @@ func experimentForTesting() (*api.Experiment, error) {
 	//if err != nil {
 	//	return nil, errors.Wrapf(err, "Error getting eval directory")
 	//}
-
+	log := zapr.NewLogger(zap.L())
 	oDir, err := os.MkdirTemp("", "testOutput")
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error creating temp directory")
 	}
+
+	dbFile := filepath.Join(oDir, "results.sqlite")
+	log.Info("Output database", "database", dbFile)
 
 	return &api.Experiment{
 		Spec: api.ExperimentSpec{
 			// EvalDir is the directory containing the eval example protos
 			EvalDir:      "/Users/jlewi/tmp/examples-for-testing",
 			AgentAddress: "http://localhost:10777/api",
-			OutputDB:     filepath.Join(oDir, "results.sqlite"),
+			OutputDB:     dbFile,
 		},
 	}, nil
 }

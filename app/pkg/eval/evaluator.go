@@ -3,6 +3,7 @@ package eval
 import (
 	"connectrpc.com/connect"
 	"context"
+	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	"github.com/jlewi/foyle/app/pkg/runme/ulid"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
@@ -65,16 +66,6 @@ func (e *Evaluator) ReconcileNode(ctx context.Context, node *yaml.RNode) error {
 
 func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) error {
 	log := logs.FromContext(ctx).WithValues("experiment", experiment.Metadata.Name)
-	//log.Info("Opening database", "database", experiment.Spec.DBDir)
-	//db, err := pebble.Open(experiment.Spec.DBDir, &pebble.Options{})
-	//if err != nil {
-	//	return err
-	//}
-	//defer helpers.DeferIgnoreError(db.Close)
-	//
-	//if experiment.Spec.Agent == nil {
-	//	return errors.New("Agent is required")
-	//}
 	aiClient := newAIServiceClient(experiment.Spec.AgentAddress)
 
 	manager, err := openResultsManager(experiment.Spec.OutputDB)
@@ -145,6 +136,13 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time, client v1alpha1connect.AIServiceClient, manager *ResultsManager) error {
 	oLog := logs.FromContext(ctx)
 
+	oaiClient, err := oai.NewClient(e.config)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to create OpenAI client")
+	}
+
+	judge, err := NewJudge(oaiClient)
+
 	// Now iterate over the examples and process them.
 	for _, example := range examples {
 		log := oLog.WithValues("exampleId", example.GetId())
@@ -154,87 +152,102 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 			continue
 		}
 
-		sessionID := ulid.GenerateID()
+		var processErr error
 
-		//selectedCell := example.GetFullContext().GetNotebook().GetCells()[example.GetFullContext().GetSelected()]
-		//// We need to send a LOG event to the agent to simulate the cells being executed.
-		//
-		logEventReq := &v1alpha1.LogEventsRequest{}
-		logEventReq.Events = append(logEventReq.Events, &v1alpha1.LogEvent{
-			Type:          v1alpha1.LogEventType_SESSION_START,
-			ContextId:     sessionID,
-			SelectedIndex: example.GetFullContext().GetSelected(),
+		manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
+			processErr = e.processResult(ctx, result, example, client, judge)
+			return nil
 		})
 
-		_, err := client.LogEvents(ctx, connect.NewRequest(logEventReq))
-		if err != nil {
-			log.Error(err, "Failed to log events")
-			// For now abort on error to see what's going on.
-			return errors.Wrapf(err, "Failed to log events")
+		if processErr != nil {
+			log.Error(processErr, "Failed to process example")
+			// For now we abort on error to see what's going on.
+			return processErr
 		}
+	}
+	return nil
+}
 
-		request := &v1alpha1.GenerateCellsRequest{
-			Notebook: example.GetFullContext().GetNotebook(),
-		}
+// processResult process the result. It is updated in place
+func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResult, example *v1alpha1.EvalExample, client v1alpha1connect.AIServiceClient, judge *Judge) error {
+	log := logs.FromContext(ctx).WithValues("exampleId", example.GetId())
 
-		resp, err := client.GenerateCells(ctx, connect.NewRequest(request))
-		if err != nil {
-			log.Error(err, "Failed to generate cells")
-			uErr := manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
-				result.Error = err.Error()
-				return nil
-			})
-			if uErr != nil {
-				log.Error(uErr, "Failed to update result")
-			}
+	result.Example = example
+
+	sessionID := ulid.GenerateID()
+
+	//selectedCell := example.GetFullContext().GetNotebook().GetCells()[example.GetFullContext().GetSelected()]
+	//// We need to send a LOG event to the agent to simulate the cells being executed.
+	//
+	logEventReq := &v1alpha1.LogEventsRequest{}
+	logEventReq.Events = append(logEventReq.Events, &v1alpha1.LogEvent{
+		Type:          v1alpha1.LogEventType_SESSION_START,
+		ContextId:     sessionID,
+		SelectedIndex: example.GetFullContext().GetSelected(),
+	})
+
+	_, err := client.LogEvents(ctx, connect.NewRequest(logEventReq))
+	if err != nil {
+		log.Error(err, "Failed to log events")
+		// For now abort on error to see what's going on.
+		return errors.Wrapf(err, "Failed to log events")
+	}
+
+	request := &v1alpha1.GenerateCellsRequest{
+		Notebook: example.GetFullContext().GetNotebook(),
+	}
+
+	resp, err := client.GenerateCells(ctx, connect.NewRequest(request))
+	if err != nil {
+		log.Error(err, "Failed to generate cells")
+		result.Error = err.Error()
+		return err
+	}
+
+	result.ActualCells = resp.Msg.GetCells()
+	// TODO(jeremy): We should set the traceId based on OTEL.
+	// There's a couple of ways we could do this.
+	// 1. We could have the client set the traceId but then we'd have to configure the server to trust the client
+	//    trace per https://github.com/connectrpc/otelconnect-go?tab=readme-ov-file#configuration-for-internal-services
+	// 2. The server could set the trace id and I believe it should be in the response? and then the client can
+	// get it?
+	// result.GenTraceId = resp.Msg.GetTraceId()
+
+	// We need to send a LOG event to the agent to simulate the cells being executed.
+	executeEventReq := &v1alpha1.LogEventsRequest{}
+
+	for _, cell := range resp.Msg.GetCells() {
+
+		if cell.Kind != parserv1.CellKind_CELL_KIND_CODE {
 			continue
 		}
 
-		uErr := manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
-			result.ActualCells = resp.Msg.GetCells()
-			return nil
+		executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+			Type: v1alpha1.LogEventType_SESSION_START,
 		})
-		if uErr != nil {
-			log.Error(uErr, "Failed to update result")
-		}
 
-		// TODO(jeremy): We should set the traceId based on OTEL.
-		// There's a couple of ways we could do this.
-		// 1. We could have the client set the traceId but then we'd have to configure the server to trust the client
-		//    trace per https://github.com/connectrpc/otelconnect-go?tab=readme-ov-file#configuration-for-internal-services
-		// 2. The server could set the trace id and I believe it should be in the response? and then the client can
-		// get it?
-		// result.GenTraceId = resp.Msg.GetTraceId()
-
-		// We need to send a LOG event to the agent to simulate the cells being executed.
-		executeEventReq := &v1alpha1.LogEventsRequest{}
-
-		for _, cell := range resp.Msg.GetCells() {
-
-			if cell.Kind != parserv1.CellKind_CELL_KIND_CODE {
-				continue
-			}
-
-			executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
-				Type: v1alpha1.LogEventType_SESSION_START,
-			})
-
-			executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
-				Type: v1alpha1.LogEventType_EXECUTE,
-				Cells: []*parserv1.Cell{
-					cell,
-				},
-				SelectedIndex: 0,
-				SelectedId:    converters.GetCellID(cell),
-			})
-		}
-
-		if _, err := client.LogEvents(ctx, connect.NewRequest(executeEventReq)); err != nil {
-			log.Error(err, "Failed to log events")
-			// For now abort on error to see what's going on.
-			return errors.Wrapf(err, "Failed to log events")
-		}
+		executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+			Type: v1alpha1.LogEventType_EXECUTE,
+			Cells: []*parserv1.Cell{
+				cell,
+			},
+			SelectedIndex: 0,
+			SelectedId:    converters.GetCellID(cell),
+		})
 	}
+
+	if _, err := client.LogEvents(ctx, connect.NewRequest(executeEventReq)); err != nil {
+		log.Error(err, "Failed to log events")
+		result.Error = errors.Wrapf(err, "Failed to log events").Error()
+		return errors.Wrapf(err, "Failed to log events")
+	}
+
+	if err := judge.Score(ctx, result); err != nil {
+		err := errors.Wrapf(err, "Failed to judge example %s", example.GetId())
+		result.Error = err.Error()
+		return err
+	}
+
 	return nil
 }
 

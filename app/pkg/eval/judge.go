@@ -47,6 +47,10 @@ func (j *Judge) Score(ctx context.Context, result *v1alpha1.EvalResult) error {
 		return errors.New("expected a single expected cell")
 	}
 
+	if len(result.GetActualCells()) < 1 {
+		return errors.New("expected at least one actual cell")
+	}
+
 	// Convert the cells to markdown
 	expectedNB := &parserv1.Notebook{
 		Cells: result.GetExample().ExpectedCells,

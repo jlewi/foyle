@@ -59,12 +59,37 @@ func NewResultsManager(db *sql.DB) (*ResultsManager, error) {
 	}, nil
 }
 
+// Get retrieves an example with the given id
+func (m *ResultsManager) Get(ctx context.Context, id string) (*v1alpha1.EvalResult, error) {
+	queries := m.queries
+
+	// Read the record
+	row, err := queries.GetResult(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	result := &v1alpha1.EvalResult{}
+	if err := protojson.Unmarshal([]byte(row.ProtoJson), result); err != nil {
+		return nil, errors.Wrapf(err, "Failed to deserialize EvalResult")
+	}
+
+	return result, nil
+}
+
 // Update updates an evaluation result. Update performs a read-modify-write operation on the results with the given id.
 // The updateFunc is called with the example to be updated. The updateFunc should modify the session in place.
 // If the updateFunc returns an error then the example is not updated.
 // If the given id doesn't exist then an empty Session is passed to updateFunc and the result will be
 // inserted if the updateFunc returns nil. If the session result exists then the result is passed to updateFunc
 // and the updated value is then written to the database
+//
+// TODO(jeremy): How should the update function signal an error that shouldn't block the update and should be reported
+// by Update. For example, when processing a result; we might have an error processing an example (e.g. generating
+// a completion). We still want to update the database though and signal to caller of the Update that the error failed.
+// Should the EvalResultUpdater return a boolean indicating whether to commit or rollback the transaction?
+// Should Update wrap the EvalResultUpdater in a error that stores the error returned by updateFunc?
 func (m *ResultsManager) Update(ctx context.Context, id string, updateFunc EvalResultUpdater) error {
 	log := logs.FromContext(ctx)
 	if id == "" {
