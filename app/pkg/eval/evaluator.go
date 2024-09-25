@@ -3,9 +3,12 @@ package eval
 import (
 	"connectrpc.com/connect"
 	"context"
+	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	"github.com/jlewi/foyle/app/pkg/runme/ulid"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"os"
@@ -21,7 +24,6 @@ import (
 	"github.com/jlewi/foyle/app/pkg/executor"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 )
@@ -34,6 +36,9 @@ type Evaluator struct {
 	config config.Config
 	parser *executor.BashishParser
 }
+
+// N.B. One issue with noise in the simulation is that the speed of log processing affects whether example
+// has been learned from by the next time it is processed.
 
 // NewEvaluator creates a new Evaluator
 // The evaluator assumes that the analyzer is already running in the background and processing logs.
@@ -67,6 +72,11 @@ func (e *Evaluator) ReconcileNode(ctx context.Context, node *yaml.RNode) error {
 func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) error {
 	log := logs.FromContext(ctx).WithValues("experiment", experiment.Metadata.Name)
 	aiClient := newAIServiceClient(experiment.Spec.AgentAddress)
+
+	logsClient := logspbconnect.NewLogsServiceClient(
+		newHTTPClient(),
+		experiment.Spec.AgentAddress,
+	)
 
 	manager, err := openResultsManager(experiment.Spec.OutputDB)
 	if err != nil {
@@ -114,26 +124,18 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	sortEvalExamplesInTime(examples)
 
 	// Now generate predictions for any results that are missing them.
-	if err := e.processExamples(ctx, examples, lastProcessedTime, aiClient, manager); err != nil {
+	if err := e.processExamples(ctx, examples, lastProcessedTime, aiClient, logsClient, manager); err != nil {
 		return err
 	}
 
-	// TODO(jeremy): We should get the traces via API because only one process can access the pebble DB at a time.
-	// And the agent needs access to the pebble DB traces.
-	tracesDB, err := pebble.Open(e.config.GetTracesDBDir(), &pebble.Options{})
-	if err != nil {
-		return err
-	}
-	defer helpers.DeferIgnoreError(tracesDB.Close)
-
-	if err := e.reconcileBestRAGResult(ctx, nil, tracesDB); err != nil {
+	if err := e.reconcileBestRAGResult(ctx, nil, nil); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time, client v1alpha1connect.AIServiceClient, manager *ResultsManager) error {
+func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, manager *ResultsManager) error {
 	oLog := logs.FromContext(ctx)
 
 	oaiClient, err := oai.NewClient(e.config)
@@ -164,6 +166,12 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 			// For now we abort on error to see what's going on.
 			return processErr
 		}
+
+		result, err := manager.Get(ctx, example.GetId())
+		if err != nil {
+			return errors.Wrapf(err, "Failed to get latest result for example %s", example.GetId())
+		}
+		e.waitForBlockLog(ctx, result, logsClient)
 	}
 	return nil
 }
@@ -174,15 +182,15 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 
 	result.Example = example
 
-	sessionID := ulid.GenerateID()
+	// ID for the generate session
+	genSessionID := ulid.GenerateID()
 
-	//selectedCell := example.GetFullContext().GetNotebook().GetCells()[example.GetFullContext().GetSelected()]
-	//// We need to send a LOG event to the agent to simulate the cells being executed.
-	//
+	// We need to send a session event to the agent to simulate the session starting.
+	// This is because SessionStart event will contain the full context used with the execution
 	logEventReq := &v1alpha1.LogEventsRequest{}
 	logEventReq.Events = append(logEventReq.Events, &v1alpha1.LogEvent{
 		Type:          v1alpha1.LogEventType_SESSION_START,
-		ContextId:     sessionID,
+		ContextId:     genSessionID,
 		SelectedIndex: example.GetFullContext().GetSelected(),
 	})
 
@@ -205,16 +213,25 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 	}
 
 	result.ActualCells = resp.Msg.GetCells()
-	// TODO(jeremy): We should set the traceId based on OTEL.
-	// There's a couple of ways we could do this.
-	// 1. We could have the client set the traceId but then we'd have to configure the server to trust the client
-	//    trace per https://github.com/connectrpc/otelconnect-go?tab=readme-ov-file#configuration-for-internal-services
-	// 2. The server could set the trace id and I believe it should be in the response? and then the client can
-	// get it?
-	// result.GenTraceId = resp.Msg.GetTraceId()
+
+	traceParent := resp.Header().Get(agent.TraceIDHeader)
+	if traceParent == "" {
+		return errors.New("GenerateCells response didn't contain traceparent header")
+	}
+	result.GenTraceId = traceParent
 
 	// We need to send a LOG event to the agent to simulate the cells being executed.
 	executeEventReq := &v1alpha1.LogEventsRequest{}
+
+	// We need to close the generate session session.
+	executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+		ContextId: genSessionID,
+		Type:      v1alpha1.LogEventType_SESSION_END,
+	})
+
+	// Start a session to execute the cell
+
+	execSessionID := ulid.GenerateID()
 
 	for _, cell := range resp.Msg.GetCells() {
 
@@ -223,16 +240,23 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 		}
 
 		executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
-			Type: v1alpha1.LogEventType_SESSION_START,
+			Type:      v1alpha1.LogEventType_SESSION_START,
+			ContextId: execSessionID,
 		})
 
 		executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
-			Type: v1alpha1.LogEventType_EXECUTE,
+			ContextId: execSessionID,
+			Type:      v1alpha1.LogEventType_EXECUTE,
 			Cells: []*parserv1.Cell{
 				cell,
 			},
 			SelectedIndex: 0,
 			SelectedId:    converters.GetCellID(cell),
+		})
+
+		executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+			Type:      v1alpha1.LogEventType_SESSION_END,
+			ContextId: execSessionID,
 		})
 	}
 
@@ -249,6 +273,60 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 	}
 
 	return nil
+}
+
+func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalResult, client logspbconnect.LogsServiceClient) error {
+	// We need to wait for the block log to be processed.
+	// This is done to
+	// 1. Increase the likelihood we have learned from the block
+	// 2. To verify that the evaluator properly sends the data needed for the agent to learn from the block.
+	log := logs.FromContext(ctx)
+	if len(result.GetActualCells()) == 0 {
+		return errors.New("Actual cells are empty")
+	}
+
+	// TODO(jeremy): What should we do if there's more than 1 code cell?
+	var codeCell *parserv1.Cell
+	for _, cell := range result.GetActualCells() {
+		if cell.Kind == parserv1.CellKind_CELL_KIND_CODE {
+			codeCell = cell
+			break
+		}
+	}
+
+	if codeCell == nil {
+		return errors.New("No code cell found")
+	}
+
+	cellID := converters.GetCellID(codeCell)
+	if cellID == "" {
+		return errors.New("Cell ID is empty")
+	}
+
+	timeOut := time.Now().Add(3 * time.Minute)
+
+	var blockLog *logspb.BlockLog
+	for time.Now().Before(timeOut) {
+
+		resp, err := client.GetBlockLog(ctx, connect.NewRequest(&logspb.GetBlockLogRequest{
+			Id: cellID,
+		}))
+
+		if err != nil {
+			log.Info("Failed to get block log", "err", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		blockLog = resp.Msg.GetBlockLog()
+		if blockLog.ExecutedBlock != nil {
+			// We find a fully formed block
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	return errors.New("Timed out waiting for block log. This could indicate we aren't properly sending the events needed to generate a BlockLog suitable for learning.")
 }
 
 //func updateResult(ctx context.Context, id string, result *v1alpha1.EvalResult, db *pebble.DB) error {
@@ -302,6 +380,7 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 //}
 
 func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, db *pebble.DB, traces *pebble.DB) error {
+	// TODO(jeremy): We should get the generate trace via API and then store the RAG result in the EvalResult
 	log := logs.FromContext(ctx)
 	log.Info("Code to identify best RAG result needs to be updated")
 	return nil
