@@ -92,9 +92,6 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 
 	log.Info("Found eval files", "numFiles", len(files))
 
-	// 1. Get the last eval example id that was processed.
-	// lastExample, err := getIDOfLastExample(edb)
-
 	// Default the time of the lastProcessedEval example to some time in the past.
 	// This way all examples should be after it and get reprocessed
 	lastProcessedTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
@@ -128,10 +125,6 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 		return err
 	}
 
-	if err := e.reconcileBestRAGResult(ctx, nil, nil); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -156,8 +149,9 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 
 		var processErr error
 
-		manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
-			processErr = e.processResult(ctx, result, example, client, judge)
+		uErr := manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
+			processErr = e.processResult(ctx, result, example, client, logsClient, judge)
+			// We need to return for the transaction to be committed.
 			return nil
 		})
 
@@ -167,17 +161,47 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 			return processErr
 		}
 
+		if uErr != nil {
+			log.Error(uErr, "Failed to update result")
+			// For now we abort on error to see what's going on.
+			return uErr
+		}
+
 		result, err := manager.Get(ctx, example.GetId())
 		if err != nil {
 			return errors.Wrapf(err, "Failed to get latest result for example %s", example.GetId())
 		}
-		e.waitForBlockLog(ctx, result, logsClient)
+		if err := e.waitForBlockLog(ctx, result, logsClient); err != nil {
+			log.Error(err, "Failed to wait for block log")
+			// For now we abort on error to see what's going on.
+			return errors.Wrapf(err, "Failed to get block log for example %s", example.GetId())
+		}
+
+		var ragErr error
+		// Getting the bestRAG result depends on the trace having been processed so we run after waiting for the BlockLog
+		uErr = manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
+			ragErr = e.reconcileBestRAGResult(ctx, result, logsClient)
+			return nil
+		})
+
+		if ragErr != nil {
+			log.Error(ragErr, "Failed to reconcile best RAG result")
+			// For now we abort on error to see what's going on.
+			return ragErr
+		}
+
+		if uErr != nil {
+			log.Error(uErr, "Failed to update result")
+			// For now we abort on error to see what's going on.
+			return uErr
+		}
+
 	}
 	return nil
 }
 
 // processResult process the result. It is updated in place
-func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResult, example *v1alpha1.EvalExample, client v1alpha1connect.AIServiceClient, judge *Judge) error {
+func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResult, example *v1alpha1.EvalExample, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, judge *Judge) error {
 	result.Example = example
 
 	if err := runGenerate(ctx, result, client); err != nil {
@@ -374,129 +398,48 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 	return errors.New("Timed out waiting for block log. This could indicate we aren't properly sending the events needed to generate a BlockLog suitable for learning.")
 }
 
-//func updateResult(ctx context.Context, id string, result *v1alpha1.EvalResult, db *pebble.DB) error {
-//	b, err := proto.Marshal(result)
-//	if err != nil {
-//		return errors.Wrapf(err, "Failed to marshal result")
-//	}
-//	if err := db.Set([]byte(id), b, nil); err != nil {
-//		return errors.Wrapf(err, "Failed to write result to DB")
-//	}
-//	return nil
-//}
+func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, evalResult *v1alpha1.EvalResult, client logspbconnect.LogsServiceClient) error {
+	if evalResult.GenTraceId == "" {
+		return errors.WithStack(errors.New("GenTraceId is empty"))
+	}
 
-//func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error {
-//	olog := logs.FromContext(ctx)
-//	iter, err := db.NewIterWithContext(ctx, nil)
-//	if err != nil {
-//		return err
-//	}
-//	defer iter.Close()
-//
-//	for iter.First(); iter.Valid(); iter.Next() {
-//		key := iter.Key()
-//		if key == nil {
-//			break
-//		}
-//
-//		log := olog.WithValues("id", string(key))
-//		value, err := iter.ValueAndErr()
-//		if err != nil {
-//			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
-//		}
-//
-//		result := &v1alpha1.EvalResult{}
-//		if err := proto.Unmarshal(value, result); err != nil {
-//			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
-//		}
-//
-//		if result.Distance >= 0 && result.Status != v1alpha1.EvalResultStatus_UNKNOWN_EVAL_RESULT_STATUS {
-//			log.Info("Skipping; distance already computed")
-//			continue
-//		}
-//
-//		updateEvalResultDistance(ctx, e.parser, result)
-//		log.Info("Updating distance", "distance", result.Distance)
-//		if err := updateResult(ctx, string(key), result, db); err != nil {
-//			log.Error(err, "Failed to update result")
-//		}
-//	}
-//	return nil
-//}
+	resp, err := client.GetTrace(ctx, connect.NewRequest(&logspb.GetTraceRequest{
+		Id: evalResult.GenTraceId,
+	}))
 
-func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, db *pebble.DB, traces *pebble.DB) error {
-	// TODO(jeremy): We should get the generate trace via API and then store the RAG result in the EvalResult
-	log := logs.FromContext(ctx)
-	log.Info("Code to identify best RAG result needs to be updated")
+	// TODO(jeremy): Should we update EvalResult to indicate the failure
+	// What should we do if the experiment doesn't involve learning
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get trace %s", evalResult.GenTraceId)
+	}
+
+	genTrace := resp.Msg.GetTrace()
+
+	for _, span := range genTrace.Spans {
+		if span.GetRag() == nil {
+			continue
+		}
+		rag := span.GetRag()
+		if rag.Results == nil {
+			continue
+		}
+
+		for _, ragResult := range rag.Results {
+			if ragResult.Example == nil {
+				continue
+			}
+			if evalResult.BestRagResult == nil {
+				evalResult.BestRagResult = ragResult
+				continue
+			}
+
+			if evalResult.BestRagResult.Score < ragResult.Score {
+				evalResult.BestRagResult = ragResult
+			}
+		}
+	}
+
 	return nil
-	//olog := logs.FromContext(ctx)
-	//iter, err := db.NewIterWithContext(ctx, nil)
-	//if err != nil {
-	//	return err
-	//}
-	//defer iter.Close()
-	//
-	//for iter.First(); iter.Valid(); iter.Next() {
-	//	key := iter.Key()
-	//	if key == nil {
-	//		break
-	//	}
-	//
-	//	log := olog.WithValues("id", string(key))
-	//	value, err := iter.ValueAndErr()
-	//	if err != nil {
-	//		return errors.Wrapf(err, "Failed to read value for key %s", string(key))
-	//	}
-	//
-	//	result := &v1alpha1.EvalResult{}
-	//	if err := proto.Unmarshal(value, result); err != nil {
-	//		return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
-	//	}
-	//
-	//	// TODO(jeremy): How do we skip this step in the case where the experiment didn't involve RAG
-	//	if result.BestRagResult != nil {
-	//		log.Info("Skipping; best RAG result already computed")
-	//		continue
-	//	}
-	//
-	//	genTrace := &logspb.Trace{}
-	//	if err := dbutil.GetProto(traces, result.GenTraceId, genTrace); err != nil {
-	//		log.Error(err, "Failed to read gen trace", "id", result.GenTraceId)
-	//		continue
-	//	}
-	//
-	//	for _, span := range genTrace.Spans {
-	//		if span.GetRag() == nil {
-	//			continue
-	//		}
-	//		rag := span.GetRag()
-	//		if rag.Results == nil {
-	//			continue
-	//		}
-	//
-	//		for _, ragResult := range rag.Results {
-	//			if ragResult.Example == nil {
-	//				continue
-	//			}
-	//			if result.BestRagResult == nil {
-	//				result.BestRagResult = ragResult
-	//				continue
-	//			}
-	//
-	//			if result.BestRagResult.Score < ragResult.Score {
-	//				result.BestRagResult = ragResult
-	//			}
-	//		}
-	//	}
-	//
-	//	if result.BestRagResult == nil {
-	//		continue
-	//	}
-	//	if err := updateResult(ctx, string(key), result, db); err != nil {
-	//		log.Error(err, "Failed to update result")
-	//	}
-	//}
-	//return nil
 }
 
 //func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experiment, db *pebble.DB) error {
