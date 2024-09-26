@@ -200,11 +200,6 @@ func (db *InMemoryExampleDB) loadExamples(ctx context.Context) error {
 			return errors.Wrapf(err, "Failed to match glob %s", glob)
 		}
 
-		// TODO(jeremy): How should we handle there being no examples?
-		if len(matches) == 0 {
-			continue
-		}
-
 		if db.examples == nil {
 			db.examples = make([]*v1alpha1.Example, 0, len(matches))
 		}

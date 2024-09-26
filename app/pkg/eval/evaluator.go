@@ -178,10 +178,28 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 
 // processResult process the result. It is updated in place
 func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResult, example *v1alpha1.EvalExample, client v1alpha1connect.AIServiceClient, judge *Judge) error {
-	log := logs.FromContext(ctx).WithValues("exampleId", example.GetId())
-
 	result.Example = example
 
+	if err := runGenerate(ctx, result, client); err != nil {
+		return err
+	}
+
+	if err := runExecute(ctx, result, client); err != nil {
+		return err
+	}
+
+	if err := judge.Score(ctx, result); err != nil {
+		err := errors.Wrapf(err, "Failed to judge example %s", example.GetId())
+		result.Error = err.Error()
+		return err
+	}
+
+	return nil
+}
+
+// runGenerate runs the generate step for the example
+func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha1connect.AIServiceClient) error {
+	log := logs.FromContext(ctx)
 	// ID for the generate session
 	genSessionID := ulid.GenerateID()
 
@@ -191,7 +209,7 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 	logEventReq.Events = append(logEventReq.Events, &v1alpha1.LogEvent{
 		Type:          v1alpha1.LogEventType_SESSION_START,
 		ContextId:     genSessionID,
-		SelectedIndex: example.GetFullContext().GetSelected(),
+		SelectedIndex: result.Example.GetFullContext().GetSelected(),
 	})
 
 	_, err := client.LogEvents(ctx, connect.NewRequest(logEventReq))
@@ -202,7 +220,7 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 	}
 
 	request := &v1alpha1.GenerateCellsRequest{
-		Notebook: example.GetFullContext().GetNotebook(),
+		Notebook: result.Example.GetFullContext().GetNotebook(),
 	}
 
 	resp, err := client.GenerateCells(ctx, connect.NewRequest(request))
@@ -220,58 +238,79 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 	}
 	result.GenTraceId = traceParent
 
+	// We need to close the generate session session.
+	endEventsReq := &v1alpha1.LogEventsRequest{
+		Events: []*v1alpha1.LogEvent{
+			{
+				ContextId: genSessionID,
+				Type:      v1alpha1.LogEventType_SESSION_END,
+			},
+		},
+	}
+
+	_, err = client.LogEvents(ctx, connect.NewRequest(endEventsReq))
+	if err != nil {
+		log.Error(err, "Failed to log events")
+		// For now abort on error to see what's going on.
+		return errors.Wrapf(err, "Failed to log events")
+	}
+	return nil
+}
+
+func runExecute(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha1connect.AIServiceClient) error {
+	log := logs.FromContext(ctx)
 	// We need to send a LOG event to the agent to simulate the cells being executed.
 	executeEventReq := &v1alpha1.LogEventsRequest{}
 
-	// We need to close the generate session session.
-	executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
-		ContextId: genSessionID,
-		Type:      v1alpha1.LogEventType_SESSION_END,
-	})
-
 	// Start a session to execute the cell
-
 	execSessionID := ulid.GenerateID()
 
-	for _, cell := range resp.Msg.GetCells() {
-
-		if cell.Kind != parserv1.CellKind_CELL_KIND_CODE {
-			continue
-		}
-
-		executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
-			Type:      v1alpha1.LogEventType_SESSION_START,
-			ContextId: execSessionID,
-		})
-
-		executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
-			ContextId: execSessionID,
-			Type:      v1alpha1.LogEventType_EXECUTE,
-			Cells: []*parserv1.Cell{
-				cell,
-			},
-			SelectedIndex: 0,
-			SelectedId:    converters.GetCellID(cell),
-		})
-
-		executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
-			Type:      v1alpha1.LogEventType_SESSION_END,
-			ContextId: execSessionID,
-		})
+	if len(result.Example.ExpectedCells) != 1 {
+		return errors.New("Expected cells isn't 1; How did this make it into the evaluation dataset? Shouldn't all examples in the eval set have 1 expected cell")
 	}
+
+	if len(result.ActualCells) < 1 {
+		return errors.New("No cells were generated even though one was expected. The way learning works we won't generate a learning example in this case. How should we handle it in evaluation")
+	}
+
+	cell := result.Example.ExpectedCells[0]
+
+	if cell.Kind != parserv1.CellKind_CELL_KIND_CODE {
+		return errors.New("The expected cell in the example isn't of type CELL_KIND_CODE. How did this make it into the evaluation dataset? Shouldn't all examples in the eval set have 1 expected cell of type CELL_KIND_CODE")
+	}
+
+	actualID := converters.GetCellID(result.ActualCells[0])
+	if actualID == "" {
+		return errors.New("Actual cell ID is empty")
+	}
+
+	converters.SetCellID(cell, actualID)
+
+	executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+		Type:      v1alpha1.LogEventType_SESSION_START,
+		ContextId: execSessionID,
+	})
+
+	executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+		ContextId: execSessionID,
+		Type:      v1alpha1.LogEventType_EXECUTE,
+		Cells: []*parserv1.Cell{
+			cell,
+		},
+		SelectedIndex: 0,
+		SelectedId:    converters.GetCellID(cell),
+	})
+
+	executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+		Type:      v1alpha1.LogEventType_SESSION_END,
+		ContextId: execSessionID,
+	})
 
 	if _, err := client.LogEvents(ctx, connect.NewRequest(executeEventReq)); err != nil {
 		log.Error(err, "Failed to log events")
 		result.Error = errors.Wrapf(err, "Failed to log events").Error()
 		return errors.Wrapf(err, "Failed to log events")
 	}
-
-	if err := judge.Score(ctx, result); err != nil {
-		err := errors.Wrapf(err, "Failed to judge example %s", example.GetId())
-		result.Error = err.Error()
-		return err
-	}
-
 	return nil
 }
 
@@ -319,11 +358,17 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 		}
 
 		blockLog = resp.Msg.GetBlockLog()
-		if blockLog.ExecutedBlock != nil {
-			// We find a fully formed block
-			return nil
+		if blockLog.ExecutedBlock == nil || blockLog.GeneratedBlock == nil {
+			log.Info("Block log isn't ready yet")
+			time.Sleep(5 * time.Second)
+			continue
 		}
-		time.Sleep(5 * time.Second)
+
+		if blockLog.GeneratedBlock.GetContents() != result.ActualCells[0].Value {
+			return errors.Errorf("BlockLog generated block doesn't match actual cell. This means the result of GenerateCells returned to the evaluator doesn't match the result that the Agent read from the BlockLogs and stored in its BlockLog; want: %s; got %s", result.ActualCells[0].Value, blockLog.GeneratedBlock.GetContents())
+		}
+
+		return nil
 	}
 
 	return errors.New("Timed out waiting for block log. This could indicate we aren't properly sending the events needed to generate a BlockLog suitable for learning.")
