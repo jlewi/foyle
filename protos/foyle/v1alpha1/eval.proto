@@ -35,6 +35,7 @@ message EvalResult {
 
   repeated runme.parser.v1.Cell actual_cells = 11;
 
+  // Error indicates an error generating the completion.
   string error = 5;
 
   // Status of the evaluation

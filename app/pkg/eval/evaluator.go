@@ -71,6 +71,19 @@ func (e *Evaluator) ReconcileNode(ctx context.Context, node *yaml.RNode) error {
 
 func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) error {
 	log := logs.FromContext(ctx).WithValues("experiment", experiment.Metadata.Name)
+
+	if experiment.Spec.AgentAddress == "" {
+		return errors.New("AgentAddress is required")
+	}
+
+	if experiment.Spec.OutputDB == "" {
+		return errors.New("OutputDB is required")
+	}
+
+	if experiment.Spec.EvalDir == "" {
+		return errors.New("EvalDir is required")
+	}
+
 	aiClient := newAIServiceClient(experiment.Spec.AgentAddress)
 
 	logsClient := logspbconnect.NewLogsServiceClient(
@@ -171,6 +184,13 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 		if err != nil {
 			return errors.Wrapf(err, "Failed to get latest result for example %s", example.GetId())
 		}
+
+		if result.Error != "" {
+			// Generating a completion failed for this example so we should keep going.
+			// There won't be a blocklog to wait for.
+			continue
+		}
+
 		if err := e.waitForBlockLog(ctx, result, logsClient); err != nil {
 			log.Error(err, "Failed to wait for block log")
 			// For now we abort on error to see what's going on.
@@ -208,6 +228,13 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 		return err
 	}
 
+	if result.Error != "" {
+		// Since an error occurred generating a completion for this example we can't continue to
+		// process this example
+		// We return nil because we want the evaluator to continue with other examples
+		return nil
+	}
+
 	if err := runExecute(ctx, result, client); err != nil {
 		return err
 	}
@@ -221,7 +248,11 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 	return nil
 }
 
-// runGenerate runs the generate step for the example
+// runGenerate runs the generate step for the example.
+//
+// runGenerate returns an error if there is a problem that should cause evaluation to abort rather than processing
+// other examples (e.g. unable to contact the agent). If there is a problem generating a completion for this specific
+// example then the result will be nil but result.Error will be set
 func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha1connect.AIServiceClient) error {
 	log := logs.FromContext(ctx)
 	// ID for the generate session
@@ -249,9 +280,21 @@ func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alph
 
 	resp, err := client.GenerateCells(ctx, connect.NewRequest(request))
 	if err != nil {
-		log.Error(err, "Failed to generate cells")
-		result.Error = err.Error()
-		return err
+		if connectErr := new(connect.Error); errors.As(err, &connectErr) {
+			// TODO(https://github.com/jlewi/foyle/issues/257)
+			// Currently GenerateCells returns a connect.Error if the completer can't generate a completion
+			// because of too many tokens.
+			if connect.CodeOf(err) == connect.CodeUnknown {
+				result.Error = err.Error()
+				// We return nil because the problem is specific to this example so the evaluator should move on
+				// to other examples
+				return nil
+			}
+		} else {
+			log.Error(err, "Failed to generate cells")
+			result.Error = err.Error()
+			return err
+		}
 	}
 
 	result.ActualCells = resp.Msg.GetCells()
@@ -294,7 +337,11 @@ func runExecute(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha
 	}
 
 	if len(result.ActualCells) < 1 {
-		return errors.New("No cells were generated even though one was expected. The way learning works we won't generate a learning example in this case. How should we handle it in evaluation")
+		// In this case the LLM failed to generate a cell. There's no point sending an execution event because
+		// There's no cellId to link the executed cell to the generation event.
+		// Currently, Foyle doesn't have a way of learning when the LLM fails to generate a cell. Learning
+		// only occurs if 1) Foyle generates a cell, 2) user edits cell 3) user executes the cell
+		return nil
 	}
 
 	cell := result.Example.ExpectedCells[0]
@@ -609,6 +656,9 @@ func findUnloadedFiles(ctx context.Context, db *pebble.DB, files []string) ([]st
 // listEvalFiles returns a list of the all the binary protobuf files in the directory evalDir.
 func listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
 	examples := make([]string, 0, 100)
+	if evalDir == "" {
+		return examples, errors.Wrapf(errors.New("evalDir is empty"), "evalDir is empty")
+	}
 	err := filepath.Walk(evalDir, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil

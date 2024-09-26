@@ -202,53 +202,7 @@ func (f *fakeClient) LogEvents(ctx context.Context, req *connect.Request[v1alpha
 	return connect.NewResponse(&v1alpha1.LogEventsResponse{}), nil
 }
 
-//func Test_Evaluator_Google_Sheets(t *testing.T) {
-//	if os.Getenv("GITHUB_ACTIONS") != "" {
-//		t.Skipf("Test is skipped in GitHub actions")
-//	}
-//
-//	t.Fatalf("Evaluator test needs to be updated per https://github.com/jlewi/foyle/issues/140")
-//
-//	log, err := zap.NewDevelopmentConfig().Build()
-//	if err != nil {
-//		t.Fatalf("Error creating logger; %v", err)
-//	}
-//	zap.ReplaceGlobals(log)
-//
-//	if err := config.InitViper(nil); err != nil {
-//		t.Fatalf("Error initializing Viper; %v", err)
-//	}
-//	cfg := config.GetConfig()
-//
-//	e, err := NewEvaluator(*cfg)
-//	if err != nil {
-//		t.Fatalf("Error creating evaluator; %v", err)
-//	}
-//
-//	experiment, err := experimentForTesting()
-//	if err != nil {
-//		t.Fatalf("Error creating experiment; %v", err)
-//	}
-//
-//	db, err := pebble.Open(experiment.Spec.DBDir, &pebble.Options{})
-//	if err != nil {
-//		t.Fatalf("Error opening DB; %v", err)
-//	}
-//	defer helpers.DeferIgnoreError(db.Close)
-//	//if err := e.updateGoogleSheet(context.Background(), *experiment, db); err != nil {
-//	//	t.Fatalf("Error updating Google Sheet; %v", err)
-//	//}
-//}
-
 func experimentForTesting() (*api.Experiment, error) {
-	//cwd, err := os.Getwd()
-	//if err != nil {
-	//	return nil, errors.Wrapf(err, "Error getting working directory")
-	//}
-	//evalDir, err := filepath.Abs(filepath.Join(cwd, "..", "..", "..", "data", "eval"))
-	//if err != nil {
-	//	return nil, errors.Wrapf(err, "Error getting eval directory")
-	//}
 	log := zapr.NewLogger(zap.L())
 	oDir, err := os.MkdirTemp("", "testOutput")
 	if err != nil {

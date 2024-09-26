@@ -25,10 +25,15 @@ type ResultsManager struct {
 type EvalResultUpdater func(result *v1alpha1.EvalResult) error
 
 func openResultsManager(dbFile string) (*ResultsManager, error) {
+	stat, err := os.Stat(dbFile)
+	if err == nil && stat.IsDir() {
+		return nil, errors.Wrapf(err, "Can't open database: %v; it is a directory", dbFile)
+	}
 	dbDir := filepath.Dir(dbFile)
 	if err := os.MkdirAll(dbDir, helpers.UserGroupAllPerm); err != nil {
 		return nil, errors.Wrapf(err, "Failed to create directory: %v", dbDir)
 	}
+
 	db, err := sql.Open(analyze.SQLLiteDriver, dbFile)
 
 	if err != nil {
