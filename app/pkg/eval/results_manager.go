@@ -1,13 +1,12 @@
 package eval
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"database/sql"
 	_ "embed"
-	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/analyze/fsql"
@@ -174,28 +173,43 @@ func (m *ResultsManager) Update(ctx context.Context, id string, updateFunc EvalR
 	return nil
 }
 
-func (m *SessionsManager) ListSessions(ctx context.Context, request *connect.Request[logspb.ListSessionsRequest]) (*connect.Response[logspb.ListSessionsResponse], error) {
-	log := logs.FromContext(ctx)
-	queries := m.queries
-	dbSessions, err := queries.ListSessions(ctx)
+// ListResults lists the results in the database if cursor is nil then the first page is returned.
+// If cursor is non-nil then the next page is returned.
+// The cursor is the time.
+func (m *ResultsManager) ListResults(ctx context.Context, cursor *time.Time, pageSize int) ([]*v1alpha1.EvalResult, *time.Time, error) {
+	params := fsql.ListResultsParams{
+		PageSize: int64(pageSize),
+	}
+
+	if cursor != nil {
+		params.Cursor = *cursor
+	} else {
+		params.Cursor = ""
+	}
+
+	rows, err := m.queries.ListResults(ctx, params)
+
 	if err != nil {
-		log.Error(err, "Failed to list sessions")
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to  list sessions"))
+		return nil, nil, errors.Wrapf(err, "Failed to list results")
 	}
 
-	resp := &logspb.ListSessionsResponse{
-		Sessions: make([]*logspb.Session, 0, len(dbSessions)),
+	results := make([]*v1alpha1.EvalResult, 0)
+
+	// ListResults return nil if there are no results
+	if rows == nil {
+		return results, nil, nil
 	}
-	for _, s := range dbSessions {
-		sess := &logspb.Session{}
-		if err := proto.Unmarshal(s.Proto, sess); err != nil {
-			log.Error(err, "Failed to deserialize session", "contextId", s.Contextid)
-			continue
+
+	for _, row := range rows {
+		result := &v1alpha1.EvalResult{}
+		if err := protojson.Unmarshal([]byte(row.ProtoJson), result); err != nil {
+			return nil, nil, errors.Wrapf(err, "Failed to deserialize EvalResult")
 		}
-		resp.Sessions = append(resp.Sessions, sess)
+		results = append(results, result)
 	}
-
-	return connect.NewResponse(resp), nil
+	lastTime := &time.Time{}
+	*lastTime = rows[len(rows)-1].Time
+	return results, lastTime, nil
 }
 
 func protoToRowUpdate(result *v1alpha1.EvalResult) (*fsql.UpdateResultParams, error) {

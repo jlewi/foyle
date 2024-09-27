@@ -1,6 +1,13 @@
 package eval
 
 import (
+	"context"
+	"database/sql"
+	"github.com/jlewi/foyle/app/pkg/analyze"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,7 +18,6 @@ import (
 )
 
 func Test_protoToRowUpdate(t *testing.T) {
-
 	type testCase struct {
 		name   string
 		result *v1alpha1.EvalResult
@@ -55,5 +61,88 @@ func Test_protoToRowUpdate(t *testing.T) {
 				t.Fatalf("Unexpected diff between expected and actual EvalResults:\n%v", d)
 			}
 		})
+	}
+}
+
+func Test_ListResults(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "Test_ListResults")
+	defer os.RemoveAll(tempDir)
+	if err != nil {
+		t.Fatalf("Error creating temp dir: %v", err)
+	}
+
+	dbFile := filepath.Join(tempDir, "results.db")
+
+	db, err := sql.Open(analyze.SQLLiteDriver, dbFile)
+	if err != nil {
+		t.Fatalf("Error creating database: %v", err)
+	}
+
+	m, err := NewResultsManager(db)
+	if err != nil {
+		t.Fatalf("Error creating ResultsManager: %v", err)
+	}
+
+	// Try listing the results when there are no results
+	rows, _, err := m.ListResults(context.Background(), nil, 10)
+	if err != nil {
+		t.Fatalf("Error listing results: %v", err)
+	}
+
+	if len(rows) != 0 {
+		t.Fatalf("Expected no results but got %v", len(rows))
+	}
+
+	// Now insert some rows.
+	baseTime := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+	results := []*v1alpha1.EvalResult{
+		{
+			Example: &v1alpha1.EvalExample{
+				Id:   "1",
+				Time: timestamppb.New(baseTime),
+			},
+		},
+		{
+			Example: &v1alpha1.EvalExample{
+				Id:   "2",
+				Time: timestamppb.New(baseTime.Add(time.Hour)),
+			},
+		},
+		{
+			Example: &v1alpha1.EvalExample{
+				Id:   "3",
+				Time: timestamppb.New(baseTime.Add(-1 * time.Hour)),
+			},
+		},
+	}
+
+	for _, r := range results {
+		uErr := m.Update(context.Background(), r.Example.Id, func(result *v1alpha1.EvalResult) error {
+			proto.Merge(result, r)
+			return nil
+		})
+		if uErr != nil {
+			t.Fatalf("Error inserting result: %v", err)
+		}
+	}
+
+	// List the results
+	rows, cursor, err := m.ListResults(context.Background(), nil, 10)
+
+	if err != nil {
+		t.Fatalf("Error listing results: %v", err)
+	}
+
+	if len(rows) != 3 {
+		t.Fatalf("Expected 3 results but got %v", len(rows))
+	}
+
+	if !isSortedByTimeDescending(rows) {
+		t.Fatalf("Results are not sorted by time")
+	}
+
+	expected := baseTime.Add(-1 * time.Hour)
+	if *cursor != baseTime.Add(-1*time.Hour) {
+		t.Fatalf("Cursor is invalid; Got %v; Want %v", *cursor, expected)
 	}
 }
