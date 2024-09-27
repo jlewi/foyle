@@ -157,6 +157,10 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 
 	judge, err := NewJudge(oaiClient)
 
+	if err != nil {
+		return errors.Wrapf(err, "Failed to create Judge")
+	}
+
 	// Now iterate over the examples and process them.
 	for _, example := range examples {
 		log := oLog.WithValues("exampleId", example.GetId())
@@ -462,17 +466,38 @@ func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, evalResult *v1al
 		return errors.WithStack(errors.New("GenTraceId is empty"))
 	}
 
-	resp, err := client.GetTrace(ctx, connect.NewRequest(&logspb.GetTraceRequest{
-		Id: evalResult.GenTraceId,
-	}))
+	timeOut := time.Now().Add(3 * time.Minute)
+	var genTrace *logspb.Trace
+	for {
+		if time.Now().After(timeOut) {
+			return errors.Errorf("Timed out waiting for traceId to be ready; traceId: %s", evalResult.GenTraceId)
+		}
+
+		resp, err := client.GetTrace(ctx, connect.NewRequest(&logspb.GetTraceRequest{
+			Id: evalResult.GenTraceId,
+		}))
+
+		if err == nil {
+			genTrace = resp.Msg.GetTrace()
+			break
+		}
+
+		// Check if the error is a "not found" error
+		// We want to retry if the trace isn't found because it might not have been processed yet
+		if connect.CodeOf(err) != connect.CodeNotFound {
+			// If it's any other error, consider it a permanent error
+			return errors.Wrapf(err, "Failed to get trace %s", evalResult.GenTraceId)
+		}
+
+		time.Sleep(5 * time.Second)
+	}
 
 	// TODO(jeremy): Should we update EvalResult to indicate the failure
 	// What should we do if the experiment doesn't involve learning
-	if err != nil {
-		return errors.Wrapf(err, "Failed to get trace %s", evalResult.GenTraceId)
-	}
 
-	genTrace := resp.Msg.GetTrace()
+	if genTrace == nil {
+		return errors.WithStack(errors.Errorf("Trace %s is nil", evalResult.GenTraceId))
+	}
 
 	for _, span := range genTrace.Spans {
 		if span.GetRag() == nil {
@@ -540,11 +565,13 @@ func getLastProcessedTime(ctx context.Context, manager *ResultsManager) (time.Ti
 	lastProcessedTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	alreadyProcessed, _, err := manager.ListResults(ctx, nil, 10)
-	if len(alreadyProcessed) == 0 {
 
-	}
 	if err != nil {
 		return lastProcessedTime, errors.Wrapf(err, "Failed to list already processed results")
+	}
+
+	if len(alreadyProcessed) == 0 {
+		return lastProcessedTime, nil
 	}
 
 	if !isSortedByTimeDescending(alreadyProcessed) {

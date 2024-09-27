@@ -3,13 +3,14 @@ package eval
 import (
 	"context"
 	"database/sql"
-	"github.com/jlewi/foyle/app/pkg/analyze"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/jlewi/foyle/app/pkg/analyze"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

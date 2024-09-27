@@ -3,9 +3,10 @@ package eval
 import (
 	"context"
 	"crypto/tls"
-	"golang.org/x/net/http2"
 	"net"
 	"net/http"
+
+	"golang.org/x/net/http2"
 )
 
 func newHTTPClient() *http.Client {
