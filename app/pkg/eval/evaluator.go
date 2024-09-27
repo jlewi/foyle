@@ -402,7 +402,8 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 	// 2. To verify that the evaluator properly sends the data needed for the agent to learn from the block.
 	log := logs.FromContext(ctx)
 	if len(result.GetActualCells()) == 0 {
-		return errors.New("Actual cells are empty")
+		// Since no cells were actually generated there won't be any blocklog to wait for.
+		return nil
 	}
 
 	// TODO(jeremy): What should we do if there's more than 1 code cell?
@@ -415,7 +416,8 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 	}
 
 	if codeCell == nil {
-		return errors.New("No code cell found")
+		// Since there is no code cell there's no blockLog to fetch
+		return nil
 	}
 
 	cellID := converters.GetCellID(codeCell)
