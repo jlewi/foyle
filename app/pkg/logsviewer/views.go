@@ -2,6 +2,7 @@ package logsviewer
 
 import (
 	"bytes"
+
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 

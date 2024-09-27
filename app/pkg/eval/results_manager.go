@@ -1,9 +1,14 @@
 package eval
 
 import (
+	"connectrpc.com/connect"
 	"context"
 	"database/sql"
 	_ "embed"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	"os"
+	"path/filepath"
+
 	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/analyze/fsql"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -11,8 +16,6 @@ import (
 	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
-	"os"
-	"path/filepath"
 )
 
 // ResultsManager manages the database containing the evaluation results
@@ -169,6 +172,30 @@ func (m *ResultsManager) Update(ctx context.Context, id string, updateFunc EvalR
 	}
 
 	return nil
+}
+
+func (m *SessionsManager) ListSessions(ctx context.Context, request *connect.Request[logspb.ListSessionsRequest]) (*connect.Response[logspb.ListSessionsResponse], error) {
+	log := logs.FromContext(ctx)
+	queries := m.queries
+	dbSessions, err := queries.ListSessions(ctx)
+	if err != nil {
+		log.Error(err, "Failed to list sessions")
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "Failed to  list sessions"))
+	}
+
+	resp := &logspb.ListSessionsResponse{
+		Sessions: make([]*logspb.Session, 0, len(dbSessions)),
+	}
+	for _, s := range dbSessions {
+		sess := &logspb.Session{}
+		if err := proto.Unmarshal(s.Proto, sess); err != nil {
+			log.Error(err, "Failed to deserialize session", "contextId", s.Contextid)
+			continue
+		}
+		resp.Sessions = append(resp.Sessions, sess)
+	}
+
+	return connect.NewResponse(resp), nil
 }
 
 func protoToRowUpdate(result *v1alpha1.EvalResult) (*fsql.UpdateResultParams, error) {

@@ -2,8 +2,9 @@ package eval
 
 import (
 	"fmt"
-	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"testing"
+
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )

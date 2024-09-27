@@ -2,12 +2,13 @@ package eval
 
 import (
 	"context"
+	"os"
+	"testing"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	"os"
-	"testing"
 )
 
 func Test_Judge(t *testing.T) {

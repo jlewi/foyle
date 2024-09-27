@@ -4,6 +4,9 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"strings"
+	"text/template"
+
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
@@ -11,8 +14,6 @@ import (
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	"strings"
-	"text/template"
 )
 
 //go:embed judge_prompt.tmpl

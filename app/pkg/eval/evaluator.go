@@ -1,8 +1,13 @@
 package eval
 
 import (
-	"connectrpc.com/connect"
 	"context"
+	"os"
+	"path/filepath"
+	"sort"
+	"time"
+
+	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
@@ -11,10 +16,6 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	"os"
-	"path/filepath"
-	"sort"
-	"time"
 
 	"github.com/jlewi/foyle/app/api"
 	"sigs.k8s.io/kustomize/kyaml/yaml"

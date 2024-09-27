@@ -1,17 +1,18 @@
 package eval
 
 import (
-	"connectrpc.com/connect"
 	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"connectrpc.com/connect"
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	"os"
-	"path/filepath"
-	"testing"
 
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/config"

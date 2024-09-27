@@ -1,12 +1,13 @@
 package eval
 
 import (
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"google.golang.org/protobuf/encoding/protojson"
-	"testing"
-	"time"
 )
 
 func Test_protoToRowUpdate(t *testing.T) {
