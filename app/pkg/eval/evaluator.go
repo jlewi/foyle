@@ -4,41 +4,37 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
+	"time"
 
-	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
-
-	"github.com/go-cmd/cmd"
-
-	"github.com/jlewi/foyle/app/pkg/dbutil"
-
-	"github.com/jlewi/foyle/app/api"
+	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/oai"
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
+	"github.com/jlewi/foyle/app/pkg/runme/ulid"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+
+	"github.com/jlewi/foyle/app/api"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
-	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/pkg/config"
-	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/executor"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"github.com/jlewi/monogo/helpers"
 	"github.com/pkg/errors"
-	"google.golang.org/api/googleapi"
-	"google.golang.org/api/impersonate"
-	"google.golang.org/api/option"
-	"google.golang.org/api/sheets/v4"
 	"google.golang.org/protobuf/proto"
-)
-
-const (
-	uninitializedDistance = -1
 )
 
 type Evaluator struct {
 	config config.Config
 	parser *executor.BashishParser
 }
+
+// N.B. One issue with noise in the simulation is that the speed of log processing affects whether example
+// has been learned from by the next time it is processed.
 
 // NewEvaluator creates a new Evaluator
 // The evaluator assumes that the analyzer is already running in the background and processing logs.
@@ -71,22 +67,33 @@ func (e *Evaluator) ReconcileNode(ctx context.Context, node *yaml.RNode) error {
 
 func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) error {
 	log := logs.FromContext(ctx).WithValues("experiment", experiment.Metadata.Name)
-	log.Info("Opening database", "database", experiment.Spec.DBDir)
-	db, err := pebble.Open(experiment.Spec.DBDir, &pebble.Options{})
-	if err != nil {
-		return err
-	}
-	defer helpers.DeferIgnoreError(db.Close)
 
-	if experiment.Spec.Agent == nil {
-		return errors.New("Agent is required")
-	}
-	agent, err := e.setupAgent(ctx, *experiment.Spec.Agent)
-	if err != nil {
-		return err
+	if experiment.Spec.AgentAddress == "" {
+		return errors.New("AgentAddress is required")
 	}
 
-	// List all the files
+	if experiment.Spec.OutputDB == "" {
+		return errors.New("OutputDB is required")
+	}
+
+	if experiment.Spec.EvalDir == "" {
+		return errors.New("EvalDir is required")
+	}
+
+	aiClient := newAIServiceClient(experiment.Spec.AgentAddress)
+
+	logsClient := logspbconnect.NewLogsServiceClient(
+		newHTTPClient(),
+		experiment.Spec.AgentAddress,
+	)
+
+	manager, err := openResultsManager(experiment.Spec.OutputDB)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to open results manager from file %s", experiment.Spec.OutputDB)
+	}
+
+	// Find all the binary protobuf files in the eval directory.
+	// This should contain EvalExample protos.
 	files, err := listEvalFiles(ctx, experiment.Spec.EvalDir)
 	if err != nil {
 		return err
@@ -94,497 +101,449 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 
 	log.Info("Found eval files", "numFiles", len(files))
 
-	// Now iterate over the DB and figure out which files haven't  been loaded into the db.
-
-	unloadedFiles, err := findUnloadedFiles(ctx, db, files)
+	// Now we need to get the id of the last processed example so we can skip over examples that have already been
+	// processed
+	lastProcessedTime, err := getLastProcessedTime(ctx, manager)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to get last processed time")
 	}
-	log.Info("Found unloaded files", "numFiles", len(unloadedFiles))
 
-	// We need to load the evaluation data into the database.
-	if err := loadMarkdownAnswerFiles(ctx, db, unloadedFiles); err != nil {
-		return err
+	// N.B. Since we set lastProcessedTime to the time of the last processed result we won't reprocess that result.
+	// We might want to rethink that if we want to be able to reprocess an example that failed on an error and
+	// we want to retry that
+
+	log.Info("Processing eval examples", "lastProcessedTime", lastProcessedTime)
+
+	// Loop over the eval examples and load them
+	examples := make([]*v1alpha1.EvalExample, 0, len(files))
+	for _, exampleFile := range files {
+		b, err := os.ReadFile(exampleFile)
+		if err != nil {
+			// TODO(jeremy): We should probably store the error in the DB.
+			log.Error(err, "Failed to read file", "file", exampleFile)
+			continue
+		}
+
+		example := &v1alpha1.EvalExample{}
+		if err := proto.Unmarshal(b, example); err != nil {
+			log.Error(err, "Failed to unmarshal example", "file", exampleFile)
+			continue
+		}
+		examples = append(examples, example)
 	}
+
+	// Now sort the examples in time order so we can process them in the same order they actually occurred
+	sortEvalExamplesInTime(examples)
 
 	// Now generate predictions for any results that are missing them.
-	if err := e.reconcilePredictions(ctx, db, agent); err != nil {
+	if err := e.processExamples(ctx, examples, lastProcessedTime, aiClient, logsClient, manager); err != nil {
 		return err
 	}
 
-	// TODO(jeremy): We should get the traces via API because only one process can access the pebble DB at a time.
-	// And the agent needs access to the pebble DB traces.
-	tracesDB, err := pebble.Open(e.config.GetTracesDBDir(), &pebble.Options{})
+	return nil
+}
+
+func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, manager *ResultsManager) error {
+	oLog := logs.FromContext(ctx)
+
+	oaiClient, err := oai.NewClient(e.config)
 	if err != nil {
-		return err
-	}
-	defer helpers.DeferIgnoreError(tracesDB.Close)
-
-	if err := e.reconcileBestRAGResult(ctx, db, tracesDB); err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to create OpenAI client")
 	}
 
-	// Compute the distance
-	if err := e.reconcileDistance(ctx, db); err != nil {
-		return err
+	judge, err := NewJudge(oaiClient)
+
+	if err != nil {
+		return errors.Wrapf(err, "Failed to create Judge")
 	}
 
-	// Update the Google Sheet
-	if err := e.updateGoogleSheet(ctx, experiment, db); err != nil {
-		return err
+	// Now iterate over the examples and process them.
+	for _, example := range examples {
+		log := oLog.WithValues("exampleId", example.GetId())
+
+		// TODO(jeremy): Should we just read the row from the database and check if it exists and has been completed?
+		// Finding the lastProcessed time and then using that seems like maybe its premature optimization? But maybe
+		// since I wrote it might as well keep it.
+		exampleTime := example.GetTime().AsTime()
+		if exampleTime.Before(lastProcessedTime) || exampleTime == lastProcessedTime {
+			log.V(logs.Debug).Info("Skipping example; already processed")
+			continue
+		}
+
+		var processErr error
+
+		uErr := manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
+			processErr = e.processResult(ctx, result, example, client, logsClient, judge)
+			// We need to return for the transaction to be committed.
+			return nil
+		})
+
+		if processErr != nil {
+			log.Error(processErr, "Failed to process example")
+			// For now we abort on error to see what's going on.
+			return processErr
+		}
+
+		if uErr != nil {
+			log.Error(uErr, "Failed to update result")
+			// For now we abort on error to see what's going on.
+			return uErr
+		}
+
+		result, err := manager.Get(ctx, example.GetId())
+		if err != nil {
+			return errors.Wrapf(err, "Failed to get latest result for example %s", example.GetId())
+		}
+
+		if result.Error != "" {
+			// Generating a completion failed for this example so we should keep going.
+			// There won't be a blocklog to wait for.
+			continue
+		}
+
+		if err := e.waitForBlockLog(ctx, result, logsClient); err != nil {
+			log.Error(err, "Failed to wait for block log")
+			// For now we abort on error to see what's going on.
+			return errors.Wrapf(err, "Failed to get block log for example %s", example.GetId())
+		}
+
+		var ragErr error
+		// Getting the bestRAG result depends on the trace having been processed so we run after waiting for the BlockLog
+		uErr = manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
+			ragErr = e.reconcileBestRAGResult(ctx, result, logsClient)
+			return nil
+		})
+
+		if ragErr != nil {
+			log.Error(ragErr, "Failed to reconcile best RAG result")
+			// For now we abort on error to see what's going on.
+			return ragErr
+		}
+
+		if uErr != nil {
+			log.Error(uErr, "Failed to update result")
+			// For now we abort on error to see what's going on.
+			return uErr
+		}
+
 	}
 	return nil
 }
 
-func (e *Evaluator) setupAgent(ctx context.Context, agentConfig api.AgentConfig) (*agent.Agent, error) {
-	cfg := e.config.DeepCopy()
+// processResult process the result. It is updated in place
+func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResult, example *v1alpha1.EvalExample, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, judge *Judge) error {
+	result.Example = example
 
-	// Swap out the AgentConfig
-	cfg.Agent = &agentConfig
-
-	// Ensure we are in evaluation mode.
-	cfg.Agent.EvalMode = true
-
-	client, err := oai.NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO(jeremy): This will need to be updated when we support other configurations.
-	completer, err := oai.NewCompleter(cfg, client)
-	if err != nil {
-		return nil, err
-	}
-
-	log := logs.FromContext(ctx)
-	log.Info("Creating agen without inMemoryExampleDB", "config", cfg.Agent)
-	if cfg.Agent.RAG != nil && cfg.Agent.RAG.Enabled {
-		return nil, errors.New("RAG is enabled but eval code needs to be updated to ddeal with streaming logs")
-	}
-
-	// TODO(jeremy): How should we construct inMemoryExampleDB? In the eval case?
-	agent, err := agent.NewAgent(cfg, completer, nil)
-
-	if err != nil {
-		return nil, err
-	}
-	return agent, nil
-}
-
-// TODO(jeremy): We should use reconcilePredictions which uses the client to generate the predictions.
-func (e *Evaluator) reconcilePredictions(ctx context.Context, db *pebble.DB, agent *agent.Agent) error {
-	olog := logs.FromContext(ctx)
-	iter, err := db.NewIterWithContext(ctx, nil)
-	if err != nil {
+	if err := runGenerate(ctx, result, client); err != nil {
 		return err
 	}
-	defer iter.Close()
 
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-		if key == nil {
-			break
-		}
+	if result.Error != "" {
+		// Since an error occurred generating a completion for this example we can't continue to
+		// process this example
+		// We return nil because we want the evaluator to continue with other examples
+		return nil
+	}
 
-		log := olog.WithValues("id", string(key))
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
-		}
+	if err := runExecute(ctx, result, client); err != nil {
+		return err
+	}
 
-		result := &v1alpha1.EvalResult{}
-		if err := proto.Unmarshal(value, result); err != nil {
-			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
-		}
+	if err := judge.Score(ctx, result); err != nil {
+		err := errors.Wrapf(err, "Failed to judge example %s", example.GetId())
+		result.Error = err.Error()
+		return err
+	}
 
-		if len(result.GetActual()) > 0 {
-			log.Info("Skipping; already have answer", "path", result.ExampleFile)
-			// We have the answer so we don't need to generate it.
-			continue
-		}
+	return nil
+}
 
-		if len(result.Actual) == 0 {
-			// Initialize a trace
-			resp, err := func() (*v1alpha1.GenerateResponse, error) {
-				newCtx, span := tracer().Start(ctx, "(*Evaluator).reconcilePredictions")
-				defer span.End()
+// runGenerate runs the generate step for the example.
+//
+// runGenerate returns an error if there is a problem that should cause evaluation to abort rather than processing
+// other examples (e.g. unable to contact the agent). If there is a problem generating a completion for this specific
+// example then the result will be nil but result.Error will be set
+func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha1connect.AIServiceClient) error {
+	log := logs.FromContext(ctx)
+	// ID for the generate session
+	genSessionID := ulid.GenerateID()
 
-				// We need to generate the answer.
-				return agent.Generate(newCtx, &v1alpha1.GenerateRequest{
-					Doc: result.Example.Query,
-				})
-			}()
-			if err != nil {
+	// We need to send a session event to the agent to simulate the session starting.
+	// This is because SessionStart event will contain the full context used with the execution
+	logEventReq := &v1alpha1.LogEventsRequest{}
+	logEventReq.Events = append(logEventReq.Events, &v1alpha1.LogEvent{
+		Type:          v1alpha1.LogEventType_SESSION_START,
+		ContextId:     genSessionID,
+		SelectedIndex: result.Example.GetFullContext().GetSelected(),
+	})
+
+	_, err := client.LogEvents(ctx, connect.NewRequest(logEventReq))
+	if err != nil {
+		log.Error(err, "Failed to log events")
+		// For now abort on error to see what's going on.
+		return errors.Wrapf(err, "Failed to log events")
+	}
+
+	request := &v1alpha1.GenerateCellsRequest{
+		Notebook: result.Example.GetFullContext().GetNotebook(),
+	}
+
+	resp, err := client.GenerateCells(ctx, connect.NewRequest(request))
+	if err != nil {
+		if connectErr := new(connect.Error); errors.As(err, &connectErr) {
+			// TODO(https://github.com/jlewi/foyle/issues/257)
+			// Currently GenerateCells returns a connect.Error if the completer can't generate a completion
+			// because of too many tokens.
+			if connect.CodeOf(err) == connect.CodeUnknown {
 				result.Error = err.Error()
-				result.Status = v1alpha1.EvalResultStatus_ERROR
-				continue
+				// We return nil because the problem is specific to this example so the evaluator should move on
+				// to other examples
+				return nil
 			}
-
-			result.Actual = resp.GetBlocks()
-			result.GenTraceId = resp.GetTraceId()
-
-			log.Info("Writing result to DB")
-			if err := updateResult(ctx, string(key), result, db); err != nil {
-				return errors.Wrapf(err, "Failed to write result to DB")
-			}
-		}
-	}
-	return nil
-}
-
-func updateResult(ctx context.Context, id string, result *v1alpha1.EvalResult, db *pebble.DB) error {
-	b, err := proto.Marshal(result)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to marshal result")
-	}
-	if err := db.Set([]byte(id), b, nil); err != nil {
-		return errors.Wrapf(err, "Failed to write result to DB")
-	}
-	return nil
-}
-
-func (e *Evaluator) reconcileDistance(ctx context.Context, db *pebble.DB) error {
-	olog := logs.FromContext(ctx)
-	iter, err := db.NewIterWithContext(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer iter.Close()
-
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-		if key == nil {
-			break
-		}
-
-		log := olog.WithValues("id", string(key))
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
-		}
-
-		result := &v1alpha1.EvalResult{}
-		if err := proto.Unmarshal(value, result); err != nil {
-			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
-		}
-
-		if result.Distance >= 0 && result.Status != v1alpha1.EvalResultStatus_UNKNOWN_EVAL_RESULT_STATUS {
-			log.Info("Skipping; distance already computed")
-			continue
-		}
-
-		updateEvalResultDistance(ctx, e.parser, result)
-		log.Info("Updating distance", "distance", result.Distance)
-		if err := updateResult(ctx, string(key), result, db); err != nil {
-			log.Error(err, "Failed to update result")
-		}
-	}
-	return nil
-}
-
-func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, db *pebble.DB, traces *pebble.DB) error {
-	olog := logs.FromContext(ctx)
-	iter, err := db.NewIterWithContext(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer iter.Close()
-
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-		if key == nil {
-			break
-		}
-
-		log := olog.WithValues("id", string(key))
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
-		}
-
-		result := &v1alpha1.EvalResult{}
-		if err := proto.Unmarshal(value, result); err != nil {
-			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
-		}
-
-		// TODO(jeremy): How do we skip this step in the case where the experiment didn't involve RAG
-		if result.BestRagResult != nil {
-			log.Info("Skipping; best RAG result already computed")
-			continue
-		}
-
-		genTrace := &logspb.Trace{}
-		if err := dbutil.GetProto(traces, result.GenTraceId, genTrace); err != nil {
-			log.Error(err, "Failed to read gen trace", "id", result.GenTraceId)
-			continue
-		}
-
-		for _, span := range genTrace.Spans {
-			if span.GetRag() == nil {
-				continue
-			}
-			rag := span.GetRag()
-			if rag.Results == nil {
-				continue
-			}
-
-			for _, ragResult := range rag.Results {
-				if ragResult.Example == nil {
-					continue
-				}
-				if result.BestRagResult == nil {
-					result.BestRagResult = ragResult
-					continue
-				}
-
-				if result.BestRagResult.Score < ragResult.Score {
-					result.BestRagResult = ragResult
-				}
-			}
-		}
-
-		if result.BestRagResult == nil {
-			continue
-		}
-		if err := updateResult(ctx, string(key), result, db); err != nil {
-			log.Error(err, "Failed to update result")
-		}
-	}
-	return nil
-}
-
-func updateEvalResultDistance(ctx context.Context, parser *executor.BashishParser, result *v1alpha1.EvalResult) {
-	log := logs.FromContext(ctx).WithValues("id", result.GetExample().GetId())
-	var actualBlock *v1alpha1.Block
-
-	for _, b := range result.Actual {
-		if b.Kind == v1alpha1.BlockKind_CODE {
-			actualBlock = b
-			break
-		}
-	}
-
-	if len(result.Example.GetAnswer()) > 1 {
-		log.Info("Warning; expected answer more than one answer block. Only the first is used")
-	}
-
-	expected, err := parser.Parse(result.Example.Answer[0].GetContents())
-	if err != nil {
-		log.Error(err, "Failed to parse expected answer to command")
-		result.Error = err.Error()
-		result.Status = v1alpha1.EvalResultStatus_ERROR
-		return
-	}
-
-	var actual []executor.Instruction
-	if actualBlock != nil {
-		parsed, err := parser.Parse(actualBlock.GetContents())
-		if err != nil {
-			log.Error(err, "Failed to parse actual answer to command")
+		} else {
+			log.Error(err, "Failed to generate cells")
 			result.Error = err.Error()
-			result.Status = v1alpha1.EvalResultStatus_ERROR
-			return
-		}
-		actual = parsed
-	} else {
-		// Since there is no code block. Initialize actual to an empty command.
-		// This will cause the distance computed to be the maximum possible distance which is what we want
-		actual = []executor.Instruction{
-			{
-				Command: cmd.NewCmd(""),
-			},
+			return err
 		}
 	}
 
-	distance, err := Distance(expected[0], actual[0])
+	result.ActualCells = resp.Msg.GetCells()
 
-	if err != nil {
-		log.Error(err, "Failed to compute distance")
-		result.Error = err.Error()
-		result.Status = v1alpha1.EvalResultStatus_ERROR
-		return
+	traceParent := resp.Header().Get(agent.TraceIDHeader)
+	if traceParent == "" {
+		return errors.New("GenerateCells response didn't contain traceparent header")
 	}
+	result.GenTraceId = traceParent
 
-	if distance.Max < distance.Distance {
-		log.Error(errors.New("Distance is greater than max distance"), "Distance is greater than max distance", "distance", distance.Distance, "max", distance.Max)
-	}
-
-	result.Distance = int32(distance.Distance)
-	result.NormalizedDistance = distance.Normalized
-	result.Status = v1alpha1.EvalResultStatus_DONE
-}
-
-func (e *Evaluator) updateGoogleSheet(ctx context.Context, experiment api.Experiment, db *pebble.DB) error {
-	log := logs.FromContext(ctx)
-	if e.config.Eval == nil || e.config.Eval.GCPServiceAccount == "" {
-		return errors.New("GCPServiceAccount is required to update Google Sheet")
-	}
-
-	sheetName := experiment.Spec.SheetName
-	sheetID := experiment.Spec.SheetID
-
-	if sheetID == "" {
-		return errors.New("SheetID is required to update Google Sheet")
-	}
-
-	if sheetName == "" {
-		return errors.New("SheetName is required to update Google Sheet")
-	}
-
-	log = log.WithValues("spreadsheetID", sheetID, "sheetName", sheetName)
-	log.Info("Updating Google Sheet")
-	credentialsConfig := &impersonate.CredentialsConfig{
-		TargetPrincipal: e.config.Eval.GCPServiceAccount,
-		Scopes:          []string{"https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"},
-	}
-
-	credentials, err := impersonate.CredentialsTokenSource(ctx, *credentialsConfig)
-	if err != nil {
-		log.Error(err, "Unable to create impersonated credentials")
-		return err
-	}
-
-	srv, err := sheets.NewService(ctx, option.WithTokenSource(credentials))
-	if err != nil {
-		log.Error(err, "Unable to retrieve Sheets client")
-		return err
-	}
-
-	// Create the sheet if it doesn't exist
-	batchUpdateRequest := &sheets.BatchUpdateSpreadsheetRequest{
-		Requests: []*sheets.Request{
+	// We need to close the generate session session.
+	endEventsReq := &v1alpha1.LogEventsRequest{
+		Events: []*v1alpha1.LogEvent{
 			{
-				AddSheet: &sheets.AddSheetRequest{
-					Properties: &sheets.SheetProperties{
-						Title: experiment.Spec.SheetName,
-					},
-				},
+				ContextId: genSessionID,
+				Type:      v1alpha1.LogEventType_SESSION_END,
 			},
 		},
 	}
 
-	_, err = srv.Spreadsheets.BatchUpdate(experiment.Spec.SheetID, batchUpdateRequest).Context(ctx).Do()
+	_, err = client.LogEvents(ctx, connect.NewRequest(endEventsReq))
 	if err != nil {
-		apiErr, ok := err.(*googleapi.Error)
-		if ok {
-			if apiErr.Code == 400 {
-				log.V(1).Info("Sheet already exists")
-			} else {
-				log.Error(err, "Unable to create new sheet ")
-				return errors.Wrapf(err, "Unable to create new sheet named: %s", sheetName)
-			}
-		} else {
-			return errors.Wrapf(err, "Unable to create new sheet named: %s", sheetName)
+		log.Error(err, "Failed to log events")
+		// For now abort on error to see what's going on.
+		return errors.Wrapf(err, "Failed to log events")
+	}
+	return nil
+}
+
+func runExecute(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha1connect.AIServiceClient) error {
+	log := logs.FromContext(ctx)
+	// We need to send a LOG event to the agent to simulate the cells being executed.
+	executeEventReq := &v1alpha1.LogEventsRequest{}
+
+	// Start a session to execute the cell
+	execSessionID := ulid.GenerateID()
+
+	if len(result.Example.ExpectedCells) != 1 {
+		return errors.New("Expected cells isn't 1; How did this make it into the evaluation dataset? Shouldn't all examples in the eval set have 1 expected cell")
+	}
+
+	if len(result.ActualCells) < 1 {
+		// In this case the LLM failed to generate a cell. There's no point sending an execution event because
+		// There's no cellId to link the executed cell to the generation event.
+		// Currently, Foyle doesn't have a way of learning when the LLM fails to generate a cell. Learning
+		// only occurs if 1) Foyle generates a cell, 2) user edits cell 3) user executes the cell
+		return nil
+	}
+
+	cell := result.Example.ExpectedCells[0]
+
+	if cell.Kind != parserv1.CellKind_CELL_KIND_CODE {
+		return errors.New("The expected cell in the example isn't of type CELL_KIND_CODE. How did this make it into the evaluation dataset? Shouldn't all examples in the eval set have 1 expected cell of type CELL_KIND_CODE")
+	}
+
+	actualID := converters.GetCellID(result.ActualCells[0])
+	if actualID == "" {
+		return errors.New("Actual cell ID is empty")
+	}
+
+	converters.SetCellID(cell, actualID)
+
+	executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+		Type:      v1alpha1.LogEventType_SESSION_START,
+		ContextId: execSessionID,
+	})
+
+	executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+		ContextId: execSessionID,
+		Type:      v1alpha1.LogEventType_EXECUTE,
+		Cells: []*parserv1.Cell{
+			cell,
+		},
+		SelectedIndex: 0,
+		SelectedId:    converters.GetCellID(cell),
+	})
+
+	executeEventReq.Events = append(executeEventReq.Events, &v1alpha1.LogEvent{
+		Type:      v1alpha1.LogEventType_SESSION_END,
+		ContextId: execSessionID,
+	})
+
+	if _, err := client.LogEvents(ctx, connect.NewRequest(executeEventReq)); err != nil {
+		log.Error(err, "Failed to log events")
+		result.Error = errors.Wrapf(err, "Failed to log events").Error()
+		return errors.Wrapf(err, "Failed to log events")
+	}
+	return nil
+}
+
+func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalResult, client logspbconnect.LogsServiceClient) error {
+	// We need to wait for the block log to be processed.
+	// This is done to
+	// 1. Increase the likelihood we have learned from the block
+	// 2. To verify that the evaluator properly sends the data needed for the agent to learn from the block.
+	log := logs.FromContext(ctx)
+	if len(result.GetActualCells()) == 0 {
+		// Since no cells were actually generated there won't be any blocklog to wait for.
+		return nil
+	}
+
+	// TODO(jeremy): What should we do if there's more than 1 code cell?
+	var codeCell *parserv1.Cell
+	for _, cell := range result.GetActualCells() {
+		if cell.Kind == parserv1.CellKind_CELL_KIND_CODE {
+			codeCell = cell
+			break
 		}
 	}
 
-	// Prepare the value range to write
-	writeRange := sheetName
-	values := [][]interface{}{{"id", "file", "prompt", "actual", "expected", "distance", "normalized_distance", "best_rag"}}
-
-	iter, err := db.NewIterWithContext(ctx, nil)
-	if err != nil {
-		return err
+	if codeCell == nil {
+		// Since there is no code cell there's no blockLog to fetch
+		return nil
 	}
-	defer iter.Close()
 
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-		if key == nil {
+	cellID := converters.GetCellID(codeCell)
+	if cellID == "" {
+		return errors.New("Cell ID is empty")
+	}
+
+	timeOut := time.Now().Add(3 * time.Minute)
+
+	var blockLog *logspb.BlockLog
+	for time.Now().Before(timeOut) {
+
+		resp, err := client.GetBlockLog(ctx, connect.NewRequest(&logspb.GetBlockLogRequest{
+			Id: cellID,
+		}))
+
+		if err != nil {
+			log.Info("Failed to get block log", "err", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		blockLog = resp.Msg.GetBlockLog()
+		if blockLog.ExecutedBlock == nil || blockLog.GeneratedBlock == nil {
+			log.Info("Block log isn't ready yet")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		if blockLog.GeneratedBlock.GetContents() != result.ActualCells[0].Value {
+			return errors.Errorf("BlockLog generated block doesn't match actual cell. This means the result of GenerateCells returned to the evaluator doesn't match the result that the Agent read from the BlockLogs and stored in its BlockLog; want: %s; got %s", result.ActualCells[0].Value, blockLog.GeneratedBlock.GetContents())
+		}
+
+		return nil
+	}
+
+	return errors.New("Timed out waiting for block log. This could indicate we aren't properly sending the events needed to generate a BlockLog suitable for learning.")
+}
+
+func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, evalResult *v1alpha1.EvalResult, client logspbconnect.LogsServiceClient) error {
+	if evalResult.GenTraceId == "" {
+		return errors.WithStack(errors.New("GenTraceId is empty"))
+	}
+
+	timeOut := time.Now().Add(3 * time.Minute)
+	var genTrace *logspb.Trace
+	for {
+		if time.Now().After(timeOut) {
+			return errors.Errorf("Timed out waiting for traceId to be ready; traceId: %s", evalResult.GenTraceId)
+		}
+
+		resp, err := client.GetTrace(ctx, connect.NewRequest(&logspb.GetTraceRequest{
+			Id: evalResult.GenTraceId,
+		}))
+
+		if err == nil {
+			genTrace = resp.Msg.GetTrace()
 			break
 		}
 
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			return errors.Wrapf(err, "Failed to read value for key %s", string(key))
+		// Check if the error is a "not found" error
+		// We want to retry if the trace isn't found because it might not have been processed yet
+		if connect.CodeOf(err) != connect.CodeNotFound {
+			// If it's any other error, consider it a permanent error
+			return errors.Wrapf(err, "Failed to get trace %s", evalResult.GenTraceId)
 		}
 
-		result := &v1alpha1.EvalResult{}
-		if err := proto.Unmarshal(value, result); err != nil {
-			return errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
+		time.Sleep(5 * time.Second)
+	}
+
+	// TODO(jeremy): Should we update EvalResult to indicate the failure
+	// What should we do if the experiment doesn't involve learning
+
+	if genTrace == nil {
+		return errors.WithStack(errors.Errorf("Trace %s is nil", evalResult.GenTraceId))
+	}
+
+	for _, span := range genTrace.Spans {
+		if span.GetRag() == nil {
+			continue
+		}
+		rag := span.GetRag()
+		if rag.Results == nil {
+			continue
 		}
 
-		prompt := docs.DocToMarkdown(result.Example.Query)
-		row := []interface{}{result.Example.Id, result.ExampleFile, prompt, docs.BlocksToMarkdown(result.Actual), docs.BlocksToMarkdown(result.Example.Answer), result.Distance, result.NormalizedDistance}
+		for _, ragResult := range rag.Results {
+			if ragResult.Example == nil {
+				continue
+			}
+			if evalResult.BestRagResult == nil {
+				evalResult.BestRagResult = ragResult
+				continue
+			}
 
-		bestRAG := ""
-		if result.BestRagResult != nil {
-			if result.BestRagResult.Example.Query != nil {
-				bestRAG = docs.DocToMarkdown(result.BestRagResult.Example.Query)
+			if evalResult.BestRagResult.Score < ragResult.Score {
+				evalResult.BestRagResult = ragResult
 			}
 		}
-		row = append(row, bestRAG)
-		values = append(values, row)
-	}
-	valueRange := &sheets.ValueRange{
-		Values: values,
-	}
-
-	// Write the value range to the sheet
-	_, err = srv.Spreadsheets.Values.Update(sheetID, writeRange, valueRange).
-		ValueInputOption("USER_ENTERED").
-		Context(ctx).
-		Do()
-	if err != nil {
-		log.Error(err, "Unable to write data to sheet")
-		return errors.Wrapf(err, "Unable to write data to sheet")
 	}
 
 	return nil
 }
 
-func findUnloadedFiles(ctx context.Context, db *pebble.DB, files []string) ([]string, error) {
-	unprocessed := map[string]bool{}
-
-	iter, err := db.NewIterWithContext(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer iter.Close()
-
-	for _, file := range files {
-		unprocessed[file] = true
-	}
-
-	// Iterate over the files in the DB and remove them from the list of files to load.
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-		if key == nil {
-			break
+// isSortedByTimeDescending checks if the slice is sorted by Time in descending order
+func isSortedByTimeDescending(slice []*v1alpha1.EvalResult) bool {
+	for i := 1; i < len(slice); i++ {
+		if slice[i-1].Example.GetTime().AsTime().Before(slice[i].Example.GetTime().AsTime()) {
+			return false
 		}
-
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			// Should we ignore the error?
-			return nil, errors.Wrapf(err, "Failed to read value for key %s", string(key))
-		}
-
-		result := &v1alpha1.EvalResult{}
-		if err := proto.Unmarshal(value, result); err != nil {
-			return nil, errors.Wrapf(err, "Failed to unmarshal value for key %s", string(key))
-		}
-
-		delete(unprocessed, result.ExampleFile)
-
 	}
-
-	toProcess := make([]string, 0, len(unprocessed))
-	for file := range unprocessed {
-		toProcess = append(toProcess, file)
-	}
-
-	return toProcess, nil
+	return true
 }
 
-// listEvalFiles returns a list of the all the markdown files in the eval directory.
+// listEvalFiles returns a list of the all the binary protobuf files in the directory evalDir.
 func listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
 	examples := make([]string, 0, 100)
+	if evalDir == "" {
+		return examples, errors.Wrapf(errors.New("evalDir is empty"), "evalDir is empty")
+	}
 	err := filepath.Walk(evalDir, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
 
-		if filepath.Ext(path) != ".md" {
+		if filepath.Ext(path) != ".binpb" {
 			return nil
 		}
 
@@ -595,73 +554,45 @@ func listEvalFiles(ctx context.Context, evalDir string) ([]string, error) {
 	return examples, err
 }
 
-// loadMarkdownFiles loads a bunch of markdown files representing evaluation data and converts them into example
-// protos. The final block in the markdown file is treated as the answer.
-func loadMarkdownAnswerFiles(ctx context.Context, db *pebble.DB, files []string) error {
-	oLog := logs.FromContext(ctx)
+// getLastProcessedTime returns the time of the last processed example
+func getLastProcessedTime(ctx context.Context, manager *ResultsManager) (time.Time, error) {
+	// Default the time of the lastProcessedEval example to some time in the past.
+	// This way all examples should be after it and get reprocessed
+	lastProcessedTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-	allErrors := &helpers.ListOfErrors{}
-	for _, path := range files {
-		log := oLog.WithValues("path", path)
-		log.Info("Processing file")
+	alreadyProcessed, _, err := manager.ListResults(ctx, nil, 10)
 
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			log.Error(err, "Failed to read file")
-			allErrors.AddCause(err)
-			// Keep going
-			continue
-		}
-
-		doc := &v1alpha1.Doc{}
-
-		blocks, err := docs.MarkdownToBlocks(string(contents))
-		if err != nil {
-			log.Error(err, "Failed to convert markdown to blocks")
-			allErrors.AddCause(err)
-			// Keep going
-			continue
-		}
-
-		doc.Blocks = blocks
-
-		if len(doc.GetBlocks()) < 2 {
-			log.Info("Skipping doc; too few blocks; at least two are required")
-			continue
-		}
-
-		answer := doc.GetBlocks()[len(doc.GetBlocks())-1]
-		doc.Blocks = doc.Blocks[:len(doc.GetBlocks())-1]
-		if answer.Kind != v1alpha1.BlockKind_CODE {
-			log.Info("Skipping doc; last block must be code")
-			continue
-		}
-
-		// We generate a stable ID for the example by hashing the contents of the document.
-		example := &v1alpha1.Example{
-			Query:  doc,
-			Answer: []*v1alpha1.Block{answer},
-		}
-		example.Id = HashExample(example)
-
-		result := &v1alpha1.EvalResult{
-			Example:     example,
-			ExampleFile: path,
-			// initialize distance to a negative value so we can tell when it hasn't been computed
-			Distance: uninitializedDistance,
-		}
-
-		if err := dbutil.SetProto(db, example.GetId(), result); err != nil {
-			log.Error(err, "Failed to write result to DB")
-			allErrors.AddCause(err)
-			// Keep going
-			continue
-		}
+	if err != nil {
+		return lastProcessedTime, errors.Wrapf(err, "Failed to list already processed results")
 	}
 
-	if len(allErrors.Causes) > 0 {
-		return allErrors
+	if len(alreadyProcessed) == 0 {
+		return lastProcessedTime, nil
 	}
 
-	return nil
+	if !isSortedByTimeDescending(alreadyProcessed) {
+		return lastProcessedTime, errors.New("Results aren't sorted by time in descending order")
+	}
+
+	return alreadyProcessed[0].Example.GetTime().AsTime(), nil
+}
+
+func sortEvalExamplesInTime(examples []*v1alpha1.EvalExample) {
+	sort.Slice(examples, func(i, j int) bool {
+		// Convert the Time field to time.Time objects
+		timeI := examples[i].Time.AsTime()
+		timeJ := examples[j].Time.AsTime()
+
+		// Compare the times
+		return timeI.Before(timeJ)
+	})
+}
+
+func newAIServiceClient(baseURL string) v1alpha1connect.AIServiceClient {
+	// Create a new client
+	client := v1alpha1connect.NewAIServiceClient(
+		newHTTPClient(),
+		baseURL,
+	)
+	return client
 }

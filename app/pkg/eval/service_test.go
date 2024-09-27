@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )
 
@@ -16,21 +18,23 @@ func Test_ToAssertRow(t *testing.T) {
 	cases := []testCase{
 		{
 			evalResult: &v1alpha1.EvalResult{
-				Example: &v1alpha1.Example{
+				Example: &v1alpha1.EvalExample{
 					Id: "1234",
-					Query: &v1alpha1.Doc{
-						Blocks: []*v1alpha1.Block{
-							{
-								Kind:     v1alpha1.BlockKind_MARKUP,
-								Contents: "Hello world",
+					FullContext: &v1alpha1.FullContext{
+						Notebook: &parserv1.Notebook{
+							Cells: []*parserv1.Cell{
+								{
+									Kind:  parserv1.CellKind_CELL_KIND_MARKUP,
+									Value: "Hello world",
+								},
 							},
 						},
 					},
 				},
-				Actual: []*v1alpha1.Block{
+				ActualCells: []*parserv1.Cell{
 					{
-						Kind:     v1alpha1.BlockKind_MARKUP,
-						Contents: "word",
+						Kind:  parserv1.CellKind_CELL_KIND_MARKUP,
+						Value: "word",
 					},
 				},
 				Assertions: []*v1alpha1.Assertion{

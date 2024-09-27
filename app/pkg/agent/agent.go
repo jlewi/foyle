@@ -463,7 +463,10 @@ func (a *Agent) GenerateCells(ctx context.Context, req *connect.Request[v1alpha1
 		Cells: cells,
 	}
 
-	return connect.NewResponse[v1alpha1.GenerateCellsResponse](resp), nil
+	// We need to attach the traceId to the response.
+	cResp := connect.NewResponse[v1alpha1.GenerateCellsResponse](resp)
+	cResp.Header().Set(TraceIDHeader, span.SpanContext().TraceID().String())
+	return cResp, nil
 }
 
 // createCompletion is a helper function to create a single completion as part of a stream.

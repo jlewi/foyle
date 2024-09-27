@@ -75,6 +75,7 @@ func Test_SessionsCRUD(t *testing.T) {
 var (
 	session1 = &logspb.Session{
 		ContextId: "1",
+		StartTime: timeMustParse(time.RFC3339, "2021-01-01T00:01:00Z"),
 		FullContext: &v1alpha1.FullContext{
 			Notebook: &parserv1.Notebook{
 				Cells: []*parserv1.Cell{
@@ -124,7 +125,8 @@ func Test_getExampleFromSession(t *testing.T) {
 			name:    "Basic",
 			session: session1,
 			expected: &v1alpha1.EvalExample{
-				Id: "1",
+				Id:   "1",
+				Time: timeMustParse(time.RFC3339, "2021-01-01T00:01:00Z"),
 				FullContext: &v1alpha1.FullContext{
 					Notebook: &parserv1.Notebook{
 						Cells: []*parserv1.Cell{
@@ -153,7 +155,7 @@ func Test_getExampleFromSession(t *testing.T) {
 				t.Fatalf("Error getting example from session: %v", err)
 			}
 
-			comparer := cmpopts.IgnoreUnexported(v1alpha1.EvalExample{}, v1alpha1.FullContext{}, parserv1.Notebook{}, parserv1.Cell{})
+			comparer := cmpopts.IgnoreUnexported(v1alpha1.EvalExample{}, v1alpha1.FullContext{}, parserv1.Notebook{}, parserv1.Cell{}, timestamppb.Timestamp{})
 			if d := cmp.Diff(actual, c.expected, comparer); d != "" {
 				t.Fatalf("Unexpected diff between expected and actual example:\n%v", d)
 			}

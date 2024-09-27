@@ -271,13 +271,6 @@ func (a *App) SetupRegistry() error {
 		return err
 	}
 
-	assertor, err := eval.NewAssertRunner(*a.Config)
-	if err != nil {
-		return err
-	}
-	if err := a.Registry.Register(api.AssertJobGVK, assertor); err != nil {
-		return err
-	}
 	return nil
 }
 

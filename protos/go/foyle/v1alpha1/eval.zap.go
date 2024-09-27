@@ -8,8 +8,10 @@ import (
 	math "math"
 	proto "github.com/golang/protobuf/proto"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
 	_ "google.golang.org/protobuf/types/known/structpb"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
+	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -33,12 +35,9 @@ func (m *EvalResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 		}
 	}
 
-	keyName = "example_file" // field example_file = 2
-	enc.AddString(keyName, m.ExampleFile)
-
-	keyName = "actual" // field actual = 3
+	keyName = "actual_cells" // field actual_cells = 11
 	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
-		for _, rv := range m.Actual {
+		for _, rv := range m.ActualCells {
 			_ = rv
 			if rv != nil {
 				var vv interface{} = rv
@@ -49,12 +48,6 @@ func (m *EvalResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 		}
 		return nil
 	}))
-
-	keyName = "distance" // field distance = 4
-	enc.AddInt32(keyName, m.Distance)
-
-	keyName = "normalized_distance" // field normalized_distance = 7
-	enc.AddFloat32(keyName, m.NormalizedDistance)
 
 	keyName = "error" // field error = 5
 	enc.AddString(keyName, m.Error)
@@ -86,6 +79,12 @@ func (m *EvalResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 		}
 		return nil
 	}))
+
+	keyName = "cells_match_result" // field cells_match_result = 12
+	enc.AddString(keyName, m.CellsMatchResult.String())
+
+	keyName = "judge_explanation" // field judge_explanation = 13
+	enc.AddString(keyName, m.JudgeExplanation)
 
 	return nil
 }
@@ -205,6 +204,11 @@ func (m *EvalExample) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder
 
 	keyName = "id" // field id = 1
 	enc.AddString(keyName, m.Id)
+
+	keyName = "time" // field time = 4
+	if t, err := github_com_golang_protobuf_ptypes.Timestamp(m.Time); err == nil {
+		enc.AddTime(keyName, t)
+	}
 
 	keyName = "full_context" // field full_context = 2
 	if m.FullContext != nil {

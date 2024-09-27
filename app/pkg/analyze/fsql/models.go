@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+type Result struct {
+	ID        string
+	Time      time.Time
+	ProtoJson string
+}
+
 type Session struct {
 	Contextid         string
 	Starttime         time.Time

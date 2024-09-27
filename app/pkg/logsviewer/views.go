@@ -3,6 +3,9 @@ package logsviewer
 import (
 	"bytes"
 
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/jlewi/foyle/app/pkg/docs"
@@ -52,6 +55,19 @@ func renderExecutedBlock(block *logspb.BlockLog) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+// nbToHTML returns the notebook as html
+func nbToHTML(nb *parserv1.Notebook) (string, error) {
+	if nb == nil {
+		return "", errors.New("notebook is nil")
+	}
+	doc, err := converters.NotebookToDoc(nb)
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed to convert notebook to doc")
+	}
+
+	return docToHTML(doc)
 }
 
 // docToHTML returns the dock as html

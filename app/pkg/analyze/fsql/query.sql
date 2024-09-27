@@ -21,3 +21,4 @@ INSERT OR REPLACE INTO sessions
 (contextID, startTime, endTime, selectedId, selectedKind, total_input_tokens, total_output_tokens, num_generate_traces, proto)
 VALUES 
 (?, ?, ?, ?, ?, ?, ?, ?, ?);
+

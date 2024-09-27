@@ -40,8 +40,8 @@ fi
 * **Note** There appears to be a bug right now in the HTML rendering causing a bunch of newlines to be introduced relative to what's in the actual markdown in the JSON request
 
 ```bash
-jq -r '.responseHtml' /tmp/response.json > /tmp/response.html
-cat /tmp/response.html
+jq -r '.requestHtml' /tmp/response.json > /tmp/request.html
+cat /tmp/request.html
 ```
 
 * To view the response

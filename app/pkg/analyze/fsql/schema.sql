@@ -23,3 +23,14 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- TODO(jeremy): Should we store the proto in JSON format so that we can run SQL queries on values in it?
     proto BLOB
 );
+
+-- Results contains evaluation results
+CREATE TABLE IF NOT EXISTS results (
+    id VARCHAR(255) PRIMARY KEY,
+    -- time is the time of the evaluation example
+    -- protobufs can't have null timestamps so no point allowing nulls
+    time TIMESTAMP NOT NULL,
+
+    -- The JSON serialization of the proto.
+    proto_json TEXT NOT NULL
+);

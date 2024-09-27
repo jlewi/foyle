@@ -79,6 +79,15 @@ func GetCellID(cell *parserv1.Cell) string {
 	}
 	return ""
 }
+
+func SetCellID(cell *parserv1.Cell, id string) {
+	// Delete any existing IDs
+	for _, idField := range []string{IdField, RunmeIdField} {
+		delete(cell.Metadata, idField)
+	}
+	cell.Metadata[RunmeIdField] = id
+}
+
 func CellKindToBlockKind(kind parserv1.CellKind) v1alpha1.BlockKind {
 	switch kind {
 	case parserv1.CellKind_CELL_KIND_CODE:
