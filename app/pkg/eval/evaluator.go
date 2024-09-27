@@ -161,7 +161,11 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 	for _, example := range examples {
 		log := oLog.WithValues("exampleId", example.GetId())
 
-		if example.Time.AsTime().Before(lastProcessedTime) {
+		// TODO(jeremy): Should we just read the row from the database and check if it exists and has been completed?
+		// Finding the lastProcessed time and then using that seems like maybe its premature optimization? But maybe
+		// since I wrote it might as well keep it.
+		exampleTime := example.GetTime().AsTime()
+		if exampleTime.Before(lastProcessedTime) || exampleTime == lastProcessedTime {
 			log.V(logs.Debug).Info("Skipping example; already processed")
 			continue
 		}
