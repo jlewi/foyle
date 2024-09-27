@@ -28,10 +28,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	uninitializedDistance = -1
-)
-
 type Evaluator struct {
 	config config.Config
 	parser *executor.BashishParser

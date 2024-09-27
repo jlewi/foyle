@@ -3,6 +3,10 @@ package eval
 import (
 	"context"
 
+	"github.com/jlewi/foyle/app/pkg/docs"
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
@@ -138,12 +142,26 @@ func toAssertionRow(result *v1alpha1.EvalResult) (*v1alpha1.AssertionRow, error)
 	log := zapr.NewLogger(zap.L())
 
 	row := &v1alpha1.AssertionRow{
-		Id: result.Example.GetId(),
-		// ExampleFile: result.GetExampleFile(),
+		Id:          result.Example.GetId(),
+		ExampleFile: result.GetExample().FullContext.NotebookUri,
 	}
 
-	//row.DocMd = docs.DocToMarkdown(result.GetExample().GetQuery())
-	//row.AnswerMd = docs.BlocksToMarkdown(result.GetActual())
+	doc, err := converters.NotebookToDoc(result.GetExample().GetFullContext().GetNotebook())
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to convert notebook to doc")
+	}
+
+	actualDoc, err := converters.NotebookToDoc(&parserv1.Notebook{
+		Cells: result.GetActualCells(),
+	})
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to convert actual cells to doc")
+	}
+
+	row.DocMd = docs.DocToMarkdown(doc)
+	row.AnswerMd = docs.DocToMarkdown(actualDoc)
 
 	for _, a := range result.GetAssertions() {
 		switch a.Name {

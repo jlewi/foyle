@@ -20,14 +20,16 @@ func Test_ToAssertRow(t *testing.T) {
 			evalResult: &v1alpha1.EvalResult{
 				Example: &v1alpha1.EvalExample{
 					Id: "1234",
-					//Query: &v1alpha1.Doc{
-					//	Blocks: []*v1alpha1.Block{
-					//		{
-					//			Kind:     v1alpha1.BlockKind_MARKUP,
-					//			Contents: "Hello world",
-					//		},
-					//	},
-					//},
+					FullContext: &v1alpha1.FullContext{
+						Notebook: &parserv1.Notebook{
+							Cells: []*parserv1.Cell{
+								{
+									Kind:  parserv1.CellKind_CELL_KIND_MARKUP,
+									Value: "Hello world",
+								},
+							},
+						},
+					},
 				},
 				ActualCells: []*parserv1.Cell{
 					{
