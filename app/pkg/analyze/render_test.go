@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jlewi/foyle/app/api"
+
 	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/pkg/browser"
 	"google.golang.org/protobuf/proto"
@@ -14,14 +16,21 @@ import (
 
 func TestRenderAnthropicRequest(t *testing.T) {
 	type testCase struct {
-		name  string
-		fname string
+		name     string
+		fname    string
+		provider api.ModelProvider
 	}
 
 	tests := []testCase{
 		{
-			name:  "basic",
-			fname: "anthropic_request.json",
+			name:     "openai",
+			fname:    "openai_request.json",
+			provider: api.ModelProviderOpenAI,
+		},
+		{
+			name:     "anthropic",
+			fname:    "anthropic_request.json",
+			provider: api.ModelProviderAnthropic,
 		},
 	}
 
@@ -40,14 +49,12 @@ func TestRenderAnthropicRequest(t *testing.T) {
 				t.Fatalf("Failed to read file %s: %v", fname, err)
 			}
 
-			req := &anthropic.MessagesRequest{}
-			if err := json.Unmarshal(data, req); err != nil {
-				t.Fatalf("Failed to unmarshal request: %v", err)
+			result, err := RenderRequestHTML(string(data), test.provider)
+			if err != nil {
+				t.Fatalf("Failed to render request: %+v", err)
 			}
-
-			result := renderAnthropicRequest(req)
 			if result == "" {
-				t.Errorf("Request should not be empty")
+				t.Fatalf("Request should not be empty")
 			}
 
 			if os.Getenv("OPEN_IN_BROWSER") != "" {
@@ -96,7 +103,15 @@ func TestRenderAnthropicResponse(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := renderAnthropicResponse(test.resp)
+			jsonData, err := json.Marshal(test.resp)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal request: %v", err)
+			}
+
+			result, err := RenderResponseHTML(string(jsonData), api.ModelProviderAnthropic)
+			if err != nil {
+				t.Errorf("Failed to render response: %v", err)
+			}
 			if result == "" {
 				t.Errorf("Result should not be empty")
 			}
@@ -113,6 +128,39 @@ func TestRenderAnthropicResponse(t *testing.T) {
 			}
 
 			t.Logf("Result HTML:\n%s", result)
+		})
+	}
+}
+
+func Test_escapePrompt(t *testing.T) {
+	type testCase struct {
+		name     string
+		prompt   string
+		expected string
+	}
+
+	cases := []testCase{
+		{
+			name: "basic",
+			prompt: `This is the input
+<example>
+some example
+</example>
+`,
+			expected: `This is the input
+&lt;example&gt;
+some example
+&lt;/example&gt;
+`,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := escapePromptTags(c.prompt)
+			if result != c.expected {
+				t.Errorf("Expected %s; got %s", c.expected, result)
+			}
 		})
 	}
 }

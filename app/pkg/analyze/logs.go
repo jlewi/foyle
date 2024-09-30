@@ -87,22 +87,8 @@ func readLLMLog(ctx context.Context, traceId string, logFile string) (*logspb.Ge
 		}
 	}
 
-	if provider == api.ModelProviderAnthropic && resp.ResponseJson != "" {
-		html, err := renderAnthropicRequestJson(resp.RequestJson)
-		if err != nil {
-			log.Error(err, "Failed to render request")
-
-		} else {
-			resp.RequestHtml = html
-		}
-
-		htmlResp, err := renderAnthropicResponseJson(resp.ResponseJson)
-		if err != nil {
-			log.Error(err, "Failed to render response")
-
-		} else {
-			resp.ResponseHtml = htmlResp
-		}
+	if err := renderHTML(resp, provider); err != nil {
+		log.Error(err, "Failed to render HTML")
 	}
 	return resp, nil
 }
