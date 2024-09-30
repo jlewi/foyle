@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/sashabaranov/go-openai"
 
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
@@ -336,6 +338,39 @@ func Test_ShouldTrigger(t *testing.T) {
 			actual := shouldTrigger(c.doc, c.selectedIndex)
 			if actual != c.expected {
 				t.Fatalf("Expected %v but got %v", c.expected, actual)
+			}
+		})
+	}
+}
+
+func Test_PostProcessBlocks(t *testing.T) {
+	type testCase struct {
+		name     string
+		blocks   []*v1alpha1.Block
+		expected []*v1alpha1.Block
+	}
+
+	cases := []testCase{
+		{
+			name: "output-tag-in-codeblocks",
+			blocks: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Contents: "</output>",
+				},
+			},
+			expected: []*v1alpha1.Block{},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual, err := postProcessBlocks(c.blocks)
+			if err != nil {
+				t.Fatalf("Error post processing blocks; %v", err)
+			}
+			if d := cmp.Diff(c.expected, actual); d != "" {
+				t.Errorf("Unexpected diff:\n%s", d)
 			}
 		})
 	}
