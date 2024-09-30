@@ -556,12 +556,23 @@ func postProcessBlocks(blocks []*v1alpha1.Block) ([]*v1alpha1.Block, error) {
 	// Post process the blocks
 	results := make([]*v1alpha1.Block, 0, len(blocks))
 	for _, block := range blocks {
-		if block.GetKind() == v1alpha1.BlockKind_CODE {
-			results = append(results, block)
-			return results, nil
+		if block.GetKind() != v1alpha1.BlockKind_CODE {
+			continue
 		}
+		// The model sometimes returns just the "</output>" tag but inside a coude block.
+		// We want to ignore such blocks.
+		if isOutputTag(block.Contents) {
+			continue
+		}
+		results = append(results, block)
+		return results, nil
 	}
 	return results, nil
+}
+
+func isOutputTag(contents string) bool {
+	trimmed := strings.TrimSpace(contents)
+	return trimmed == "</output>"
 }
 
 // streamState is a structure to keep track of the state for a stream and deal with concurrency
