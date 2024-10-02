@@ -361,6 +361,16 @@ func Test_PostProcessBlocks(t *testing.T) {
 			},
 			expected: []*v1alpha1.Block{},
 		},
+		{
+			name: "whitespace-only-block",
+			blocks: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Contents: "   ",
+				},
+			},
+			expected: []*v1alpha1.Block{},
+		},
 	}
 
 	for _, c := range cases {
@@ -371,6 +381,45 @@ func Test_PostProcessBlocks(t *testing.T) {
 			}
 			if d := cmp.Diff(c.expected, actual); d != "" {
 				t.Errorf("Unexpected diff:\n%s", d)
+			}
+		})
+	}
+}
+
+func Test_dropResponse(t *testing.T) {
+	type testCase struct {
+		name     string
+		response *v1alpha1.StreamGenerateResponse
+		expected bool
+	}
+
+	cases := []testCase{
+		{
+			name: "basic",
+			response: &v1alpha1.StreamGenerateResponse{
+				Cells: []*parserv1.Cell{
+					{
+						Kind:  parserv1.CellKind_CELL_KIND_CODE,
+						Value: "print('Hello, World!')",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "empty",
+			response: &v1alpha1.StreamGenerateResponse{
+				Cells: []*parserv1.Cell{},
+			},
+			expected: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := dropResponse(c.response)
+			if result != c.expected {
+				t.Errorf("Expected %v; got %v", c.expected, result)
 			}
 		})
 	}
