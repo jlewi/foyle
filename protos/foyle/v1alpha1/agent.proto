@@ -9,7 +9,7 @@ option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
 
 message GenerateRequest {
   Doc doc = 1;
-  // The index of th
+  // The index of the selected cell.
   int32 selected_index = 2;
 }
 
