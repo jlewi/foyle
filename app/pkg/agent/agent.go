@@ -244,6 +244,11 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					return
 				}
 
+				if dropResponse(response) {
+					log.V(logs.Debug).Info("Dropping response", zap.Object("response", response))
+					continue
+				}
+
 				log.V(logs.Debug).Info("Sending response", zap.Object("response", response))
 				if err := stream.Send(response); err != nil {
 					log.Error(err, "Failed to send response")
@@ -564,6 +569,11 @@ func postProcessBlocks(blocks []*v1alpha1.Block) ([]*v1alpha1.Block, error) {
 		if isOutputTag(block.Contents) {
 			continue
 		}
+
+		// If the block is empty filter it out.
+		if strings.TrimSpace(block.Contents) == "" {
+			continue
+		}
 		results = append(results, block)
 		return results, nil
 	}
@@ -606,4 +616,18 @@ func shouldTrigger(doc *v1alpha1.Doc, selectedIndex int32) bool {
 	// For now only trigger completion if the selected cell is a markup cell.
 	selectedCell := doc.Blocks[selectedIndex]
 	return selectedCell.GetKind() == v1alpha1.BlockKind_MARKUP
+}
+
+// dropResponse returns true if the response should be dropped rather than being sent to the client.
+// The reason for doing this is because if a previous generation generated a "good" response we don't want
+// to overwrite it with this one
+func dropResponse(response *v1alpha1.StreamGenerateResponse) bool {
+	if response == nil {
+		return true
+	}
+	// We don't want to send empty cells because that will cause the client to remove any previously suggested cells
+	if len(response.Cells) == 0 {
+		return true
+	}
+	return false
 }
