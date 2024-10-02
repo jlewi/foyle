@@ -255,6 +255,9 @@ func (m *GenerateCellsRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.Obje
 		}
 	}
 
+	keyName = "selected_index" // field selected_index = 2
+	enc.AddInt32(keyName, m.SelectedIndex)
+
 	return nil
 }
 

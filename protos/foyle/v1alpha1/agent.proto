@@ -114,6 +114,8 @@ message StreamGenerateResponse {
 
 message GenerateCellsRequest {
   runme.parser.v1.Notebook notebook = 1;
+  // The index of the selected cell.
+  int32 selected_index = 2;
 }
 
 message GenerateCellsResponse {

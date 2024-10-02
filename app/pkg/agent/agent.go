@@ -450,7 +450,8 @@ func (a *Agent) GenerateCells(ctx context.Context, req *connect.Request[v1alpha1
 		return nil, err
 	}
 	agentReq := &v1alpha1.GenerateRequest{
-		Doc: doc,
+		Doc:           doc,
+		SelectedIndex: req.Msg.GetSelectedIndex(),
 	}
 
 	// Call the agent
