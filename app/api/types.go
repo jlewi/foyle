@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
+
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -221,4 +223,36 @@ func (L *LogEntry) Time() time.Time {
 
 	timestamp := time.Unix(seconds, nanoseconds)
 	return timestamp
+}
+
+// SetRequest sets the request field in the log entry.
+// This is only intended for constructing log entries as part of testing
+func SetRequest(e *LogEntry, req interface{}) error {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+
+	o := make(map[string]interface{})
+	if err := json.Unmarshal(b, &o); err != nil {
+		return err
+	}
+	(*e)[matchers.RequestField] = o
+	return nil
+}
+
+// SetResponse sets the response field in the log entry.
+// This is only intended for constructing log entries as part of testing
+func SetResponse(e *LogEntry, req interface{}) error {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+
+	o := make(map[string]interface{})
+	if err := json.Unmarshal(b, &o); err != nil {
+		return err
+	}
+	(*e)[matchers.ResponseField] = o
+	return nil
 }

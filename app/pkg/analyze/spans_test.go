@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
+	"github.com/sashabaranov/go-openai"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jlewi/foyle/app/api"
@@ -68,6 +71,110 @@ func Test_logEntryToSpan(t *testing.T) {
 				t.Fatalf("Unexpected diff:\n%v", d)
 			}
 		})
+	}
+}
+
+func Test_logEntrytoLLMSpan(t *testing.T) {
+	type testCase struct {
+		name     string
+		entry    *api.LogEntry
+		expected *logspb.Span
+	}
+
+	oaiRequestEntry := &api.LogEntry{
+		"function": matchers.OAIComplete,
+	}
+
+	oaiRequest := &openai.ChatCompletionRequest{
+		Model: "model",
+	}
+
+	if err := api.SetRequest(oaiRequestEntry, oaiRequest); err != nil {
+		t.Fatalf("Failed to set request: %v", err)
+	}
+
+	oaiRequestJson, err := json.Marshal(oaiRequest)
+
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	oaiResponseEntry := &api.LogEntry{
+		"function": matchers.OAIComplete,
+	}
+
+	oaiResponse := &openai.ChatCompletionResponse{
+		Model: "somemodel",
+	}
+	if err := api.SetResponse(oaiResponseEntry, oaiResponse); err != nil {
+		t.Fatalf("Failed to set request: %v", err)
+	}
+	oaiResponseJson, err := json.Marshal(oaiResponse)
+
+	if err != nil {
+		t.Fatalf("Failed to marshal response: %v", err)
+	}
+
+	cases := []testCase{
+		{
+			name:  "OAIRequest",
+			entry: oaiRequestEntry,
+			expected: &logspb.Span{
+				Data: &logspb.Span_Llm{
+					Llm: &logspb.LLMSpan{
+						Provider:    v1alpha1.ModelProvider_OPEN_AI,
+						RequestJson: string(oaiRequestJson),
+					},
+				},
+			},
+		},
+		{
+			name:  "OAIResponse",
+			entry: oaiResponseEntry,
+			expected: &logspb.Span{
+				Data: &logspb.Span_Llm{
+					Llm: &logspb.LLMSpan{
+						Provider:     v1alpha1.ModelProvider_OPEN_AI,
+						ResponseJson: string(oaiResponseJson),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			span := logEntryToSpan(context.Background(), tc.entry)
+
+			if span == nil {
+				t.Fatalf("Expected non nil span")
+			}
+
+			if span.GetLlm() == nil {
+				t.Fatalf("Expected LLM span")
+			}
+
+			if span.GetLlm().GetProvider() != v1alpha1.ModelProvider_OPEN_AI {
+				t.Fatalf("Expected OpenAI provider")
+			}
+
+			// The JSON serialization of the proto isn't deterministic so we can't use cmp.diff to evaluate the response
+			expectedHasRequest := tc.expected.GetLlm().GetRequestJson() != ""
+			expectedHasResponse := tc.expected.GetLlm().GetResponseJson() != ""
+
+			if expectedHasRequest {
+				if span.GetLlm().GetRequestJson() == "" {
+					t.Fatalf("Expected request")
+				}
+			}
+
+			if expectedHasResponse {
+				if span.GetLlm().GetResponseJson() == "" {
+					t.Fatalf("Expected response")
+				}
+			}
+		})
+
 	}
 }
 

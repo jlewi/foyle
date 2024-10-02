@@ -182,7 +182,8 @@ type EvalResult struct {
 	// Example is the answer and expected result
 	Example     *EvalExample `protobuf:"bytes,1,opt,name=example,proto3" json:"example,omitempty"`
 	ActualCells []*v1.Cell   `protobuf:"bytes,11,rep,name=actual_cells,json=actualCells,proto3" json:"actual_cells,omitempty"`
-	Error       string       `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	// Error indicates an error generating the completion.
+	Error string `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
 	// Status of the evaluation
 	Status EvalResultStatus `protobuf:"varint,6,opt,name=status,proto3,enum=EvalResultStatus" json:"status,omitempty"`
 	// The ID of the generate trace

@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
+
 	"github.com/jlewi/foyle/app/api"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -65,7 +67,7 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 		System:      systemPrompt,
 	}
 
-	log.Info("Anthropic:CreateMessages", "request", request)
+	log.Info("Anthropic:CreateMessages", matchers.RequestField, request)
 	resp, err := c.client.CreateMessages(ctx, request)
 
 	if err != nil {
@@ -88,7 +90,7 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 		attribute.String("llm.stop_reason", string(resp.StopReason)),
 	)
 
-	log.Info("Anthropic:CreateMessages response", "resp", resp)
+	log.Info("Anthropic:CreateMessages response", matchers.ResponseField, resp)
 	usage := api.LLMUsage{
 		InputTokens:  resp.Usage.InputTokens,
 		OutputTokens: resp.Usage.OutputTokens,

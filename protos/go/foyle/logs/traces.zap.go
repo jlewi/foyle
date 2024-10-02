@@ -95,6 +95,17 @@ func (m *Span) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error
 		}
 	}
 
+	keyName = "llm" // field llm = 3
+	if ov, ok := m.GetData().(*Span_Llm); ok {
+		_ = ov
+		if ov.Llm != nil {
+			var vv interface{} = ov.Llm
+			if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+				enc.AddObject(keyName, marshaler)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -122,6 +133,26 @@ func (m *RAGSpan) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) er
 		}
 		return nil
 	}))
+
+	return nil
+}
+
+func (m *LLMSpan) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "provider" // field provider = 1
+	enc.AddString(keyName, m.Provider.String())
+
+	keyName = "request_json" // field request_json = 2
+	enc.AddString(keyName, m.RequestJson)
+
+	keyName = "response_json" // field response_json = 3
+	enc.AddString(keyName, m.ResponseJson)
 
 	return nil
 }

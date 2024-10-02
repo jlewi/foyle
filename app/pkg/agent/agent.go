@@ -137,7 +137,8 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateRequest, examples []*v1alpha1.Example) ([]*v1alpha1.Block, error) {
 	log := logs.FromContext(ctx)
 
-	t := docs.NewTailer(req.Doc.GetBlocks(), MaxDocChars)
+	cells := preprocessDoc(req)
+	t := docs.NewTailer(cells, MaxDocChars)
 
 	exampleArgs := make([]Example, 0, len(examples))
 	for _, example := range examples {
@@ -224,7 +225,8 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					// This should be safe because each time we update pendingDoc we update it to point to
 					// a new doc object. So the other thread won't be modifying the doc pendingDoc points to
 					r := &v1alpha1.GenerateRequest{
-						Doc: pendingDoc,
+						Doc:           pendingDoc,
+						SelectedIndex: selectedCell,
 					}
 					pendingDoc = nil
 					return r
@@ -234,7 +236,7 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					continue
 				}
 
-				response, err := a.createCompletion(ctx, generateRequest, notebookUri, selectedCell, state.getContextID())
+				response, err := a.createCompletion(ctx, generateRequest, notebookUri, state.getContextID())
 
 				if err != nil {
 					log.Error(err, "createCompletion failed")
@@ -475,11 +477,12 @@ func (a *Agent) GenerateCells(ctx context.Context, req *connect.Request[v1alpha1
 }
 
 // createCompletion is a helper function to create a single completion as part of a stream.
-func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.GenerateRequest, notebookUri string, selectedCell int32, contextID string) (*v1alpha1.StreamGenerateResponse, error) {
+func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.GenerateRequest, notebookUri string, contextID string) (*v1alpha1.StreamGenerateResponse, error) {
 	span := trace.SpanFromContext(ctx)
 	log := logs.FromContext(ctx)
 	traceId := span.SpanContext().TraceID()
 	tp := tracer()
+
 	// We need to generate a new ctx with a new trace ID because we want one trace per completion
 	// We need to use withNewRoot because we want to make it a new trace and not rooted at the current one
 	generateCtx, generateSpan := tp.Start(ctx, "CreateCompletion", trace.WithNewRoot(), trace.WithAttributes(attribute.String("streamTraceID", traceId.String()), attribute.String("contextID", contextID)))
@@ -501,7 +504,7 @@ func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.
 	response := &v1alpha1.StreamGenerateResponse{
 		Cells:       cells,
 		NotebookUri: notebookUri,
-		InsertAt:    selectedCell + 1,
+		InsertAt:    generateRequest.GetSelectedIndex() + 1,
 		ContextId:   contextID,
 	}
 
@@ -630,4 +633,11 @@ func dropResponse(response *v1alpha1.StreamGenerateResponse) bool {
 		return true
 	}
 	return false
+}
+
+// preprocessDoc does some preprocessing of the doc.
+func preprocessDoc(req *v1alpha1.GenerateRequest) []*v1alpha1.Block {
+	// We want to remove all cells after the selected cell because our prompt doesn't know how to take them into account.
+	cells := req.Doc.Blocks[:req.SelectedIndex+1]
+	return cells
 }

@@ -52,10 +52,6 @@ func readLLMLog(ctx context.Context, traceId string, logFile string) (*logspb.Ge
 			continue
 		}
 		isMatch := false
-		if strings.HasSuffix(entry.Function(), "anthropic.(*Completer).Complete") {
-			provider = api.ModelProviderAnthropic
-			isMatch = true
-		}
 
 		if matchers.IsOAIComplete(entry.Function()) {
 			provider = api.ModelProviderOpenAI

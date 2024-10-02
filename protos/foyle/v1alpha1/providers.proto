@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+
+option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
+
+enum ModelProvider {
+  MODEL_PROVIDER_UNKNOWN = 0;
+  OPEN_AI = 1;
+  ANTHROPIC = 2;
+  REPLICATE = 3;
+}
