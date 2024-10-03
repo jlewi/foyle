@@ -1,0 +1,12 @@
+# Mirror the Foyle docker image from Google Artifact Registry to GitHub Container Registry
+apiVersion: hydros.dev/v1alpha1
+kind: ReplicatedImage
+metadata:
+  name: mirror-foyle-image
+  labels:
+    env: release
+spec:
+  source:
+    repository: "us-west1-docker.pkg.dev/foyle-public/images/foyle"
+  destinations:
+    - "ghcr.io/jlewi/foyle"

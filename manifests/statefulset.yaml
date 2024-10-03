@@ -1,0 +1,84 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: foyle
+  labels:
+    app: foyle
+spec:
+  ports:
+  - port: 8877    
+  clusterIP: None
+  selector:
+    app: foyle
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: foyle
+spec:
+  serviceName: "foyle"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: foyle
+  # https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#update-strategies
+  # N.B. This is an attempt to ensure that when we update the statefulset we will kick the pod
+  # even if there is only one pod.
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        app: foyle
+    spec:
+      securityContext:
+        fsGroup: 65532
+      containers:
+      - name: foyle
+        image: ghcr.io/jlewi/foyle:latest
+        args:
+        - --config=/config/foyle.yaml
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "500Mi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        ports:
+        - containerPort: 8877
+          name: web
+        volumeMounts:
+        - name: foyle
+          mountPath: /data/foyle
+        - name: openai-key
+          mountPath: /etc/secrets/openai-key
+          readOnly: true
+        - name: foyle-config
+          mountPath: /config
+          readOnly: true
+      volumes:
+        - name: foyle
+          persistentVolumeClaim:
+            claimName: foyle
+        - name: openai-key
+          secret:
+            secretName: openai-key
+        - name: foyle-config
+          configMap:
+            name: foyle-config
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: foyle
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
