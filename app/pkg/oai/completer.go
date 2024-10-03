@@ -3,6 +3,8 @@ package oai
 import (
 	"context"
 
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
+
 	"github.com/jlewi/foyle/app/api"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -56,7 +58,7 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 		Temperature: temperature,
 	}
 
-	log.Info("OpenAI:CreateChatCompletion", "request", request)
+	log.Info("OpenAI:CreateChatCompletion", matchers.RequestField, request)
 	resp, err := c.client.CreateChatCompletion(ctx, request)
 
 	if err != nil {
@@ -75,7 +77,7 @@ func (c *Completer) Complete(ctx context.Context, systemPrompt string, message s
 		return nil, errors.Wrapf(err, "CreateChatCompletion failed")
 	}
 
-	log.Info("OpenAI:CreateChatCompletion response", "resp", resp)
+	log.Info("OpenAI:CreateChatCompletion response", matchers.ResponseField, resp)
 	usage := api.LLMUsage{
 		InputTokens:  resp.Usage.PromptTokens,
 		OutputTokens: resp.Usage.CompletionTokens,

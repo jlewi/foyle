@@ -1,10 +1,17 @@
-package matchers
+// package test is a hacky way to avoid circular imports in the test.
+// The test imports some packages (e.g. anthropic/oai) that also import matchers
+// so if we don't use a separate package we end up with a circular import.
+package test
 
 import (
 	"reflect"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/jlewi/foyle/app/pkg/logs/matchers"
+
+	"github.com/jlewi/foyle/app/pkg/anthropic"
 
 	"github.com/jlewi/foyle/app/pkg/oai"
 
@@ -30,12 +37,12 @@ func Test_Names(t *testing.T) {
 
 	cases := []testCases{
 		{
-			expected: LogEvents,
+			expected: matchers.LogEvents,
 			input:    (&agent.Agent{}).LogEvents,
 		},
 
 		{
-			expected: StreamGenerate,
+			expected: matchers.StreamGenerate,
 			input:    (&agent.Agent{}).StreamGenerate,
 		},
 	}
@@ -50,7 +57,7 @@ func Test_Names(t *testing.T) {
 func Test_Matchers(t *testing.T) {
 	type testCases struct {
 		name     string
-		Matcher  Matcher
+		Matcher  matchers.Matcher
 		input    interface{}
 		expected bool
 	}
@@ -58,25 +65,31 @@ func Test_Matchers(t *testing.T) {
 	cases := []testCases{
 		{
 			input:    (&oai.Completer{}).Complete,
-			Matcher:  IsOAIComplete,
+			Matcher:  matchers.IsOAIComplete,
 			name:     "IsOAIComplete",
 			expected: true,
 		},
 		{
+			input:    (&anthropic.Completer{}).Complete,
+			Matcher:  matchers.IsAnthropicComplete,
+			name:     "IsAnthropicComplete",
+			expected: true,
+		},
+		{
 			input:    (&agent.Agent{}).Generate,
-			Matcher:  IsGenerate,
+			Matcher:  matchers.IsGenerate,
 			name:     "IsGenerate",
 			expected: true,
 		},
 		{
 			input:    (&agent.Agent{}).StreamGenerate,
-			Matcher:  IsStreamGenerate,
+			Matcher:  matchers.IsStreamGenerate,
 			name:     "IsStreamGenerate",
 			expected: true,
 		},
 		{
 			input:    logs.LogLLMUsage,
-			Matcher:  IsLLMUsage,
+			Matcher:  matchers.IsLLMUsage,
 			name:     "IsLLMUsage",
 			expected: true,
 		},
