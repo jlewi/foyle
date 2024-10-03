@@ -1,0 +1,23 @@
+apiVersion: ""
+kind: ""
+logging:
+    level: info
+    logDir: /data/foyle/logs
+    sinks:    
+    - json: false
+      path: stderr
+server:
+    bindAddress: 0.0.0.0    
+    httpMaxReadTimeout: 5m0s
+    httpMaxWriteTimeout: 5m0s
+agent:
+    model: gpt-4o-mini
+    rag:
+        enabled: true
+        maxResults: 3
+    evalMode: false
+openai:
+    apiKeyFile: /etc/secrets/openai-key/openai.api.key    
+learner:    
+    exampleDirs:
+        - /data/foyle/training
