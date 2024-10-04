@@ -408,6 +408,7 @@ func InitViperInstance(v *viper.Viper, cmd *cobra.Command) error {
 
 	// Ensure the path for the config file path is set
 	// Required since we use viper to persist the location of the config file so can save to it.
+	// This allows us to overwrite the config file location with the --config flag.
 	cfgFile := v.GetString(ConfigFlagName)
 	if cfgFile != "" {
 		v.SetConfigFile(cfgFile)
