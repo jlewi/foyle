@@ -285,7 +285,8 @@ func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alph
 	}
 
 	request := &v1alpha1.GenerateCellsRequest{
-		Notebook: result.Example.GetFullContext().GetNotebook(),
+		Notebook:      result.Example.GetFullContext().GetNotebook(),
+		SelectedIndex: result.Example.GetFullContext().GetSelected(),
 	}
 
 	resp, err := client.GenerateCells(ctx, connect.NewRequest(request))
