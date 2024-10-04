@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/pkg/errors"
@@ -31,39 +30,21 @@ func NewSetConfigCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			err := func() error {
-				if err := config.InitViper(cmd); err != nil {
+				v := viper.GetViper()
+
+				if err := config.InitViperInstance(v, cmd); err != nil {
 					return err
 				}
 
-				pieces := strings.Split(args[0], "=")
-				cfgName := pieces[0]
+				fConfig, err := config.UpdateViperConfig(v, args[0])
 
-				var fConfig *config.Config
-				switch cfgName {
-				case "azureOpenAI.deployments":
-					if len(pieces) != 3 {
-						return errors.New("Invalid argument; argument is not in the form azureOpenAI.deployments=<model>=<deployment>")
-					}
-
-					d := config.AzureDeployment{
-						Model:      pieces[1],
-						Deployment: pieces[2],
-					}
-
-					fConfig = config.GetConfig()
-					config.SetAzureDeployment(fConfig, d)
-				default:
-					if len(pieces) < 2 {
-						return errors.New("Invalid usage; set expects an argument in the form <NAME>=<VALUE>")
-					}
-					cfgValue := pieces[1]
-					viper.Set(cfgName, cfgValue)
-					fConfig = config.GetConfig()
+				if err != nil {
+					return errors.Wrap(err, "Failed to update configuration")
 				}
 
-				file := viper.ConfigFileUsed()
+				file := fConfig.GetConfigFile()
 				if file == "" {
-					file = config.DefaultConfigFile()
+					return errors.New("Failed to get configuration file")
 				}
 				// Persist the configuration
 				return fConfig.Write(file)

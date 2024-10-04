@@ -363,6 +363,7 @@ func (c *Config) DeepCopy() Config {
 func InitViper(cmd *cobra.Command) error {
 	// N.B. we need to set globalV because the subsequent call GetConfig will use that viper instance.
 	// Would it make sense to combine InitViper and Get into one command that returns a config object?
+	// TODO(jeremy): Could we just use viper.GetViper() to get the global instance?
 	globalV = viper.New()
 	return InitViperInstance(globalV, cmd)
 }
@@ -407,6 +408,7 @@ func InitViperInstance(v *viper.Viper, cmd *cobra.Command) error {
 
 	// Ensure the path for the config file path is set
 	// Required since we use viper to persist the location of the config file so can save to it.
+	// This allows us to overwrite the config file location with the --config flag.
 	cfgFile := v.GetString(ConfigFlagName)
 	if cfgFile != "" {
 		v.SetConfigFile(cfgFile)
