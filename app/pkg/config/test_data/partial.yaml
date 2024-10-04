@@ -26,13 +26,7 @@ openai:
 telemetry:
   honeycomb:
     apiKeyFile: /Users/fred/secrets/honeycomb.api.key
-eval:
-  gcpServiceAccount: developer@fred-dev.iam.gserviceaccount.com
 learner:
   logDirs: []
   exampleDirs:
     - /Users/fred/.foyle/training
-replicate:
-  apiKeyFile: /Users/fred/replicate/secrets/apikey
-anthropic:
-  apiKeyFile: /Users/fred/secrets/anthropic.key
