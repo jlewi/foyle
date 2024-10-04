@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"github.com/go-logr/logr"
 	"os"
 	"path/filepath"
 	"sort"
@@ -233,6 +234,8 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 // processResult process the result. It is updated in place
 func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResult, example *v1alpha1.EvalExample, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, judge *Judge) error {
 	result.Example = example
+	log := logs.FromContext(ctx).WithValues("exampleId", example.GetId())
+	ctx = logr.NewContext(ctx, log)
 
 	if err := runGenerate(ctx, result, client); err != nil {
 		return err
@@ -291,6 +294,7 @@ func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alph
 
 	resp, err := client.GenerateCells(ctx, connect.NewRequest(request))
 	if err != nil {
+		log.Error(err, "Failed to generate cells")
 		if connectErr := new(connect.Error); errors.As(err, &connectErr) {
 			// TODO(https://github.com/jlewi/foyle/issues/257)
 			// Currently GenerateCells returns a connect.Error if the completer can't generate a completion
@@ -300,9 +304,12 @@ func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alph
 				// We return nil because the problem is specific to this example so the evaluator should move on
 				// to other examples
 				return nil
+			} else {
+				result.Error = err.Error()
+				// Assume its a problem that could affect other examples so abort it.
+				return err
 			}
 		} else {
-			log.Error(err, "Failed to generate cells")
 			result.Error = err.Error()
 			return err
 		}
