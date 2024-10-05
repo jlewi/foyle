@@ -458,6 +458,7 @@ func (a *Agent) GenerateCells(ctx context.Context, req *connect.Request[v1alpha1
 	agentResp, err := a.Generate(ctx, agentReq)
 	if err != nil {
 		log.Error(err, "Agent.Generate failed")
+		err := errors.Wrapf(err, "Agent.Generate failed; traceId %s", span.SpanContext().TraceID().String())
 		return nil, err
 	}
 
