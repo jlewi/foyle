@@ -3,10 +3,13 @@ package oai
 import (
 	"context"
 
+	"github.com/jlewi/foyle/app/pkg/docs"
+	"github.com/jlewi/foyle/app/pkg/llms"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/pkg/errors"
 	"github.com/sashabaranov/go-openai"
-	"gonum.org/v1/gonum/mat"
 )
 
 func NewVectorizer(client *openai.Client) *Vectorizer {
@@ -19,7 +22,12 @@ type Vectorizer struct {
 	client *openai.Client
 }
 
-func (v *Vectorizer) Embed(ctx context.Context, text string) (*mat.VecDense, error) {
+func (v *Vectorizer) Embed(ctx context.Context, req *v1alpha1.GenerateRequest) (llms.Vector, error) {
+	// Should we use more than one block? Do we have examples where using moe than 1 one block would help
+	qBlock := req.GetDoc().GetBlocks()[req.GetSelectedIndex()]
+	text := docs.BlocksToMarkdown([]*v1alpha1.Block{qBlock})
+
+	// Compute the embedding for the query.
 	log := logs.FromContext(ctx)
 	log.Info("RAG Query", "query", text)
 	request := openai.EmbeddingRequestStrings{
@@ -29,6 +37,7 @@ func (v *Vectorizer) Embed(ctx context.Context, text string) (*mat.VecDense, err
 		EncodingFormat: "float",
 	}
 
+	// N.B. regarding retries. We should already be doing retries in the HTTP client.
 	resp, err := v.client.CreateEmbeddings(ctx, request)
 	if err != nil {
 		return nil, errors.Errorf("Failed to create embeddings")
@@ -42,12 +51,7 @@ func (v *Vectorizer) Embed(ctx context.Context, text string) (*mat.VecDense, err
 		return nil, errors.Errorf("Embeddings have wrong dimension; got %v, want %v", len(resp.Data[0].Embedding), SmallEmbeddingsDims)
 	}
 
-	// Compute the cosine similarity between the query and each example.
-	qVec := mat.NewVecDense(SmallEmbeddingsDims, nil)
-	for i := 0; i < SmallEmbeddingsDims; i++ {
-		qVec.SetVec(i, float64(resp.Data[0].Embedding[i]))
-	}
-	return qVec, nil
+	return resp.Data[0].Embedding, nil
 }
 
 func (v *Vectorizer) Length() int {

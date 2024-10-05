@@ -1,6 +1,9 @@
 package oai
 
-import "github.com/sashabaranov/go-openai"
+import (
+	"github.com/pkg/errors"
+	"github.com/sashabaranov/go-openai"
+)
 
 const (
 	// ContextLengthExceededCode the error code returned by OpenAI to indicate the context length was exceeded
@@ -20,4 +23,14 @@ func ErrorIs(err error, oaiCode string) bool {
 	}
 
 	return val == oaiCode
+}
+
+// HTTPStatusCode returns the HTTP status code from the error if it is an OpenAI error.
+// Returns -1 if its not of type APIError.
+func HTTPStatusCode(err error) int {
+	target := &openai.APIError{}
+	if !errors.As(err, &target) {
+		return -1
+	}
+	return target.HTTPStatusCode
 }

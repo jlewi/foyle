@@ -92,7 +92,7 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 	var examples []*v1alpha1.Example
 	if a.config.UseRAG() {
 		var err error
-		examples, err = a.db.GetExamples(ctx, req.Doc, a.config.RagMaxResults())
+		examples, err = a.db.GetExamples(ctx, req, a.config.RagMaxResults())
 		if err != nil {
 			// Fail gracefully; keep going without examples
 			log.Error(err, "Failed to get examples")

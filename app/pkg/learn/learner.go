@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -20,7 +19,6 @@ import (
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/jlewi/foyle/app/pkg/config"
-	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
@@ -59,18 +57,22 @@ type Learner struct {
 	postFunc        PostLearnEvent
 	eventLoopIsDone sync.WaitGroup
 	factory         *files.Factory
+	vectorizer      *oai.Vectorizer
 }
 
 func NewLearner(cfg config.Config, client *openai.Client, blocksDB *dbutil.LockingDB[*logspb.BlockLog]) (*Learner, error) {
 	if client == nil {
 		return nil, errors.New("OpenAI client is required")
 	}
+
+	vectorizer := oai.NewVectorizer(client)
 	return &Learner{
-		Config:   cfg,
-		client:   client,
-		blocksDB: blocksDB,
-		queue:    workqueue.NewDelayingQueue(),
-		factory:  &files.Factory{},
+		Config:     cfg,
+		client:     client,
+		blocksDB:   blocksDB,
+		queue:      workqueue.NewDelayingQueue(),
+		factory:    &files.Factory{},
+		vectorizer: vectorizer,
 	}, nil
 }
 
@@ -113,10 +115,10 @@ func (l *Learner) eventLoop(ctx context.Context) {
 			}
 
 			if err := l.Reconcile(ctx, exampleId); err != nil {
+				// N.B. Right now we treat learning errors as permanent and don't retry.
+				// The most likely source of retryable errors the vectorizer endpoint should already be handled
+				// by using a retryable HTTP client.
 				log.Error(err, "Error learning from example", "example", exampleId)
-				// Requeue the item so we will try again.
-				// TODO(jeremy): should we use a rate limiting queue so we eventually give up?
-				l.queue.AddAfter(exampleId, 30*time.Second)
 				return
 			}
 		}()
@@ -275,30 +277,21 @@ func (l *Learner) computeEmbeddings(ctx context.Context, example *v1alpha1.Examp
 		return nil
 	}
 
-	query := docs.DocToMarkdown(example.Query)
+	selectedIndex := len(example.Query.GetBlocks()) - 1
+	qVec, err := l.vectorizer.Embed(ctx, &v1alpha1.GenerateRequest{
+		Doc:           example.Query,
+		SelectedIndex: int32(selectedIndex),
+	})
 
-	request := openai.EmbeddingRequestStrings{
-		Input:          []string{query},
-		Model:          openai.SmallEmbedding3,
-		User:           "",
-		EncodingFormat: "float",
-	}
-	resp, err := l.client.CreateEmbeddings(ctx, request)
 	if err != nil {
-		log.Error(err, "Failed to create embeddings", "id", example.Id, "query", query)
-		return errors.Wrapf(err, "Failed to create embeddings")
+		return err
 	}
 
-	if len(resp.Data) != 1 {
-		log.Error(err, "Expected exactly 1 embedding", "id", example.Id, "query", query, "got", len(resp.Data))
-		return errors.Errorf("Expected exactly 1 embedding but got %d", len(resp.Data))
+	if len(qVec) != oai.SmallEmbeddingsDims {
+		log.Error(err, "Embeddings have wrong dimension", "id", example.Id, "query", example.Query, "got", len(qVec), "want", oai.SmallEmbeddingsDims)
+		return errors.Wrapf(err, "Embeddings have wrong dimension; got %v, want %v", len(qVec), oai.SmallEmbeddingsDims)
 	}
 
-	if len(resp.Data[0].Embedding) != oai.SmallEmbeddingsDims {
-		log.Error(err, "Embeddings have wrong dimension", "id", example.Id, "query", query, "got", len(resp.Data[0].Embedding), "want", oai.SmallEmbeddingsDims)
-		return errors.Wrapf(err, "Embeddings have wrong dimension; got %v, want %v", len(resp.Data[0].Embedding), oai.SmallEmbeddingsDims)
-	}
-
-	example.Embedding = resp.Data[0].Embedding
+	example.Embedding = qVec
 	return nil
 }

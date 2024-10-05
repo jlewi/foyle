@@ -114,7 +114,11 @@ func Test_InMemoryDB(t *testing.T) {
 			},
 		},
 	}
-	examples, err := db.GetExamples(context.Background(), doc, 1)
+	req := &v1alpha1.GenerateRequest{
+		Doc:           doc,
+		SelectedIndex: 0,
+	}
+	examples, err := db.GetExamples(context.Background(), req, 1)
 	if err != nil {
 		t.Fatalf("Error getting examples; %v", err)
 	}
