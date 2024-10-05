@@ -2,6 +2,7 @@ package learn
 
 import (
 	"context"
+	"github.com/jlewi/foyle/app/pkg/docs"
 	"io"
 	"sort"
 	"sync"
@@ -78,8 +79,13 @@ func (db *InMemoryExampleDB) GetExamples(ctx context.Context, req *v1alpha1.Gene
 		return []*v1alpha1.Example{}, nil
 	}
 
+	blocks, err := docs.CreateQuery(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create query")
+	}
+
 	// Compute the embedding for the query.
-	qVecData, err := db.vectorizer.Embed(ctx, req)
+	qVecData, err := db.vectorizer.Embed(ctx, blocks)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to compute embedding for query")
 	}

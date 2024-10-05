@@ -3,6 +3,7 @@ package learn
 import (
 	"context"
 	"fmt"
+	"github.com/jlewi/foyle/app/pkg/docs"
 	"io"
 	"strings"
 	"sync"
@@ -182,16 +183,30 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 
 	if len(expectedFiles) == 0 {
 		cellsProcessed.WithLabelValues("noExampleFiles").Inc()
-		log.Error(err, "No training files found", "id", b.GetId())
+		log.Error(err, "No training files found", "blockId", b.GetId())
 		return errors.Wrapf(err, "No training files found for example %s", b.GetId())
 	}
 
 	// TODO(jeremy): Should we take into account execution status when looking for mistakes?
 
 	// Deep copy the original message
-	newDoc := proto.Clone(b.Doc).(*v1alpha1.Doc)
 	newBlock := proto.Clone(b.ExecutedBlock).(*v1alpha1.Block)
 	answer := []*v1alpha1.Block{newBlock}
+
+	req := &v1alpha1.GenerateRequest{
+		Doc:           b.Doc,
+		SelectedIndex: int32(len(b.Doc.Blocks) - 1),
+	}
+	queryBlocks, err := docs.CreateQuery(ctx, req)
+
+	newDoc := &v1alpha1.Doc{
+		Blocks: queryBlocks,
+	}
+
+	if err != nil {
+		log.Error(err, "Failed to create query", "exampleId", b.GetId())
+		return errors.Wrapf(err, "Failed to create query for example %s", b.GetId())
+	}
 
 	example := &v1alpha1.Example{
 		Id:     b.GetId(),
@@ -277,11 +292,7 @@ func (l *Learner) computeEmbeddings(ctx context.Context, example *v1alpha1.Examp
 		return nil
 	}
 
-	selectedIndex := len(example.Query.GetBlocks()) - 1
-	qVec, err := l.vectorizer.Embed(ctx, &v1alpha1.GenerateRequest{
-		Doc:           example.Query,
-		SelectedIndex: int32(selectedIndex),
-	})
+	qVec, err := l.vectorizer.Embed(ctx, example.Query.GetBlocks())
 
 	if err != nil {
 		return err

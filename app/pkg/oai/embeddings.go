@@ -22,10 +22,8 @@ type Vectorizer struct {
 	client *openai.Client
 }
 
-func (v *Vectorizer) Embed(ctx context.Context, req *v1alpha1.GenerateRequest) (llms.Vector, error) {
-	// Should we use more than one block? Do we have examples where using moe than 1 one block would help
-	qBlock := req.GetDoc().GetBlocks()[req.GetSelectedIndex()]
-	text := docs.BlocksToMarkdown([]*v1alpha1.Block{qBlock})
+func (v *Vectorizer) Embed(ctx context.Context, blocks []*v1alpha1.Block) (llms.Vector, error) {
+	text := docs.BlocksToMarkdown(blocks)
 
 	// Compute the embedding for the query.
 	log := logs.FromContext(ctx)

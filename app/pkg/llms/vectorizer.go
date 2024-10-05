@@ -12,8 +12,8 @@ type Vector []float32
 
 // Vectorizer computes embedding representations of text.
 type Vectorizer interface {
-	// Embed computes the embedding of the text
-	Embed(ctx context.Context, req *v1alpha1.GenerateRequest) (Vector, error)
+	// Embed computes the embedding of the blocks
+	Embed(ctx context.Context, blocks []*v1alpha1.Block) (Vector, error)
 	// Length returns the length of the embeddings
 	Length() int
 }
