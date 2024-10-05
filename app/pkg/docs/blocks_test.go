@@ -1,10 +1,12 @@
 package docs
 
 import (
+	"context"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/jlewi/foyle/app/pkg/testutil"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"testing"
 )
 
 func Test_CreateQuery(t *testing.T) {
@@ -68,7 +70,7 @@ func Test_CreateQuery(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			blocks, err := CreateQuery(nil, tc.input)
+			blocks, err := CreateQuery(context.Background(), tc.input)
 			if err != nil {
 				t.Fatalf("CreateQuery failed: %v", err)
 			}

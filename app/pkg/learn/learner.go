@@ -3,10 +3,11 @@ package learn
 import (
 	"context"
 	"fmt"
-	"github.com/jlewi/foyle/app/pkg/docs"
 	"io"
 	"strings"
 	"sync"
+
+	"github.com/jlewi/foyle/app/pkg/docs"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"

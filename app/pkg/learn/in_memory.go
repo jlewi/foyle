@@ -2,10 +2,11 @@ package learn
 
 import (
 	"context"
-	"github.com/jlewi/foyle/app/pkg/docs"
 	"io"
 	"sort"
 	"sync"
+
+	"github.com/jlewi/foyle/app/pkg/docs"
 
 	"github.com/jlewi/foyle/app/pkg/llms"
 
