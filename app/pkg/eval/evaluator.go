@@ -2,11 +2,12 @@ package eval
 
 import (
 	"context"
-	"github.com/go-logr/logr"
 	"os"
 	"path/filepath"
 	"sort"
 	"time"
+
+	"github.com/go-logr/logr"
 
 	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/agent"
