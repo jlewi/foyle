@@ -171,6 +171,7 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 			log.V(logs.Debug).Info("Skipping example; already processed")
 			continue
 		}
+		log.Info("Processing example")
 
 		var processErr error
 
