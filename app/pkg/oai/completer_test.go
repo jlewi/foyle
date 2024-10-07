@@ -20,7 +20,7 @@ func TestOaiCompleter(t *testing.T) {
 	}
 
 	cfg := config.GetConfig()
-	cfg.Agent.Model = openai.GPT3Dot5Turbo // Not sure if this is a good model, just dug up one through one of the imports in completer.go
+	cfg.Agent.Model = openai.GPT4oMini // Not sure if this is a good model, just dug up one through one of the imports in completer.go
 	client, err := NewClient(*cfg)
 	if err != nil {
 		t.Fatalf("Failed to create OpenAI client: %v", err)
