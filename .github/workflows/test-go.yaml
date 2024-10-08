@@ -1,6 +1,10 @@
 # A basic workflow for Go
 name: test-go
-on: [push]
+on: 
+  # N.B. If we don't trigger on pull_request then I don't think we trigger the workflow
+  # on PRs created from forks (e.g. outside contributors).
+  - push
+  - pull_request
 defaults:
   run:
     shell: bash -ieo pipefail {0}
