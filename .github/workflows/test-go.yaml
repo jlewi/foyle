@@ -2,8 +2,7 @@
 name: test-go
 on: 
   # N.B. If we don't trigger on pull_request then I don't think we trigger the workflow
-  # on PRs created from forks (e.g. outside contributors).
-  - push
+  # on PRs created from forks (e.g. outside contributors).  
   - pull_request
 defaults:
   run:
