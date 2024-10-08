@@ -566,10 +566,10 @@ func postProcessBlocks(blocks []*v1alpha1.Block) ([]*v1alpha1.Block, error) {
 	// Post process the blocks
 	results := make([]*v1alpha1.Block, 0, len(blocks))
 	for _, block := range blocks {
-		if block.GetKind() != v1alpha1.BlockKind_CODE {
-			continue
-		}
-		// The model sometimes returns just the "</output>" tag but inside a coude block.
+		//if block.GetKind() != v1alpha1.BlockKind_CODE {
+		//	continue
+		//}
+		// The model sometimes returns just the "</output>" tag but inside a code block.
 		// We want to ignore such blocks.
 		if isOutputTag(block.Contents) {
 			continue
@@ -617,10 +617,8 @@ func shouldTrigger(doc *v1alpha1.Doc, selectedIndex int32) bool {
 	if len(doc.Blocks) == 0 {
 		return false
 	}
-	// N.B. This is a bit of a hack to reduce costs because we are using so many tokens.
-	// For now only trigger completion if the selected cell is a markup cell.
-	selectedCell := doc.Blocks[selectedIndex]
-	return selectedCell.GetKind() == v1alpha1.BlockKind_MARKUP
+
+	return true
 }
 
 // dropResponse returns true if the response should be dropped rather than being sent to the client.
