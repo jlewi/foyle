@@ -77,4 +77,4 @@ Documentation is available at [https://foyle.io/docs/](https://foyle.io/docs/)
 
 ## Feedback
 
-If you have questions or run into bugs please open a GitHub issue in the [Foyle repository](https://github.com/jlewi/foyle/issues).
+We are actively seeking feedback to help us improve Foyle. If you have questions, feature requests, or run into bugs please open a GitHub issue in the [Foyle repository](https://github.com/jlewi/foyle/issues).
