@@ -135,5 +135,14 @@ message AssertionTableResponse {
 service EvalService {
   rpc List(EvalResultListRequest) returns (EvalResultListResponse) {}
   rpc AssertionTable(AssertionTableRequest) returns (AssertionTableResponse) {}
+  rpc GetEvalResult(GetEvalResultRequest) returns (GetEvalResultResponse) {}
 }
 
+message GetEvalResultRequest {
+  // The ID of the example to fetch
+  string id = 1;
+}
+
+message GetEvalResultResponse {
+  string reportHTML = 1;
+}

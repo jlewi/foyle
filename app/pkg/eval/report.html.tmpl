@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eval Result: {{.Result.Example.Id}} </title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .message {
+            margin-bottom: 20px;
+        }
+        .role {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Table of Contents</h1>
+<ul>
+    <li><a href="#evaluation-results">Evaluation Results</a></li>
+    <li><a href="#llm-request">LLM Request</a></li>
+    <li><a href="#llm-response">LLM Response</a></li>
+    <li><a href="#expected-response">Expected Response</a></li>
+</ul>
+
+<h1 id="evaluation-results">Evaluation Results</h1>
+<table>
+    <tr>
+        <th>Parameter</th>
+        <th>Value</th>
+    </tr>
+    <tr>
+        <td>Example ID</td>
+        <td>{{.Result.Example.Id}}</td>
+    </tr>
+    <tr>
+        <td>Notebook</td>
+        <td>{{.Result.Example.FullContext.NotebookUri}}</td>
+     </tr>
+     <tr>
+         <td>Selected Index</td>
+         <td>{{.Result.Example.FullContext.Selected}}</td>
+     </tr>
+    <tr>
+        <td>CellsMatchResult</td>
+        <td>{{.Result.CellsMatchResult}}</td>
+    </tr>
+
+</table>
+
+<h2>Judge Explanation</h2>
+
+{{.JudgeExplanationHTML}}
+
+<h1 id="llm-request">LLM Request</h1>
+
+<div>
+{{.LLMRequestHTML}}
+</div>
+
+<h1 id="llm-response">LLM Response</h1>
+
+<div>
+{{.LLMResponseHTML}}
+</div>
+
+<h1 id="expected-response">Expected Response</h1>
+
+<div>
+{{.ExpectedResponseHTML}}
+</div>
+
+
+</body>
+</html>
