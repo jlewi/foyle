@@ -73,7 +73,7 @@ This allows Foyle to provide more accurate suggestions over time.
     
 ## Documentation
 
-Documentation is available at [https://foyle.io](https://foyle.io)
+Documentation is available at [https://foyle.io/docs/](https://foyle.io/docs/)
 
 ## Feedback
 
