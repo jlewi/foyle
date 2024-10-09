@@ -4,6 +4,10 @@ title: Getting Started Locally
 weight: 2
 ---
 
+{{< alert type="info" >}}
+Deploying Foyle locally is the quickest, easiest way to try out Foyle.
+{{< /alert >}}
+
 ## Installation
 
 ### Prerequisites: VSCode & RunMe 
