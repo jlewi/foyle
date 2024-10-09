@@ -11,7 +11,7 @@ runme:
 Foyle is a copilot that works with VSCode Notebooks. As you describe your intent in a markup
 cell, Foyle suggests code cells containing commands you can run to achieve that intent.
 
-![Foyle Ghost Cells](images/foyle_ghost_cells.gif)
+![Foyle Ghost Cells](docs/static/images/foyle_ghost_cells.gif)
 
 Foyle is primarily intended to help software engineers operate their applications. Foyle simplifies
 software operations by removing the need to remember complex commands. Developers can just

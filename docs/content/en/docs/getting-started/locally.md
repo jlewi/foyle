@@ -4,15 +4,19 @@ title: Getting Started Locally
 weight: 2
 ---
 
+{{% pageinfo %}}
+Deploying Foyle locally is the quickest, easiest way to try out Foyle.
+{{% /pageinfo %}}
+
 ## Installation
 
 ### Prerequisites: VSCode & RunMe 
 
-Foyle relies on [VSCode](https://code.visualstudio.com/) and [RunMe.dev](https://runme.dev/)
+Foyle relies on [VSCode](https://code.visualstudio.com/) and [Runme.dev](https://runme.dev/)
 to provide the frontend.
 
 1. If you don't have VSCode visit the [downloads page](https://code.visualstudio.com/) and install it
-1. Follow [RunMe.dev](https://docs.runme.dev/installation/installrunme#installing-runme-on-vs-code) instructions to install the RunMe.dev extension in vscode
+1. Follow [Runme.dev](https://docs.runme.dev/installation/installrunme#installing-runme-on-vs-code) instructions to install the RunMe.dev extension in vscode
 
 ### Install Foyle
 

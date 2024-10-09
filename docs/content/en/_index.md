@@ -18,8 +18,10 @@ title: Foyle
 Foyle provides an AI powered assistant and literate environment to help you deploy and operate software.
 
 <div style="position: relative; padding-bottom: 25%; height: 0;">
-<iframe width="560" height="315" src="https://www.youtube.com/embed/_wbAW7CYluw?si=6sBN1L736XcKd5Qy" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-</div>
+<video controls style="max-width: 50%; height: auto;">
+  <source src="https://storage.googleapis.com/foyle-public/videos/Foyle-Cost-Demo-Ghost-Cells-Part-1-with-captions.mp4" type="video/mp4">
+  <track src="https://storage.googleapis.com/foyle-public/videos/Foyle-Cost-Demo-Ghost-Cells-Part-1.vtt" kind="subtitles" srclang="en" label="English">
+</video>
 {{% /blocks/lead %}}
 
 

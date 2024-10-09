@@ -1,6 +1,6 @@
 ---
 title: "Honeycomb"
-description: "Honeycomb"
+description: "How to use Foyle to assist you with Honeycomb."
 weight: 8
 ---
 

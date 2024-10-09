@@ -1,6 +1,6 @@
 ---
 description: How to monitor Foyle with Honeycomb
-title: Monitoring Foyle With Honeycomb
+title: Honeycomb
 weight: 8
 ---
 

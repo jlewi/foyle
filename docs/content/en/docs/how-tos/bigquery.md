@@ -1,6 +1,6 @@
 ---
 title: "BigQuery"
-description: "BigQuery"
+description: "How to use Foyle to assist you with BigQuery."
 weight: 7
 ---
 
