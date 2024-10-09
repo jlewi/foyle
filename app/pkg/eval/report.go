@@ -5,6 +5,8 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"html/template"
+
 	"github.com/jlewi/foyle/app/api"
 	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/docs"
@@ -15,7 +17,6 @@ import (
 	"github.com/pkg/errors"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"github.com/yuin/goldmark"
-	"html/template"
 )
 
 //go:embed report.html.tmpl

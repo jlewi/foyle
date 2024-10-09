@@ -3,14 +3,14 @@ package eval
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"os"
+	"testing"
+
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/browser"
 	"github.com/sashabaranov/go-openai"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	"os"
-	"testing"
 )
 
 func Test_buildReport(t *testing.T) {
@@ -101,7 +101,7 @@ input
 	}
 
 	if os.Getenv("OPEN_IN_BROWSER") != "" {
-		name := fmt.Sprintf("/tmp/evalreport.html")
+		name := "/tmp/evalreport.html"
 		if err := os.WriteFile(name, []byte(reportHtml), 0644); err != nil {
 			t.Errorf("Failed to write file %s: %v", name, err)
 		} else {

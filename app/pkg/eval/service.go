@@ -2,10 +2,11 @@ package eval
 
 import (
 	"context"
+	"path/filepath"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
-	"path/filepath"
 
 	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
