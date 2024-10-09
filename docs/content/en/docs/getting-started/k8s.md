@@ -4,9 +4,9 @@ title: Deploying Foyle on Kubernetes
 weight: 3
 ---
 
-{{< alert type="info" >}}
+{{% pageinfo %}}
 Deploying Foyle on Kubernetes is the recommended way for teams to have a shared instance that transfers knowledge across the organization.
-{{< /alert >}}
+{{% /pageinfo %}}
 
 
 ## Installation

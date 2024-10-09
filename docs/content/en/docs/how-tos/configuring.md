@@ -1,5 +1,5 @@
 ---
-title: "Configuring"
+title: "Configuring RAG"
 description: "Configuring Learning In Foyle"
 weight: 1
 ---
