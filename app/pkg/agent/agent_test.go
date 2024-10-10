@@ -331,7 +331,7 @@ func Test_ShouldTrigger(t *testing.T) {
 				},
 			},
 			selectedIndex: 0,
-			expected:      false,
+			expected:      true,
 		},
 	}
 
