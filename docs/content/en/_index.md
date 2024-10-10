@@ -19,8 +19,13 @@ Foyle provides an AI powered assistant and literate environment to help you depl
 
 <div style="position: relative; padding-bottom: 25%; height: 0;">
 <video controls style="max-width: 50%; height: auto;">
+  <!-- I believe captions should be embedded in the mp4 but they don't seem to show up. My solution
+    was to export a vtt file from deskrypt and host it on the site. 
+    Subtitles are served out of hugo/netlify and not Cloud Storage because the request to fetch the vtt
+    out of cloud storage gets blocked by browser security settings.
+  !-->
   <source src="https://storage.googleapis.com/foyle-public/videos/Foyle-Cost-Demo-Ghost-Cells-Part-1-with-captions.mp4" type="video/mp4">
-  <track src="https://storage.googleapis.com/foyle-public/videos/Foyle-Cost-Demo-Ghost-Cells-Part-1.vtt" kind="subtitles" srclang="en" label="English">
+  <track src="/video-subtitles/Foyle-Cost-Demo-Ghost-Cells-Part-1.vtt" kind="subtitles" srclang="en" label="English" default>
 </video>
 {{% /blocks/lead %}}
 
