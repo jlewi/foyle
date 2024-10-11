@@ -43,6 +43,32 @@ func Test_BlockToMarkdown(t *testing.T) {
 			},
 			expected: "```bash\necho \"something something\"\n```\n```output\nsomething something\n```\n",
 		},
+		{
+			name: "filter-by-mime-type",
+			block: &v1alpha1.Block{
+				Kind:     v1alpha1.BlockKind_CODE,
+				Contents: "echo \"something something\"",
+				Outputs: []*v1alpha1.BlockOutput{
+					{
+						Items: []*v1alpha1.BlockOutputItem{
+							{
+								TextData: "Should be excluded",
+								Mime:     StatefulRunmeOutputItemsMimeType,
+							},
+							{
+								TextData: "Terminal be excluded",
+								Mime:     StatefulRunmeTerminalMimeType,
+							},
+							{
+								TextData: "Should be included",
+								Mime:     "application/vnd.code.notebook.stdout",
+							},
+						},
+					},
+				},
+			},
+			expected: "```bash\necho \"something something\"\n```\n```output\nShould be included\n```\n",
+		},
 	}
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
