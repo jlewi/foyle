@@ -33,6 +33,21 @@ func writeBlockMarkdown(sb *strings.Builder, block *v1alpha1.Block) {
 	// Handle the outputs
 	for _, output := range block.GetOutputs() {
 		for _, oi := range output.Items {
+
+			if oi.GetMime() == StatefulRunmeOutputItemsMimeType || oi.GetMime() == StatefulRunmeTerminalMimeType {
+				// See: https://github.com/jlewi/foyle/issues/286. This output item contains a JSON dictionary
+				// with a bunch of meta information that seems specific to Runme/stateful and not necessarily
+				// relevant as context for AI so we filter it out. The output item we are interested in should
+				// have a mime type of application/vnd.code.notebook.stdout and contain the stdout of the executed
+				// code.
+				//
+				// We use an exclude list for now because Runme is adding additional mime types as it adds custom
+				// renderers. https://github.com/stateful/vscode-runme/blob/3e36b16e3c41ad0fa38f0197f1713135e5edb27b/src/constants.ts#L6
+				// So for now we want to error on including useless data rather than silently dropping useful data.
+				// In the future we may want to revisit that.
+				continue
+			}
+
 			sb.WriteString("```" + OUTPUTLANG + "\n")
 			sb.WriteString(oi.GetTextData())
 			sb.WriteString("\n```\n")
