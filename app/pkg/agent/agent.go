@@ -579,6 +579,7 @@ func postProcessBlocks(blocks []*v1alpha1.Block) ([]*v1alpha1.Block, error) {
 		if strings.TrimSpace(block.Contents) == "" {
 			continue
 		}
+
 		results = append(results, block)
 		// return results, nil
 	}
