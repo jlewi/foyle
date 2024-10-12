@@ -580,7 +580,7 @@ func postProcessBlocks(blocks []*v1alpha1.Block) ([]*v1alpha1.Block, error) {
 			continue
 		}
 		results = append(results, block)
-		return results, nil
+		// return results, nil
 	}
 	return results, nil
 }

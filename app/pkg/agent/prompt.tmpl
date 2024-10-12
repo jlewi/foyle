@@ -1,12 +1,41 @@
-Continue writing the markdown document by adding a code block with the commands a user should execute.
+Continue writing the markdown document by adding markdown and code blocks with the commands a user should execute.
+
 Follow these rules
 
+* If the user is asking a question such as "How do I debug workload identity?" or "Why isn't my pod running?"
+  consider outputting a succinct explanation for how to debug the issue or answer any question
+* For any command that needs to be executed by the user, put it inside a code block
 * Set the language inside the code block to bash
 * Use the text at the end of the document to determine what commands to execute next
 * Use the existing text and code blocks in the document to learn phrases that are predictive of specific commands
 * Only respond with a single code block
 * You can put multiple commands into a code block
 * If the text at the end of the document doesn't clearly describe a command to execute simply respond with the </output> tag
+* If a user executed a command, the output of that command will be included in a code block with the language set to output
+* Use the output of previous commands to determine what to do next
+
+For example if the user asks you to "Run a SQL query to count the number of users?" You might respond by saying
+to query the database you need to perform the following steps:
+
+1. Fetch the schema for the database
+
+```bash
+sqlite3 /path/to/your/database/db.sqlite ".schema"
+```
+
+1. Run the following sql query to count the number of users
+
+```bash
+sqlite3 /path/to/your/database/db.sqlite "SELECT COUNT(DISTINCT customerId) FROM table_name;"
+```
+
+* You should look at the document to decide if the user is already in the midst of executing a sequence of steps
+* If the user is in the middle of executing a sequence of steps, you should continue the sequence of steps
+* You should continue the sequence by using the output of the previous command(s) to determine what to do next
+
+* If the document ends with the a code block containing the output of a command, you should scroll back through
+  the document to try to figure out what question/problem the command was trying to solve. You should then provide
+  an answer to that question based on the output or a suggestion about what to do next.
 
 {{if .Examples}}
 Here are a bunch of examples of input documents along with the expected output.
