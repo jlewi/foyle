@@ -6,93 +6,75 @@ runme:
 
 # Foyle
 
+## What Is Foyle
+
+Foyle is a copilot that works with VSCode Notebooks. As you describe your intent in a markup
+cell, Foyle suggests code cells containing commands you can run to achieve that intent.
+
+![Foyle Ghost Cells](docs/static/images/foyle_ghost_cells.gif)
+
+Foyle is primarily intended to help software engineers operate their applications. Foyle simplifies
+software operations by removing the need to remember complex commands. Developers can just
+describe their intent in natural language and Foyle will suggest the commands to run.
+
+Since Foyle is integrated into VSCode Notebooks, Foyle provides a single UI for interacting with LLMs
+and executing suggested commands. 
+
+As you execute commands, Foyle learns how to predict those commands given the cells preceding them.
+This allows Foyle to provide more accurate suggestions over time.
+
 ## Quickstart
 
-Follow the [Getting Started Guide](https://foyle.io/docs/getting-started/)
+### Installation
 
-## Docs
+1. Download the latest release from the [releases page](https://github.com/jlewi/foyle/releases)
 
-Documentation is available at [https://foyle.io](https://foyle.io)
+   * On Mac you may need to remove the quarantine attribute from the binary
+   
+     ```bash
+      xattr -d com.apple.quarantine /path/to/foyle
+     ```
 
-## Overview
+1. Configure your OpenAPI Key
+  
+   ```
+   foyle config set openai.apiKeyFile=/path/to/openai/apikey
+   ```
 
-Foyle is a project aimed at building agents to help software developers
-deploy and operate software. The key premise of foyle is that better data
-is the key to building better agents. To enable that foyle aims to change
-how SWE's interact with their infrastructure so as to facilitate collecting
-the data necessary to build agents.
+1. Start the Foyle server
 
-Foyle aims to move software operations out of the shell and into a literate
-environment. In particular, Foyle uses vscode notebooks to let users
-interact with their infrastructure. This is achieved using a [VSCode Notebook Controller](https://code.visualstudio.com/api/extension-guides/notebook#controller) which executes cells
-containing shell commands by using a simple API to send them to a server capable of executing them.
+   ```
+   foyle serve
+   ```
 
-The goal of foyle is to use this literate environment to collect two types of data
-with the aim of building better agents
+1. Open VSCode and install the [Runme extension](https://docs.runme.dev/installation/vscode)
 
-1. Human feedback on agent suggestions
-2. Human examples of reasoning traces
 
-## Human feedback
+1. Inside VSCode configure Runme to use Foyle
 
-We are all asking AI's (ChatGPT, Claude, Bard, etc...) to write commands to perform
-operations. These AI's often make mistakes. This is especially true when the correct answer depends on internal
-knowledge which the AI doesn't have.
+   1. Open the VSCode setting palette
+   2. Search for `Runme: Ai Base URL`
+   3. Set the address to `http://localhost:${HTTP_PORT}/api`
+      * The default port is 8877
 
-Consider a simple example, lets ask ChatGPT
+### Try It Out
 
-```sh {"id":"01HWC3HJZE75PN5S3A6P09NM0J"}
-What's the gcloud logging command to fetch the hydros logs for the hydros manifest
-named hydros?
-```
+1. Inside VSCode Open a markdown file or create a notebook; this will open the notebook inside Runme
 
-ChatGPT responds with
+   * Refer to [Runme's documentation](https://docs.runme.dev/installation/installrunme#full-display-of-runmes-action-on-a-markdown-file-in-vs-code) for a walk through
+      of Runme's UI
+   * If the notebook doesn't open in Runme
+      1. right click on the file and select "Open With"
+      2. Select the option "Run your markdown" to open it with Runme
 
-```sh {"id":"01HWC3HJZE75PN5S3A6QKSBCZ1"}
-gcloud logging read "resource.labels.manifest_name='hydros' AND logName='projects/YOUR_PROJECT_ID/logs/hydros'"
-```
+1. You can now add code and notebook cells like you normally would in vscode
 
-This is wrong; ChatGPT even suspects its likely to be wrong because it doesn't have any knowledge of the logging scheme
-used by [hydros](https://github.com/jlewi/hydros). As users, we would most likely copy the command into our shell and iterate on it until we come
-up with the correct command; i.e
+1. As you edit markup cells Foyle will suggest code cells you can run to achieve the intent described in the markup cell
+    
+## Documentation
 
-```sh {"id":"01HWC3HJZE75PN5S3A6SD7SFGB"}
-gcloud logging read 'jsonPayload."ManifestSync.Name" ="hydros"'
-```
+Documentation is available at [https://foyle.io/docs/](https://foyle.io/docs/)
 
-This feedback is gold. We now have ground truth data `(prompt, human corrected answer)` that we could use to improve
-our AIs. Unfortunately, today's UX (copy and pasting into the shell) means we are throwing this data way.
+## Feedback
 
-The goal of foyle's literate environment is to create a UX that allows us to easily capture
-
-1. The original prompt
-2. The AI provided answer
-3. Any corrections the user makes.
-
-Foyle aims to continuously use this data to retrain the AI so that it gets better and better the more you use it.
-
-## Reasoning Traces
-
-Everyone is excited about the ability to build agents that can reason and perform complex tasks e.g. [Devin](https://www.cognition-labs.com/introducing-devin).
-To build these agents we will need examples of reasoning traces that can be used to train the agent. This need is
-especially acute when it comes to building agents that can work with our private, internal systems.
-
-![tweet about cicd](images/cicdtweet.png)
-
-Even when we start with the same tools (Kubernetes, GitHub Actions, Docker, Vercel, etc...), we end up building
-platforms to customize those tools to how we do things. These platforms can be simple scripts to encode things like
-naming conventions or they may be complex internal developer platforms. Either way,
-agents need to be trained to understand these platforms if we want them to operate software on our behalf.
-
-Literate environments (e.g. [Datadog Notebooks](https://docs.datadoghq.com/notebooks/)) are great for routine operations and troubleshooting.
-Using literate environments to operate infrastructure leads to a self documenting process that automatically captures
-
-1. Human thinking/analysis
-2. Commands/operations executed
-3. Command output
-
-Using literate environments provides a superior experience to copy/pasting commands and outputs into a GitHub
-issue/slack channel/Google Doc to create a record of what happened.
-
-More importantly, the documents produced by literate environments contain essential information for training agents to
-operate our infrastructure.
+We are actively seeking feedback to help us improve Foyle. If you have questions, feature requests, or run into bugs please open a GitHub issue in the [Foyle repository](https://github.com/jlewi/foyle/issues).

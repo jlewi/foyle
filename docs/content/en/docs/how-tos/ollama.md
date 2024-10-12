@@ -1,5 +1,5 @@
 ---
-title: "Ollama"
+title: "Use Ollama"
 description: "How to use Ollama with Foyle"
 weight: 3
 ---

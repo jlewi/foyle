@@ -1,7 +1,7 @@
 ---
-title: "Anthropic"
+title: "Use Anthropic"
 description: "Using Anthropic with Foyle"
-weight: 4
+weight: 2
 ---
 
 ## What You'll Learn

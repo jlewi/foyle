@@ -259,3 +259,31 @@ func (m *AssertionTableResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Ob
 
 	return nil
 }
+
+func (m *GetEvalResultRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "id" // field id = 1
+	enc.AddString(keyName, m.Id)
+
+	return nil
+}
+
+func (m *GetEvalResultResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "reportHTML" // field reportHTML = 1
+	enc.AddString(keyName, m.ReportHTML)
+
+	return nil
+}

@@ -59,6 +59,7 @@ type Server struct {
 	executor         *executor.Executor
 	logsCrud         *analyze.CrudHandler
 	sessManager      *analyze.SessionsManager
+	evalServer       *eval.EvalServer
 	shutdownComplete chan bool
 }
 
@@ -83,6 +84,7 @@ func NewServer(config config.Config, blocksDB *pebble.DB, agent *agent.Agent, tr
 		agent:       agent,
 		logsCrud:    logsCrud,
 		sessManager: sessManager,
+		evalServer:  eval.NewEvalServer(config, tracesDB),
 	}
 
 	if err := s.createGinEngine(); err != nil {
@@ -130,7 +132,9 @@ func (s *Server) createGinEngine() error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to create otel interceptor")
 	}
-	path, handler := v1alpha1connect.NewEvalServiceHandler(&eval.EvalServer{}, connect.WithInterceptors(otelInterceptor))
+
+	path, handler := v1alpha1connect.NewEvalServiceHandler(s.evalServer, connect.WithInterceptors(otelInterceptor))
+
 	log.Info("Setting up eval service", "path", path)
 	// Since we want to add the prefix apiPrefix we need to strip it before passing it to the connect-rpc handler
 	// Refer to https://connectrpc.com/docs/go/routing#prefixing-routes. Note that grpc-go clients don't

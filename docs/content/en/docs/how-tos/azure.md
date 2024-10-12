@@ -1,5 +1,5 @@
 ---
-title: "Azure OpenAI"
+title: "Use Azure OpenAI"
 description: "Using Azure OpenAI with Foyle"
 weight: 3
 ---

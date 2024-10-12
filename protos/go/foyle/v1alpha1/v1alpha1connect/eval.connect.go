@@ -38,6 +38,9 @@ const (
 	// EvalServiceAssertionTableProcedure is the fully-qualified name of the EvalService's
 	// AssertionTable RPC.
 	EvalServiceAssertionTableProcedure = "/EvalService/AssertionTable"
+	// EvalServiceGetEvalResultProcedure is the fully-qualified name of the EvalService's GetEvalResult
+	// RPC.
+	EvalServiceGetEvalResultProcedure = "/EvalService/GetEvalResult"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -45,12 +48,14 @@ var (
 	evalServiceServiceDescriptor              = v1alpha1.File_foyle_v1alpha1_eval_proto.Services().ByName("EvalService")
 	evalServiceListMethodDescriptor           = evalServiceServiceDescriptor.Methods().ByName("List")
 	evalServiceAssertionTableMethodDescriptor = evalServiceServiceDescriptor.Methods().ByName("AssertionTable")
+	evalServiceGetEvalResultMethodDescriptor  = evalServiceServiceDescriptor.Methods().ByName("GetEvalResult")
 )
 
 // EvalServiceClient is a client for the EvalService service.
 type EvalServiceClient interface {
 	List(context.Context, *connect.Request[v1alpha1.EvalResultListRequest]) (*connect.Response[v1alpha1.EvalResultListResponse], error)
 	AssertionTable(context.Context, *connect.Request[v1alpha1.AssertionTableRequest]) (*connect.Response[v1alpha1.AssertionTableResponse], error)
+	GetEvalResult(context.Context, *connect.Request[v1alpha1.GetEvalResultRequest]) (*connect.Response[v1alpha1.GetEvalResultResponse], error)
 }
 
 // NewEvalServiceClient constructs a client for the EvalService service. By default, it uses the
@@ -75,6 +80,12 @@ func NewEvalServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(evalServiceAssertionTableMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getEvalResult: connect.NewClient[v1alpha1.GetEvalResultRequest, v1alpha1.GetEvalResultResponse](
+			httpClient,
+			baseURL+EvalServiceGetEvalResultProcedure,
+			connect.WithSchema(evalServiceGetEvalResultMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -82,6 +93,7 @@ func NewEvalServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 type evalServiceClient struct {
 	list           *connect.Client[v1alpha1.EvalResultListRequest, v1alpha1.EvalResultListResponse]
 	assertionTable *connect.Client[v1alpha1.AssertionTableRequest, v1alpha1.AssertionTableResponse]
+	getEvalResult  *connect.Client[v1alpha1.GetEvalResultRequest, v1alpha1.GetEvalResultResponse]
 }
 
 // List calls EvalService.List.
@@ -94,10 +106,16 @@ func (c *evalServiceClient) AssertionTable(ctx context.Context, req *connect.Req
 	return c.assertionTable.CallUnary(ctx, req)
 }
 
+// GetEvalResult calls EvalService.GetEvalResult.
+func (c *evalServiceClient) GetEvalResult(ctx context.Context, req *connect.Request[v1alpha1.GetEvalResultRequest]) (*connect.Response[v1alpha1.GetEvalResultResponse], error) {
+	return c.getEvalResult.CallUnary(ctx, req)
+}
+
 // EvalServiceHandler is an implementation of the EvalService service.
 type EvalServiceHandler interface {
 	List(context.Context, *connect.Request[v1alpha1.EvalResultListRequest]) (*connect.Response[v1alpha1.EvalResultListResponse], error)
 	AssertionTable(context.Context, *connect.Request[v1alpha1.AssertionTableRequest]) (*connect.Response[v1alpha1.AssertionTableResponse], error)
+	GetEvalResult(context.Context, *connect.Request[v1alpha1.GetEvalResultRequest]) (*connect.Response[v1alpha1.GetEvalResultResponse], error)
 }
 
 // NewEvalServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -118,12 +136,20 @@ func NewEvalServiceHandler(svc EvalServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(evalServiceAssertionTableMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	evalServiceGetEvalResultHandler := connect.NewUnaryHandler(
+		EvalServiceGetEvalResultProcedure,
+		svc.GetEvalResult,
+		connect.WithSchema(evalServiceGetEvalResultMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/EvalService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case EvalServiceListProcedure:
 			evalServiceListHandler.ServeHTTP(w, r)
 		case EvalServiceAssertionTableProcedure:
 			evalServiceAssertionTableHandler.ServeHTTP(w, r)
+		case EvalServiceGetEvalResultProcedure:
+			evalServiceGetEvalResultHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -139,4 +165,8 @@ func (UnimplementedEvalServiceHandler) List(context.Context, *connect.Request[v1
 
 func (UnimplementedEvalServiceHandler) AssertionTable(context.Context, *connect.Request[v1alpha1.AssertionTableRequest]) (*connect.Response[v1alpha1.AssertionTableResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("EvalService.AssertionTable is not implemented"))
+}
+
+func (UnimplementedEvalServiceHandler) GetEvalResult(context.Context, *connect.Request[v1alpha1.GetEvalResultRequest]) (*connect.Response[v1alpha1.GetEvalResultResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("EvalService.GetEvalResult is not implemented"))
 }
