@@ -43,7 +43,9 @@ const (
 	// We use the heuristic 1 token ~ 2 characters
 	// For details of how we came up with this see
 	// (https://platform.openai.com/docs/models/gpt-3-5-turbo)
-	MaxDocChars = 1110
+	// We bumped this up because we are using gpt4o-mini and want to include outputs of previous cells which can be quite
+	// long
+	MaxDocChars = 11100
 	temperature = 0.9
 )
 
