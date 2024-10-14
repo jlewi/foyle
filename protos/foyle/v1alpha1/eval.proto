@@ -49,13 +49,20 @@ message EvalResult {
 
   repeated Assertion assertions = 10;
 
-
   // cells_match_result is the LLM judge's evaluation of whether the actual and expected response match
   // We use an enum so we can encode unknown
   CellsMatchResult cells_match_result = 12;
 
   // Explanation given by the LLM judge
   string judge_explanation = 13;
+
+  // Time in milliseconds to generate the completion
+  int64 generate_time_ms = 14;
+
+  // block_log_success indicates whether evaluation successfully waited for the block log before moving
+  // onto the next example. If this is false then we potentially failed to learn from this example on subsequent
+  // examples.
+  BlockLogStatus block_log_status = 15;
 
   // Removed fields
   // example_file is the file containing the example
@@ -66,6 +73,12 @@ message EvalResult {
   // int32 distance = 4;
   // float normalized_distance = 7;
   reserved 2, 3, 4, 7;
+}
+
+enum BlockLogStatus {
+  BLOCK_LOG_STATUS_UNKNOWN = 0;
+  BLOCK_LOG_STATUS_SUCCESS = 1;
+  BLOCK_LOG_STATUS_TIMEOUT = 2;
 }
 
 message Assertion {
