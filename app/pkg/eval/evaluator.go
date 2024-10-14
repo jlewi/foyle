@@ -439,6 +439,7 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 		return errors.New("Cell ID is empty")
 	}
 
+	log = log.WithValues("blockId", cellID)
 	timeOut := time.Now().Add(3 * time.Minute)
 
 	var blockLog *logspb.BlockLog
@@ -468,6 +469,7 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 		return nil
 	}
 
+	log.Info("Timeout waiting for block log")
 	return errors.New("Timed out waiting for block log. This could indicate we aren't properly sending the events needed to generate a BlockLog suitable for learning.")
 }
 

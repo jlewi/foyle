@@ -647,6 +647,13 @@ func (a *App) Shutdown() error {
 	l := zap.L()
 	log := zapr.NewLogger(l)
 
+	// We do a log sync here. To try to flush any logs that are buffered.
+	if err := l.Sync(); err != nil {
+		log.Error(err, "Error flushing logs")
+		fmt.Fprintf(os.Stdout, "Error flushing logs: %v\n", err)
+	}
+
+	log.Info("Logs flushed.")
 	if a.analyzer != nil {
 		if err := a.analyzer.Shutdown(context.Background()); err != nil {
 			log.Error(err, "Error shutting down analyzer")
@@ -694,6 +701,13 @@ func (a *App) Shutdown() error {
 
 	log.Info("Shutting down the application")
 	// Flush the logs
+	// We do a log sync here. To try to flush any logs that are buffered.
+	// Per https://github.com/jlewi/foyle/issues/295 it looks for GcpLogs calling close doesn't call
+	// sync so we call Sync explicitly.
+	if err := l.Sync(); err != nil {
+		log.Error(err, "Error flushing logs")
+		fmt.Fprintf(os.Stdout, "Error flushing logs: %v\n", err)
+	}
 	for _, closer := range a.logClosers {
 		closer()
 	}
