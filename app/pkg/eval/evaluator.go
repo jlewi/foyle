@@ -294,7 +294,11 @@ func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alph
 		SelectedIndex: result.Example.GetFullContext().GetSelected(),
 	}
 
+	start := time.Now() // Record the start time
 	resp, err := client.GenerateCells(ctx, connect.NewRequest(request))
+	generateDuration := time.Since(start)
+	result.GenerateTimeMs = generateDuration.Milliseconds()
+
 	if err != nil {
 		log.Error(err, "Failed to generate cells")
 		if connectErr := new(connect.Error); errors.As(err, &connectErr) {
