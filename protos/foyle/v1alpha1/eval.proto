@@ -49,13 +49,15 @@ message EvalResult {
 
   repeated Assertion assertions = 10;
 
-
   // cells_match_result is the LLM judge's evaluation of whether the actual and expected response match
   // We use an enum so we can encode unknown
   CellsMatchResult cells_match_result = 12;
 
   // Explanation given by the LLM judge
   string judge_explanation = 13;
+
+  // Time in milliseconds to generate the completion
+  int64 generate_time_ms = 14;
 
   // Removed fields
   // example_file is the file containing the example

@@ -86,6 +86,9 @@ func (m *EvalResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 	keyName = "judge_explanation" // field judge_explanation = 13
 	enc.AddString(keyName, m.JudgeExplanation)
 
+	keyName = "generate_time_ms" // field generate_time_ms = 14
+	enc.AddInt64(keyName, m.GenerateTimeMs)
+
 	return nil
 }
 
