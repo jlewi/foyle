@@ -69,6 +69,7 @@ func (e *Evaluator) ReconcileNode(ctx context.Context, node *yaml.RNode) error {
 
 func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) error {
 	log := logs.FromContext(ctx).WithValues("experiment", experiment.Metadata.Name)
+	ctx = logr.NewContext(ctx, log)
 
 	if experiment.Spec.AgentAddress == "" {
 		return errors.New("AgentAddress is required")
@@ -142,6 +143,7 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 		return err
 	}
 
+	log.Info("Successfully processed examples")
 	return nil
 }
 
@@ -160,7 +162,7 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 	}
 
 	// Now iterate over the examples and process them.
-	for _, example := range examples {
+	for eIndex, example := range examples {
 		log := oLog.WithValues("exampleId", example.GetId())
 
 		// TODO(jeremy): Should we just read the row from the database and check if it exists and has been completed?
@@ -171,7 +173,7 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 			log.V(logs.Debug).Info("Skipping example; already processed")
 			continue
 		}
-		log.Info("Processing example")
+		log.Info("Processing example", "index", eIndex, "numExamples", len(examples))
 
 		var processErr error
 
@@ -444,20 +446,19 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 
 	var blockLog *logspb.BlockLog
 	for time.Now().Before(timeOut) {
-
 		resp, err := client.GetBlockLog(ctx, connect.NewRequest(&logspb.GetBlockLogRequest{
 			Id: cellID,
 		}))
 
 		if err != nil {
-			log.Info("Failed to get block log", "err", err)
+			log.V(logs.Debug).Info("Failed to get block log", "err", err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
 		blockLog = resp.Msg.GetBlockLog()
 		if blockLog.ExecutedBlock == nil || blockLog.GeneratedBlock == nil {
-			log.Info("Block log isn't ready yet")
+			log.V(logs.Debug).Info("Block log isn't ready yet")
 			time.Sleep(5 * time.Second)
 			continue
 		}
@@ -466,11 +467,13 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 			return errors.Errorf("BlockLog generated block doesn't match actual cell. This means the result of GenerateCells returned to the evaluator doesn't match the result that the Agent read from the BlockLogs and stored in its BlockLog; want: %s; got %s", result.ActualCells[0].Value, blockLog.GeneratedBlock.GetContents())
 		}
 
+		result.BlockLogStatus = v1alpha1.BlockLogStatus_BLOCK_LOG_STATUS_SUCCESS
 		return nil
 	}
 
 	log.Info("Timeout waiting for block log")
-	return errors.New("Timed out waiting for block log. This could indicate we aren't properly sending the events needed to generate a BlockLog suitable for learning.")
+	result.BlockLogStatus = v1alpha1.BlockLogStatus_BLOCK_LOG_STATUS_TIMEOUT
+	return nil
 }
 
 func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, evalResult *v1alpha1.EvalResult, client logspbconnect.LogsServiceClient) error {
