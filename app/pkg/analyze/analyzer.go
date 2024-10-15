@@ -742,12 +742,14 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (*logs
 }
 
 func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
+	log := logs.FromContext(ctx)
 	gTrace := &logspb.GenerateTrace{}
 	trace := &logspb.Trace{
 		Data: &logspb.Trace_Generate{
 			Generate: gTrace,
 		},
-		Spans: make([]*logspb.Span, 0, 10),
+		Spans:      make([]*logspb.Span, 0, 10),
+		Assertions: make([]*v1alpha1.Assertion, 0),
 	}
 	evalMode := false
 	for _, e := range entries {
@@ -762,6 +764,16 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb
 			if mode {
 				evalMode = mode
 			}
+		}
+
+		if e.Message() == logs.Level1Assertion {
+			assertion := &v1alpha1.Assertion{}
+			if !e.GetProto("assertion", assertion) {
+				log.Error(errors.New("Failed to decode assertion"), "Failed to decode assertion", "entry", e)
+				continue
+			}
+			trace.Assertions = append(trace.Assertions, assertion)
+			continue
 		}
 
 		if gTrace.Request == nil && strings.HasSuffix(e.Function(), "agent.(*Agent).Generate") {

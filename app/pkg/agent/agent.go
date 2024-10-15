@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"github.com/jlewi/foyle/app/pkg/runme/ulid"
 	"io"
 	"strings"
 	"sync"
@@ -150,8 +151,9 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 		})
 	}
 	for try := 0; try < maxTries; try++ {
+		docText := t.Text()
 		args := promptArgs{
-			Document: t.Text(),
+			Document: docText,
 			Examples: exampleArgs,
 		}
 
@@ -173,6 +175,19 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 			// TODO(jeremy): Should we surface the error to the user as blocks in the notebook
 			return nil, errors.Wrapf(err, "CreateChatCompletion failed")
 		}
+
+		// Level1 assertion that docText is a non-empty string
+		assertion := &v1alpha1.Assertion{
+			Name:   logs.Level1Assertion,
+			Result: v1alpha1.AssertResult_PASSED,
+			Id:     ulid.GenerateID(),
+		}
+
+		if len(strings.TrimSpace(docText)) == 0 {
+			assertion.Result = v1alpha1.AssertResult_FAILED
+		}
+
+		log.Info(logs.Level1Assertion, "assertion", assertion)
 
 		return blocks, nil
 	}

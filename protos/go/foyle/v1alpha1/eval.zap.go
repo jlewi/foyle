@@ -112,6 +112,9 @@ func (m *Assertion) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) 
 	keyName = "detail" // field detail = 3
 	enc.AddString(keyName, m.Detail)
 
+	keyName = "id" // field id = 4
+	enc.AddString(keyName, m.Id)
+
 	return nil
 }
 

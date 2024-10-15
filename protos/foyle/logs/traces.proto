@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "foyle/logs/logs.proto";
 import "foyle/v1alpha1/agent.proto";
+import "foyle/v1alpha1/eval.proto";
 import "foyle/v1alpha1/providers.proto";
 import "foyle/v1alpha1/trainer.proto";
 import "foyle/logs/blocks.proto";
@@ -29,6 +30,10 @@ message Trace {
   bool eval_mode = 6;
 
   repeated Span spans = 8;
+
+  // Assertions about this trace.
+  // Should these be properties of the spans? We'll cross that bridge if we come to it.
+  repeated Assertion assertions = 9;
 
   reserved 5,7;
 }

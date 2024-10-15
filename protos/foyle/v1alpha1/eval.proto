@@ -87,6 +87,11 @@ message Assertion {
   AssertResult result = 2;
   // Human readable detail of the assertion. If there was an error this should contain the error message.
   string detail = 3;
+
+  // id is a unique id of the assertion. This is needed for real time processing of the logs. Since our log
+  // processing guarantees at least once semantics, we may end up processing the same log entry about an assertion
+  // multiple times. By assigning a unique id to each assertion we can dedupe them.
+  string id = 4;
 }
 
 message EvalResultListRequest {
