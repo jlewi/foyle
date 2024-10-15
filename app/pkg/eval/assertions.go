@@ -20,7 +20,7 @@ type AssertCodeAfterMarkdown struct {
 
 func (a *AssertCodeAfterMarkdown) Assert(ctx context.Context, doc *v1alpha1.Doc, examples []*v1alpha1.Example, answer []*v1alpha1.Block) (*v1alpha1.Assertion, error) {
 	assertion := &v1alpha1.Assertion{
-		Name: a.Name(),
+		Name: v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
 	}
 
 	if len(doc.Blocks) == 0 {
@@ -62,7 +62,7 @@ type AssertOneCodeCell struct {
 
 func (a *AssertOneCodeCell) Assert(ctx context.Context, doc *v1alpha1.Doc, examples []*v1alpha1.Example, answer []*v1alpha1.Block) (*v1alpha1.Assertion, error) {
 	assertion := &v1alpha1.Assertion{
-		Name: a.Name(),
+		Name: v1alpha1.Assertion_ONE_CODE_CELL,
 	}
 
 	if len(doc.Blocks) == 0 {
@@ -99,7 +99,7 @@ type AssertEndsWithCodeCell struct {
 
 func (a *AssertEndsWithCodeCell) Assert(ctx context.Context, doc *v1alpha1.Doc, examples []*v1alpha1.Example, answer []*v1alpha1.Block) (*v1alpha1.Assertion, error) {
 	assertion := &v1alpha1.Assertion{
-		Name: a.Name(),
+		Name: v1alpha1.Assertion_ENDS_WITH_CODE_CELL,
 	}
 
 	if len(doc.Blocks) == 0 {

@@ -263,11 +263,11 @@ func toAssertionRow(result *v1alpha1.EvalResult) (*v1alpha1.AssertionRow, error)
 
 	for _, a := range result.GetAssertions() {
 		switch a.Name {
-		case CodeAfterMarkdownName:
+		case v1alpha1.Assertion_CODE_AFTER_MARKDOWN:
 			row.CodeAfterMarkdown = a.GetResult()
-		case OneCodeCellName:
+		case v1alpha1.Assertion_ONE_CODE_CELL:
 			row.OneCodeCell = a.GetResult()
-		case EndsWithCodeCellName:
+		case v1alpha1.Assertion_ENDS_WITH_CODE_CELL:
 			row.EndsWithCodeCell = a.GetResult()
 		default:
 			log.Info("Unknown assertion", "name", a.Name)
