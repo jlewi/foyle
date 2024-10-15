@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"google.golang.org/protobuf/encoding/protojson"
 	"os"
 	"path/filepath"
 	"sort"
@@ -144,6 +145,34 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	}
 
 	log.Info("Successfully processed examples")
+
+	report, err := e.buildExperimentReport(ctx, experiment.Metadata.Name, manager)
+
+	if err != nil {
+		return err
+	}
+
+	log.Info("Successfully reported results")
+
+	outputDir := filepath.Dir(experiment.Spec.OutputDB)
+
+	reportFile := filepath.Join(outputDir, "report.json")
+
+	opts := protojson.MarshalOptions{
+		Indent:            "  ",
+		EmitDefaultValues: true,
+	}
+	reportJson, err := opts.Marshal(report)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to marshal report")
+	}
+
+	if err := os.WriteFile(reportFile, reportJson, 0644); err != nil {
+		return errors.Wrapf(err, "Failed to write report to file %s", reportFile)
+	}
+
+	log.Info("Successfully wrote report", "file", reportFile)
+
 	return nil
 }
 
@@ -539,6 +568,46 @@ func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, evalResult *v1al
 	}
 
 	return nil
+}
+
+// buildExperimentReport generates a report of the experiment results. These are aggregate statistics for the
+// experiment
+func (e *Evaluator) buildExperimentReport(ctx context.Context, name string, manager *ResultsManager) (*v1alpha1.ExperimentReport, error) {
+	r := &v1alpha1.ExperimentReport{
+		Name: name,
+	}
+
+	numExamples, err := manager.queries.CountResults(ctx)
+	if err != nil {
+		return r, errors.Wrapf(err, "Failed to count number of examples")
+	}
+
+	r.NumExamples = numExamples
+
+	errCount, err := manager.queries.CountErrors(ctx)
+	if err != nil {
+		return r, errors.Wrapf(err, "Failed to count errors")
+	}
+
+	r.NumErrors = errCount
+
+	// Get the counts based on cellsMatchResult
+	counts, err := manager.queries.CountByCellsMatchResult(ctx)
+	if err != nil {
+		return r, errors.Wrapf(err, "Failed to count cellsMatchResult")
+	}
+
+	r.CellsMatchCounts = make(map[string]int32)
+
+	for _, c := range counts {
+		s, ok := c.MatchResult.(string)
+		if !ok {
+			return r, errors.Wrapf(err, "Failed to convert cellsMatchResult to string")
+		}
+		r.CellsMatchCounts[s] = int32(c.Count)
+	}
+
+	return r, nil
 }
 
 // isSortedByTimeDescending checks if the slice is sorted by Time in descending order

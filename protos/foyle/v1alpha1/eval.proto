@@ -159,3 +159,20 @@ message GetEvalResultRequest {
 message GetEvalResultResponse {
   string reportHTML = 1;
 }
+
+// ExperimentReport is a report for an experiment
+message ExperimentReport {
+  string name = 1;
+
+  // num_examples is the number of examples evaluated in the experiment
+  int64 num_examples = 2;
+
+  // num_errors is the number of examples that resulted in an error
+  int64 num_errors = 3;
+
+  // Map from string representation of CellsMatchResult to the number of counts
+  map<string, int32> cells_match_counts = 4;
+
+  // TODO(jeremy): How should we report aggregate statistics for assertions? Should it be a list of maps
+  // Where each item in the list has a name for the assertion and then a map of counts.
+}

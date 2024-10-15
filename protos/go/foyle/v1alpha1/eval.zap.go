@@ -293,3 +293,33 @@ func (m *GetEvalResultResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Obj
 
 	return nil
 }
+
+func (m *ExperimentReport) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "name" // field name = 1
+	enc.AddString(keyName, m.Name)
+
+	keyName = "num_examples" // field num_examples = 2
+	enc.AddInt64(keyName, m.NumExamples)
+
+	keyName = "num_errors" // field num_errors = 3
+	enc.AddInt64(keyName, m.NumErrors)
+
+	keyName = "cells_match_counts" // field cells_match_counts = 4
+	enc.AddObject(keyName, go_uber_org_zap_zapcore.ObjectMarshalerFunc(func(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+		for mk, mv := range m.CellsMatchCounts {
+			key := mk
+			_ = key
+			enc.AddInt32(key, mv)
+		}
+		return nil
+	}))
+
+	return nil
+}
