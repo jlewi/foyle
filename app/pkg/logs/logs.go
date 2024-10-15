@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/jlewi/foyle/app/pkg/runme/ulid"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+
 	"github.com/jlewi/foyle/app/api"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -21,6 +24,9 @@ const (
 
 	// Debug is for debug verbosity level
 	Debug = 1
+
+	// Level1Assertion Message denoting a level1 assertion
+	Level1Assertion = "Level1Assert"
 )
 
 // FromContext returns a logr.Logger from the context or an instance of the global logger
@@ -69,4 +75,18 @@ func ZapProto(key string, pb proto.Message) zap.Field {
 func LogLLMUsage(ctx context.Context, usage api.LLMUsage) {
 	log := FromContext(ctx)
 	log.Info("LLM usage", "usage", usage)
+}
+
+// BuildAssertion creates an assertion based on the name.
+// N.B. We don't put this in the eval package because that would create a circular dependency.
+func BuildAssertion(name v1alpha1.Assertion_Name, passed bool) *v1alpha1.Assertion {
+	result := v1alpha1.AssertResult_FAILED
+	if passed {
+		result = v1alpha1.AssertResult_PASSED
+	}
+	return &v1alpha1.Assertion{
+		Name:   name,
+		Result: result,
+		Id:     ulid.GenerateID(),
+	}
 }

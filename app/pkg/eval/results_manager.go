@@ -90,7 +90,7 @@ func (m *ResultsManager) Get(ctx context.Context, id string) (*v1alpha1.EvalResu
 // If the updateFunc returns an error then the example is not updated.
 // If the given id doesn't exist then an empty Session is passed to updateFunc and the result will be
 // inserted if the updateFunc returns nil. If the session result exists then the result is passed to updateFunc
-// and the updated value is then written to the database
+// and the updated Value is then written to the database
 //
 // TODO(jeremy): How should the update function signal an error that shouldn't block the update and should be reported
 // by Update. For example, when processing a result; we might have an error processing an example (e.g. generating
@@ -176,6 +176,7 @@ func (m *ResultsManager) Update(ctx context.Context, id string, updateFunc EvalR
 // ListResults lists the results in the database if cursor is nil then the first page is returned.
 // If cursor is non-nil then the next page is returned.
 // The cursor is the time.
+// Returns empty list of results when no more results.
 func (m *ResultsManager) ListResults(ctx context.Context, cursor *time.Time, pageSize int) ([]*v1alpha1.EvalResult, *time.Time, error) {
 	params := fsql.ListResultsParams{
 		PageSize: int64(pageSize),

@@ -23,7 +23,7 @@ func TestAssertCodeAfterMarkdown(t *testing.T) {
 			examples: []*v1alpha1.Example{},
 			answer:   []*v1alpha1.Block{},
 			expected: &v1alpha1.Assertion{
-				Name:   "AssertCodeAfterMarkdown",
+				Name:   v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
 				Result: v1alpha1.AssertResult_SKIPPED,
 			},
 		},
@@ -43,7 +43,7 @@ func TestAssertCodeAfterMarkdown(t *testing.T) {
 				},
 			},
 			expected: &v1alpha1.Assertion{
-				Name:   "AssertCodeAfterMarkdown",
+				Name:   v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
 				Result: v1alpha1.AssertResult_PASSED,
 			},
 		},
@@ -63,7 +63,7 @@ func TestAssertCodeAfterMarkdown(t *testing.T) {
 				},
 			},
 			expected: &v1alpha1.Assertion{
-				Name:   "AssertCodeAfterMarkdown",
+				Name:   v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
 				Result: v1alpha1.AssertResult_FAILED,
 			},
 		},
@@ -91,7 +91,7 @@ func TestAssertOneCodeCell(t *testing.T) {
 			examples: []*v1alpha1.Example{},
 			answer:   []*v1alpha1.Block{},
 			expected: &v1alpha1.Assertion{
-				Name:   "AssertCodeAfterMarkdown",
+				Name:   v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
 				Result: v1alpha1.AssertResult_SKIPPED,
 			},
 		},
@@ -111,7 +111,7 @@ func TestAssertOneCodeCell(t *testing.T) {
 				},
 			},
 			expected: &v1alpha1.Assertion{
-				Name:   CodeAfterMarkdownName,
+				Name:   v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
 				Result: v1alpha1.AssertResult_PASSED,
 			},
 		},
@@ -131,7 +131,7 @@ func TestAssertOneCodeCell(t *testing.T) {
 				},
 			},
 			expected: &v1alpha1.Assertion{
-				Name:   OneCodeCellName,
+				Name:   v1alpha1.Assertion_ONE_CODE_CELL,
 				Result: v1alpha1.AssertResult_FAILED,
 			},
 		},
@@ -159,7 +159,7 @@ func TestAssertEndsWithCodeCell(t *testing.T) {
 			examples: []*v1alpha1.Example{},
 			answer:   []*v1alpha1.Block{},
 			expected: &v1alpha1.Assertion{
-				Name:   EndsWithCodeCellName,
+				Name:   v1alpha1.Assertion_ENDS_WITH_CODE_CELL,
 				Result: v1alpha1.AssertResult_SKIPPED,
 			},
 		},
@@ -179,7 +179,7 @@ func TestAssertEndsWithCodeCell(t *testing.T) {
 				},
 			},
 			expected: &v1alpha1.Assertion{
-				Name:   EndsWithCodeCellName,
+				Name:   v1alpha1.Assertion_ENDS_WITH_CODE_CELL,
 				Result: v1alpha1.AssertResult_PASSED,
 			},
 		},
@@ -202,7 +202,7 @@ func TestAssertEndsWithCodeCell(t *testing.T) {
 				},
 			},
 			expected: &v1alpha1.Assertion{
-				Name:   EndsWithCodeCellName,
+				Name:   v1alpha1.Assertion_ENDS_WITH_CODE_CELL,
 				Result: v1alpha1.AssertResult_FAILED,
 			},
 		},

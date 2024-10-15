@@ -6,6 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
+	"google.golang.org/protobuf/encoding/protojson"
+	"gopkg.in/yaml.v3"
+
 	"connectrpc.com/connect"
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/agent"
@@ -221,4 +225,50 @@ func experimentForTesting() (*api.Experiment, error) {
 			OutputDB:     dbFile,
 		},
 	}, nil
+}
+
+func Test_buildExperimentReport(t *testing.T) {
+	// N.B. This is an integration test because it depends on an actual set of experiment results.
+	// It also potentially needs a running agent that we can use to access the traces of
+	if os.Getenv("GITHUB_ACTIONS") != "" {
+		t.Skipf("Test is skipped in GitHub actions")
+	}
+
+	experimentFile := "/Users/jlewi/foyle_experiments/20241014-timing/experiment.yaml"
+	experimentBytes, err := os.ReadFile(experimentFile)
+	if err != nil {
+		t.Fatalf("Error reading experiment file; %v", err)
+	}
+
+	experiment := &api.Experiment{}
+	if err := yaml.Unmarshal(experimentBytes, experiment); err != nil {
+		t.Fatalf("Error unmarshalling experiment; %v", err)
+	}
+
+	resultsManager, err := openResultsManager(experiment.Spec.OutputDB)
+
+	if err != nil {
+		t.Fatalf("Error opening results manager; %v", err)
+	}
+
+	logsClient := logspbconnect.NewLogsServiceClient(
+		newHTTPClient(),
+		experiment.Spec.AgentAddress,
+	)
+
+	e := &Evaluator{}
+	report, err := e.buildExperimentReport(context.Background(), "testexperiment", resultsManager, logsClient)
+	if err != nil {
+		t.Fatalf("Error building report; %v", err)
+	}
+
+	opts := protojson.MarshalOptions{
+		Indent:            "  ",
+		EmitDefaultValues: true,
+	}
+	reportJson, err := opts.Marshal(report)
+	if err != nil {
+		t.Fatalf("Error marshalling report; %v", err)
+	}
+	t.Logf("Report: %v", string(reportJson))
 }

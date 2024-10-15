@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jlewi/foyle/app/pkg/runme/ulid"
+
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -114,6 +116,8 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 		return nil, err
 	}
 
+	log.Info(logs.Level1Assertion, "assertion", logs.BuildAssertion(v1alpha1.Assertion_AT_LEAST_ONE_BLOCK_POST_PROCESSED, len(postProcessed) > 0))
+
 	// Attach block ids to any blocks generated.
 	// N.B. This is kind of a last resort to make sure all blocks have an ID set. In general, we want to set blockIds
 	// earlier in the processing pipeline so that any log messages involving blocks has block ids set. BlockIDs
@@ -148,8 +152,9 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 		})
 	}
 	for try := 0; try < maxTries; try++ {
+		docText := t.Text()
 		args := promptArgs{
-			Document: t.Text(),
+			Document: docText,
 			Examples: exampleArgs,
 		}
 
@@ -172,6 +177,29 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 			return nil, errors.Wrapf(err, "CreateChatCompletion failed")
 		}
 
+		// Level1 assertion that docText is a non-empty string
+		assertion := &v1alpha1.Assertion{
+			Name:   v1alpha1.Assertion_NON_EMPTY_DOC,
+			Result: v1alpha1.AssertResult_PASSED,
+			Id:     ulid.GenerateID(),
+		}
+
+		if len(strings.TrimSpace(docText)) == 0 {
+			assertion.Result = v1alpha1.AssertResult_FAILED
+		}
+
+		log.Info(logs.Level1Assertion, "assertion", assertion)
+
+		assertBlocks := &v1alpha1.Assertion{
+			Name:   v1alpha1.Assertion_AT_LEAST_ONE_BLOCK,
+			Result: v1alpha1.AssertResult_PASSED,
+			Id:     ulid.GenerateID(),
+		}
+
+		if len(blocks) == 0 {
+			assertBlocks.Result = v1alpha1.AssertResult_FAILED
+		}
+		log.Info(logs.Level1Assertion, "assertion", assertion)
 		return blocks, nil
 	}
 	err := errors.Errorf("Failed to generate a chat completion after %d tries", maxTries)
