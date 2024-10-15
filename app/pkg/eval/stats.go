@@ -1,19 +1,15 @@
 package eval
 
 import (
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/pkg/errors"
 	"math"
 	"sort"
 )
 
-type IntegerPercentile struct {
-	Percentile float64
-	Value      int64
-}
-
 // computePercentilesOfInts computes the percentiles of a slice of integers.
 // p is a slice of percentiles to compute. Values should be between > 0 and <1.
-func computePercentilesOfInts(data []int, p []float64) ([]IntegerPercentile, error) {
+func computePercentilesOfInts(data []int, p []float64) ([]*v1alpha1.PercentileStat, error) {
 	sort.Ints(data)
 
 	indexes := map[int]bool{}
@@ -39,12 +35,12 @@ func computePercentilesOfInts(data []int, p []float64) ([]IntegerPercentile, err
 	// Sort the keys
 	sort.Ints(keys)
 
-	percentiles := make([]IntegerPercentile, 0, len(p))
+	percentiles := make([]*v1alpha1.PercentileStat, 0, len(p))
 	for _, k := range keys {
 		// Compute the Value at the kth index
-		percentiles = append(percentiles, IntegerPercentile{
+		percentiles = append(percentiles, &v1alpha1.PercentileStat{
 			Percentile: float64(k+1) / float64(len(data)),
-			Value:      int64(data[k]),
+			Value:      float64(data[k]),
 		})
 	}
 

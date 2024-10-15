@@ -176,6 +176,7 @@ func (m *ResultsManager) Update(ctx context.Context, id string, updateFunc EvalR
 // ListResults lists the results in the database if cursor is nil then the first page is returned.
 // If cursor is non-nil then the next page is returned.
 // The cursor is the time.
+// Returns empty list of results when no more results.
 func (m *ResultsManager) ListResults(ctx context.Context, cursor *time.Time, pageSize int) ([]*v1alpha1.EvalResult, *time.Time, error) {
 	params := fsql.ListResultsParams{
 		PageSize: int64(pageSize),

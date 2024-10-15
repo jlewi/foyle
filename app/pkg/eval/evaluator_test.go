@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
 	"google.golang.org/protobuf/encoding/protojson"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -249,8 +250,13 @@ func Test_buildExperimentReport(t *testing.T) {
 		t.Fatalf("Error opening results manager; %v", err)
 	}
 
+	logsClient := logspbconnect.NewLogsServiceClient(
+		newHTTPClient(),
+		experiment.Spec.AgentAddress,
+	)
+
 	e := &Evaluator{}
-	report, err := e.buildExperimentReport(context.Background(), "testexperiment", resultsManager)
+	report, err := e.buildExperimentReport(context.Background(), "testexperiment", resultsManager, logsClient)
 	if err != nil {
 		t.Fatalf("Error building report; %v", err)
 	}

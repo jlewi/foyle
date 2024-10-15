@@ -3,6 +3,8 @@ package logs
 import (
 	"context"
 	"encoding/json"
+	"github.com/jlewi/foyle/app/pkg/runme/ulid"
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 
 	"github.com/jlewi/foyle/app/api"
 
@@ -72,4 +74,18 @@ func ZapProto(key string, pb proto.Message) zap.Field {
 func LogLLMUsage(ctx context.Context, usage api.LLMUsage) {
 	log := FromContext(ctx)
 	log.Info("LLM usage", "usage", usage)
+}
+
+// BuildAssertion creates an assertion based on the name.
+// N.B. We don't put this in the eval package because that would create a circular dependency.
+func BuildAssertion(name v1alpha1.Assertion_Name, passed bool) *v1alpha1.Assertion {
+	result := v1alpha1.AssertResult_FAILED
+	if passed {
+		result = v1alpha1.AssertResult_PASSED
+	}
+	return &v1alpha1.Assertion{
+		Name:   name,
+		Result: result,
+		Id:     ulid.GenerateID(),
+	}
 }

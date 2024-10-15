@@ -2,9 +2,10 @@ package eval
 
 import (
 	"context"
-
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )
+
+// TODO(jeremy): A lot of this code is probably obsolete now that we are using protos.
 
 // Assertion is an interface for evaluating AI generations.
 type Assertion interface {
@@ -14,7 +15,3 @@ type Assertion interface {
 }
 
 type AssertResult string
-
-const AssertPassed AssertResult = "passed"
-const AssertFailed AssertResult = "failed"
-const AssertSkipped AssertResult = "skipped"

@@ -39,7 +39,7 @@ func Test_ToAssertRow(t *testing.T) {
 				},
 				Assertions: []*v1alpha1.Assertion{
 					{
-						Name:   "AssertCodeAfterMarkdown",
+						Name:   v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
 						Result: v1alpha1.AssertResult_PASSED,
 					},
 				},

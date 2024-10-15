@@ -146,7 +146,7 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 
 	log.Info("Successfully processed examples")
 
-	report, err := e.buildExperimentReport(ctx, experiment.Metadata.Name, manager)
+	report, err := e.buildExperimentReport(ctx, experiment.Metadata.Name, manager, logsClient)
 
 	if err != nil {
 		return err
@@ -572,7 +572,8 @@ func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, evalResult *v1al
 
 // buildExperimentReport generates a report of the experiment results. These are aggregate statistics for the
 // experiment
-func (e *Evaluator) buildExperimentReport(ctx context.Context, name string, manager *ResultsManager) (*v1alpha1.ExperimentReport, error) {
+func (e *Evaluator) buildExperimentReport(ctx context.Context, name string, manager *ResultsManager, logsClient logspbconnect.LogsServiceClient) (*v1alpha1.ExperimentReport, error) {
+	log := logs.FromContext(ctx)
 	r := &v1alpha1.ExperimentReport{
 		Name: name,
 	}
@@ -608,8 +609,88 @@ func (e *Evaluator) buildExperimentReport(ctx context.Context, name string, mana
 	}
 
 	// Compute the 90th, 95th, 99th Percentile of generate time
+	// And assertionstats
+	assertionStats := make(map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts)
+	generateTimes := make([]int, 0, numExamples)
+	var cursor *time.Time
+	for {
+		var listErr error
+		var results []*v1alpha1.EvalResult
+		results, cursor, listErr = manager.ListResults(ctx, cursor, 100)
+		if listErr != nil {
+			return r, errors.Wrapf(listErr, "Failed to list results")
+		}
 
+		if results == nil  || len(results) == 0 {
+			break
+		}
+		for _, result := range results {
+			generateTimes = append(generateTimes, int(result.GenerateTimeMs))
+
+			// Get the Level1 assertions for this trace
+			if result.GetGenTraceId() != "" {
+				assertions, err := getAssertions(ctx, result.GetGenTraceId(), logsClient)
+				if err != nil {
+					log.Error(err, "Failed to get assertions", "targetTraceId", result.GetGenTraceId(), "exampleId", result.GetExample().GetId())
+					continue
+				}
+
+				accumulateAssertionCounts(assertionStats, assertions)
+			}
+		}
+	}
+
+	percentiles, err := computePercentilesOfInts(generateTimes, []float64{.9, .95})
+	if err != nil {
+		return r, errors.Wrapf(err, "Failed to compute percentiles")
+	}
+
+	r.GenerateLatencyStats = percentiles
+
+	// Add the assertions in sorted order based on key
+	statKeys := make([]string, 0, len(assertionStats))
+	for k := range assertionStats {
+		statKeys = append(statKeys, k.String())
+	}
+
+	r.AssertionCounts = make([]*v1alpha1.AssertionCounts, 0, len(assertionStats))
+	for _, key := range statKeys {
+		stat := assertionStats[v1alpha1.Assertion_Name(v1alpha1.Assertion_Name_value[key])]
+		r.AssertionCounts = append(r.AssertionCounts, stat)
+	}
 	return r, nil
+}
+
+func accumulateAssertionCounts(stats map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts, assertions []*v1alpha1.Assertion) {
+	for _, assertion := range assertions {
+		if _, ok := stats[assertion.GetName()]; !ok {
+			stats[assertion.GetName()] = &v1alpha1.AssertionCounts{}
+		}
+
+		switch assertion.GetResult() {
+		case v1alpha1.AssertResult_PASSED:
+			stats[assertion.GetName()].Passed++
+		case v1alpha1.AssertResult_FAILED:
+			stats[assertion.GetName()].Failed++
+		case v1alpha1.AssertResult_UNKNOWN_AssertResult:
+			stats[assertion.GetName()].Unknown++
+		case v1alpha1.AssertResult_SKIPPED:
+			stats[assertion.GetName()].Skipped++
+		}
+	}
+}
+
+func getAssertions(ctx context.Context, traceId string, client logspbconnect.LogsServiceClient) ([]*v1alpha1.Assertion, error) {
+	resp, err := client.GetTrace(ctx, connect.NewRequest(&logspb.GetTraceRequest{
+		Id: traceId,
+	}))
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to get trace %s", traceId)
+	}
+
+	trace := resp.Msg.GetTrace()
+	return trace.Assertions, nil
 }
 
 // isSortedByTimeDescending checks if the slice is sorted by Time in descending order

@@ -7,9 +7,9 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
+	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
 	_ "google.golang.org/protobuf/types/known/structpb"
-	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
@@ -104,7 +104,7 @@ func (m *Assertion) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) 
 	}
 
 	keyName = "name" // field name = 1
-	enc.AddString(keyName, m.Name)
+	enc.AddString(keyName, m.Name.String())
 
 	keyName = "result" // field result = 2
 	enc.AddString(keyName, m.Result.String())
@@ -323,6 +323,77 @@ func (m *ExperimentReport) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEn
 		}
 		return nil
 	}))
+
+	keyName = "assertion_counts" // field assertion_counts = 5
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.AssertionCounts {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	keyName = "generate_latency_stats" // field generate_latency_stats = 6
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.GenerateLatencyStats {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	return nil
+}
+
+func (m *AssertionCounts) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "name" // field name = 1
+	enc.AddString(keyName, m.Name.String())
+
+	keyName = "passed" // field passed = 2
+	enc.AddInt32(keyName, m.Passed)
+
+	keyName = "failed" // field failed = 3
+	enc.AddInt32(keyName, m.Failed)
+
+	keyName = "unknown" // field unknown = 4
+	enc.AddInt32(keyName, m.Unknown)
+
+	keyName = "skipped" // field skipped = 5
+	enc.AddInt32(keyName, m.Skipped)
+
+	return nil
+}
+
+func (m *PercentileStat) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "percentile" // field percentile = 1
+	enc.AddFloat64(keyName, m.Percentile)
+
+	keyName = "value" // field value = 2
+	enc.AddFloat64(keyName, m.Value)
 
 	return nil
 }
