@@ -1,9 +1,10 @@
 package eval
 
 import (
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"testing"
 )
 
 func Test_computePercentilesInts(t *testing.T) {

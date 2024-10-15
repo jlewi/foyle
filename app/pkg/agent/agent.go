@@ -2,10 +2,11 @@ package agent
 
 import (
 	"context"
-	"github.com/jlewi/foyle/app/pkg/runme/ulid"
 	"io"
 	"strings"
 	"sync"
+
+	"github.com/jlewi/foyle/app/pkg/runme/ulid"
 
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 
@@ -151,8 +152,9 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 		})
 	}
 	for try := 0; try < maxTries; try++ {
+		docText := t.Text()
 		args := promptArgs{
-			Document: t.Text(),
+			Document: docText,
 			Examples: exampleArgs,
 		}
 
