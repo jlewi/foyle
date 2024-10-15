@@ -76,13 +76,13 @@ func (s *EvalServer) List(
 
 		value, err := iter.ValueAndErr()
 		if err != nil {
-			log.Error(err, "Failed to read value for key", "key", string(key))
+			log.Error(err, "Failed to read Value for key", "key", string(key))
 			continue
 		}
 
 		result := &v1alpha1.EvalResult{}
 		if err := proto.Unmarshal(value, result); err != nil {
-			log.Error(err, "Failed to unmarshal value for", "key", string(key))
+			log.Error(err, "Failed to unmarshal Value for", "key", string(key))
 			continue
 		}
 		results.Items = append(results.Items, result)
@@ -194,13 +194,13 @@ func (s *EvalServer) AssertionTable(
 
 		value, err := iter.ValueAndErr()
 		if err != nil {
-			log.Error(err, "Failed to read value for key", "key", string(key))
+			log.Error(err, "Failed to read Value for key", "key", string(key))
 			continue
 		}
 
 		result := &v1alpha1.EvalResult{}
 		if err := proto.Unmarshal(value, result); err != nil {
-			log.Error(err, "Failed to unmarshal value for", "key", string(key))
+			log.Error(err, "Failed to unmarshal Value for", "key", string(key))
 			continue
 		}
 

@@ -26,7 +26,7 @@ func Test_buildReport(t *testing.T) {
 			ExpectedCells: []*parserv1.Cell{
 				{
 					Kind:  parserv1.CellKind_CELL_KIND_CODE,
-					Value: "expected cell value",
+					Value: "expected cell Value",
 				},
 			},
 		},
