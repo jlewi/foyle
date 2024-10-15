@@ -1,8 +1,9 @@
 package eval
 
 import (
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
+
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
