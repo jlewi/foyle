@@ -1,10 +1,11 @@
 package eval
 
 import (
-	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
-	"github.com/pkg/errors"
 	"math"
 	"sort"
+
+	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
+	"github.com/pkg/errors"
 )
 
 // computePercentilesOfInts computes the percentiles of a slice of integers.

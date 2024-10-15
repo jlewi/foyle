@@ -2,11 +2,12 @@ package eval
 
 import (
 	"context"
-	"google.golang.org/protobuf/encoding/protojson"
 	"os"
 	"path/filepath"
 	"sort"
 	"time"
+
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/go-logr/logr"
 
@@ -621,7 +622,7 @@ func (e *Evaluator) buildExperimentReport(ctx context.Context, name string, mana
 			return r, errors.Wrapf(listErr, "Failed to list results")
 		}
 
-		if results == nil  || len(results) == 0 {
+		if len(results) == 0 {
 			break
 		}
 		for _, result := range results {

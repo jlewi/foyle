@@ -9,6 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
+	"google.golang.org/protobuf/encoding/protojson"
+	"gopkg.in/yaml.v3"
+
 	"connectrpc.com/connect"
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/agent"
