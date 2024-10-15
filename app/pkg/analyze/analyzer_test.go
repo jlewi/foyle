@@ -259,7 +259,7 @@ func Test_Analyzer(t *testing.T) {
 	}
 
 	logOffsetsFile := filepath.Join(rawDir, "log_offsets.json")
-	a, err := NewAnalyzer(logOffsetsFile, lockingRawDB, tracesDB, lockingBlocksDB, sessionsManager)
+	a, err := NewAnalyzer(logOffsetsFile, 3, lockingRawDB, tracesDB, lockingBlocksDB, sessionsManager)
 	if err != nil {
 		t.Fatalf("Failed to create analyzer: %v", err)
 	}
