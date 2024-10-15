@@ -1,14 +1,15 @@
 package eval
 
 import (
-	"connectrpc.com/otelconnect"
 	"context"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 	"os"
 	"path/filepath"
 	"sort"
 	"time"
+
+	"connectrpc.com/otelconnect"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
