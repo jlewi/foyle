@@ -214,6 +214,7 @@ func (m *ResultsManager) ListResults(ctx context.Context, cursor *time.Time, pag
 }
 
 func protoToRowUpdate(result *v1alpha1.EvalResult) (*fsql.UpdateResultParams, error) {
+	// TODO(jeremy): We should emit default values. Otherwise SQL queries become more complex.
 	protoJson, err := protojson.Marshal(result)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to serialize EvalResult to JSON")
