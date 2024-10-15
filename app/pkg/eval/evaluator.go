@@ -1,7 +1,10 @@
 package eval
 
 import (
+	"connectrpc.com/otelconnect"
 	"context"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"path/filepath"
 	"sort"
@@ -85,11 +88,17 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 		return errors.New("EvalDir is required")
 	}
 
-	aiClient := newAIServiceClient(experiment.Spec.AgentAddress)
+	otelInterceptor, err := otelconnect.NewInterceptor()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to create OpenTelemetry interceptor")
+	}
+
+	aiClient := newAIServiceClient(experiment.Spec.AgentAddress, connect.WithInterceptors(otelInterceptor))
 
 	logsClient := logspbconnect.NewLogsServiceClient(
 		newHTTPClient(),
 		experiment.Spec.AgentAddress,
+		connect.WithInterceptors(otelInterceptor),
 	)
 
 	manager, err := openResultsManager(experiment.Spec.OutputDB)
@@ -141,7 +150,7 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	sortEvalExamplesInTime(examples)
 
 	// Now generate predictions for any results that are missing them.
-	if err := e.processExamples(ctx, examples, lastProcessedTime, aiClient, logsClient, manager); err != nil {
+	if err := e.processExamples(ctx, experiment, examples, lastProcessedTime, aiClient, logsClient, manager); err != nil {
 		return err
 	}
 
@@ -177,7 +186,7 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	return nil
 }
 
-func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, manager *ResultsManager) error {
+func (e *Evaluator) processExamples(ctx context.Context, experiment api.Experiment, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, manager *ResultsManager) error {
 	oLog := logs.FromContext(ctx)
 
 	oaiClient, err := oai.NewClient(e.config)
@@ -205,62 +214,78 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 		}
 		log.Info("Processing example", "index", eIndex, "numExamples", len(examples))
 
-		var processErr error
-
-		uErr := manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
-			processErr = e.processResult(ctx, result, example, client, logsClient, judge)
-			// We need to return for the transaction to be committed.
-			return nil
-		})
-
-		if processErr != nil {
-			log.Error(processErr, "Failed to process example")
-			// For now we abort on error to see what's going on.
-			return processErr
+		exampleCtx := logr.NewContext(ctx, log)
+		if err := e.processExample(exampleCtx, experiment.Metadata.Name, example, client, logsClient, manager, judge); err != nil {
+			return err
 		}
+	}
+	return nil
+}
 
-		if uErr != nil {
-			log.Error(uErr, "Failed to update result")
-			// For now we abort on error to see what's going on.
-			return uErr
-		}
+func (e *Evaluator) processExample(originalCtx context.Context, name string, example *v1alpha1.EvalExample, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, manager *ResultsManager, judge *Judge) error {
+	log := logs.FromContext(originalCtx).WithValues("exampleId", example.GetId())
+	// We need to start a new trace for this example
+	tp := tracer()
+	traceCtx, traceSpan := tp.Start(originalCtx, "(*Evaluator).processExample", trace.WithNewRoot(), trace.WithAttributes(attribute.String("experiment", name), attribute.String("exampleId", example.GetId())))
+	traceId := traceSpan.SpanContext().TraceID()
+	log = log.WithValues("traceId", traceId.String())
+	ctx := logr.NewContext(traceCtx, log)
+	defer traceSpan.End()
+	log.Info("Start example")
+	var processErr error
 
-		result, err := manager.Get(ctx, example.GetId())
-		if err != nil {
-			return errors.Wrapf(err, "Failed to get latest result for example %s", example.GetId())
-		}
+	uErr := manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
+		processErr = e.processResult(ctx, result, example, client, logsClient, judge)
+		// We need to return for the transaction to be committed.
+		return nil
+	})
 
-		if result.Error != "" {
-			// Generating a completion failed for this example so we should keep going.
-			// There won't be a blocklog to wait for.
-			continue
-		}
+	if processErr != nil {
+		log.Error(processErr, "Failed to process example")
+		// For now we abort on error to see what's going on.
+		return processErr
+	}
 
-		if err := e.waitForBlockLog(ctx, result, logsClient); err != nil {
-			log.Error(err, "Failed to wait for block log")
-			// For now we abort on error to see what's going on.
-			return errors.Wrapf(err, "Failed to get block log for example %s", example.GetId())
-		}
+	if uErr != nil {
+		log.Error(uErr, "Failed to update result")
+		// For now we abort on error to see what's going on.
+		return uErr
+	}
 
-		var ragErr error
-		// Getting the bestRAG result depends on the trace having been processed so we run after waiting for the BlockLog
-		uErr = manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
-			ragErr = e.reconcileBestRAGResult(ctx, result, logsClient)
-			return nil
-		})
+	result, err := manager.Get(ctx, example.GetId())
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get latest result for example %s", example.GetId())
+	}
 
-		if ragErr != nil {
-			log.Error(ragErr, "Failed to reconcile best RAG result")
-			// For now we abort on error to see what's going on.
-			return ragErr
-		}
+	if result.Error != "" {
+		// Generating a completion failed for this example so we should keep going.
+		// There won't be a blocklog to wait for.
+		return nil
+	}
 
-		if uErr != nil {
-			log.Error(uErr, "Failed to update result")
-			// For now we abort on error to see what's going on.
-			return uErr
-		}
+	if err := e.waitForBlockLog(ctx, result, logsClient); err != nil {
+		log.Error(err, "Failed to wait for block log")
+		// For now we abort on error to see what's going on.
+		return errors.Wrapf(err, "Failed to get block log for example %s", example.GetId())
+	}
 
+	var ragErr error
+	// Getting the bestRAG result depends on the trace having been processed so we run after waiting for the BlockLog
+	uErr = manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
+		ragErr = e.reconcileBestRAGResult(ctx, result, logsClient)
+		return nil
+	})
+
+	if ragErr != nil {
+		log.Error(ragErr, "Failed to reconcile best RAG result")
+		// For now we abort on error to see what's going on.
+		return ragErr
+	}
+
+	if uErr != nil {
+		log.Error(uErr, "Failed to update result")
+		// For now we abort on error to see what's going on.
+		return uErr
 	}
 	return nil
 }
@@ -270,6 +295,8 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 	result.Example = example
 	log := logs.FromContext(ctx).WithValues("exampleId", example.GetId())
 	ctx = logr.NewContext(ctx, log)
+	ctx, span := tracer().Start(ctx, "(*Evaluator).processResult")
+	defer span.End()
 
 	if err := runGenerate(ctx, result, client); err != nil {
 		return err
@@ -302,6 +329,9 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 // example then the result will be nil but result.Error will be set
 func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha1connect.AIServiceClient) error {
 	log := logs.FromContext(ctx)
+	ctx, span := tracer().Start(ctx, "runGenerate")
+	defer span.End()
+
 	// ID for the generate session
 	genSessionID := ulid.GenerateID()
 
@@ -381,6 +411,8 @@ func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alph
 }
 
 func runExecute(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha1connect.AIServiceClient) error {
+	ctx, span := tracer().Start(ctx, "runExecute")
+	defer span.End()
 	log := logs.FromContext(ctx)
 	// We need to send a LOG event to the agent to simulate the cells being executed.
 	executeEventReq := &v1alpha1.LogEventsRequest{}
@@ -442,6 +474,8 @@ func runExecute(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha
 }
 
 func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalResult, client logspbconnect.LogsServiceClient) error {
+	ctx, span := tracer().Start(ctx, "(*Evaluator).waitForBlockLog")
+	defer span.End()
 	// We need to wait for the block log to be processed.
 	// This is done to
 	// 1. Increase the likelihood we have learned from the block
@@ -507,6 +541,9 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 }
 
 func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, evalResult *v1alpha1.EvalResult, client logspbconnect.LogsServiceClient) error {
+	ctx, span := tracer().Start(ctx, "(*Evaluator).reconcileBestRAGResult")
+	defer span.End()
+
 	if evalResult.GenTraceId == "" {
 		return errors.WithStack(errors.New("GenTraceId is empty"))
 	}
@@ -760,11 +797,12 @@ func sortEvalExamplesInTime(examples []*v1alpha1.EvalExample) {
 	})
 }
 
-func newAIServiceClient(baseURL string) v1alpha1connect.AIServiceClient {
+func newAIServiceClient(baseURL string, opts ...connect.ClientOption) v1alpha1connect.AIServiceClient {
 	// Create a new client
 	client := v1alpha1connect.NewAIServiceClient(
 		newHTTPClient(),
 		baseURL,
+		opts...,
 	)
 	return client
 }
