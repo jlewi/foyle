@@ -17,3 +17,13 @@ SELECT * FROM results
 WHERE (:cursor = '' OR time < :cursor)
 ORDER BY time DESC
     LIMIT :page_size;
+
+-- name: CountResults :one
+-- Count the total number of results
+SELECT COUNT(*) FROM results;
+
+-- name: CountErrors :one
+SELECT COUNT(*) FROM results WHERE json_extract(proto_json, '$.error') IS NOT NULL;
+
+-- name: CountByCellsMatchResult :many
+SELECT json_extract(proto_json, '$.cellsMatchResult') as match_result, COUNT(*) as count FROM results GROUP BY match_result;
