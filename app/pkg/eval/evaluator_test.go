@@ -2,12 +2,13 @@ package eval
 
 import (
 	"context"
-	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
-	"google.golang.org/protobuf/encoding/protojson"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
+	"google.golang.org/protobuf/encoding/protojson"
+	"gopkg.in/yaml.v3"
 
 	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
 	"google.golang.org/protobuf/encoding/protojson"

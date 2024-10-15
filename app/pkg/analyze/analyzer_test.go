@@ -4,14 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
-	"github.com/jlewi/foyle/app/pkg/logs"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
+	"github.com/jlewi/foyle/app/pkg/logs"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/google/go-cmp/cmp"
