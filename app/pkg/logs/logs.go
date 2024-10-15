@@ -23,6 +23,9 @@ const (
 
 	// Debug is for debug verbosity level
 	Debug = 1
+
+	// Level1Assertion Message denoting a level1 assertion
+	Level1Assertion = "Level1Assert"
 )
 
 // FromContext returns a logr.Logger from the context or an instance of the global logger
