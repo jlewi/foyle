@@ -640,9 +640,19 @@ func (e *Evaluator) buildExperimentReport(ctx context.Context, name string, mana
 	r.CellsMatchCounts = make(map[string]int32)
 
 	for _, c := range counts {
+		if c.MatchResult == nil {
+			// N.B. I think for unknown it ends up being a nil value. I suspect this is because default values are
+			// elided when marshalling to JSON. We should fix that by changing the JSON serialization.
+			key := v1alpha1.CellsMatchResult_UNKNOWN_CellsMatchResult.String()
+			if _, ok := r.CellsMatchCounts[key]; !ok {
+				r.CellsMatchCounts[key] = 0
+			}
+			r.CellsMatchCounts[key] = r.CellsMatchCounts[key] + int32(c.Count)
+			continue
+		}
 		s, ok := c.MatchResult.(string)
 		if !ok {
-			return r, errors.Wrapf(err, "Failed to convert cellsMatchResult to string")
+			return r, errors.New("Failed to convert cellsMatchResult to string")
 		}
 		r.CellsMatchCounts[s] = int32(c.Count)
 	}
@@ -679,7 +689,7 @@ func (e *Evaluator) buildExperimentReport(ctx context.Context, name string, mana
 		}
 	}
 
-	percentiles, err := computePercentilesOfInts(generateTimes, []float64{.9, .95})
+	percentiles, err := computePercentilesOfInts(generateTimes, []float64{.5, .75, .9, .95})
 	if err != nil {
 		return r, errors.Wrapf(err, "Failed to compute percentiles")
 	}
