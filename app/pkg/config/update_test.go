@@ -27,8 +27,9 @@ func Test_UpdateViperConfig(t *testing.T) {
 			expression: "agent.model=some-other-model",
 			expected: &Config{
 				Logging: Logging{
-					Level: "info",
-					Sinks: []LogSink{{JSON: true, Path: "gcplogs:///projects/fred-dev/logs/foyle"}, {Path: "stderr"}},
+					Level:           "info",
+					Sinks:           []LogSink{{JSON: true, Path: "gcplogs:///projects/fred-dev/logs/foyle"}, {Path: "stderr"}},
+					MaxDelaySeconds: 30,
 				},
 				Agent: &api.AgentConfig{
 					Model:         "some-other-model",
