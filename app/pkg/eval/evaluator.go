@@ -710,10 +710,13 @@ func (e *Evaluator) buildExperimentReport(ctx context.Context, name string, mana
 	return r, nil
 }
 
+// accumulateAssertionCounts accumulates assertions into the stats map
 func accumulateAssertionCounts(stats map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts, assertions []*v1alpha1.Assertion) {
 	for _, assertion := range assertions {
 		if _, ok := stats[assertion.GetName()]; !ok {
-			stats[assertion.GetName()] = &v1alpha1.AssertionCounts{}
+			stats[assertion.GetName()] = &v1alpha1.AssertionCounts{
+				Name: assertion.GetName(),
+			}
 		}
 
 		switch assertion.GetResult() {

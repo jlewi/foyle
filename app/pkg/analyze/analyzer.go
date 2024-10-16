@@ -136,7 +136,7 @@ func initOffsets(logOffsetsFile string) (*logspb.LogsWaterMark, error) {
 	watermark := &logspb.LogsWaterMark{}
 
 	if err := protojson.Unmarshal(raw, watermark); err != nil {
-		log.Error(err, "Failed to unmarshal watermarks file %s; watermarks will be reinitialized", logOffsetsFile)
+		log.Error(err, "Failed to unmarshal watermarks; watermarks will be reinitialized", "file", logOffsetsFile)
 	}
 	return watermark, nil
 }
@@ -750,12 +750,14 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (*logs
 }
 
 func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
+	log := logs.FromContext(ctx)
 	gTrace := &logspb.GenerateTrace{}
 	trace := &logspb.Trace{
 		Data: &logspb.Trace_Generate{
 			Generate: gTrace,
 		},
-		Spans: make([]*logspb.Span, 0, 10),
+		Spans:      make([]*logspb.Span, 0, 10),
+		Assertions: make([]*v1alpha1.Assertion, 0),
 	}
 	evalMode := false
 	for _, e := range entries {
@@ -770,6 +772,16 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb
 			if mode {
 				evalMode = mode
 			}
+		}
+
+		if e.Message() == logs.Level1Assertion {
+			assertion := &v1alpha1.Assertion{}
+			if !e.GetProto("assertion", assertion) {
+				log.Error(errors.New("Failed to decode assertion"), "Failed to decode assertion", "entry", e)
+				continue
+			}
+			trace.Assertions = append(trace.Assertions, assertion)
+			continue
 		}
 
 		if gTrace.Request == nil && strings.HasSuffix(e.Function(), "agent.(*Agent).Generate") {
@@ -804,5 +816,23 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb
 	trace.EvalMode = evalMode
 
 	combineSpans(trace)
+	dedupeAssertions(trace)
 	return trace, nil
+}
+
+// dedupeAssertions since our processing has at least once semantics we could wind up with duplicate copies
+// of an assertion
+func dedupeAssertions(trace *logspb.Trace) {
+	newAssertions := make([]*v1alpha1.Assertion, 0, len(trace.Assertions))
+	seen := make(map[string]bool)
+
+	for _, a := range trace.Assertions {
+		if seen[a.GetId()] {
+			continue
+		}
+		newAssertions = append(newAssertions, a)
+		seen[a.GetId()] = true
+	}
+
+	trace.Assertions = newAssertions
 }
