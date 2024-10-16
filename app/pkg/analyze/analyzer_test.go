@@ -10,6 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
+	"github.com/jlewi/foyle/app/pkg/logs"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -259,7 +263,7 @@ func Test_Analyzer(t *testing.T) {
 	}
 
 	logOffsetsFile := filepath.Join(rawDir, "log_offsets.json")
-	a, err := NewAnalyzer(logOffsetsFile, 3, lockingRawDB, tracesDB, lockingBlocksDB, sessionsManager)
+	a, err := NewAnalyzer(logOffsetsFile, 3*time.Second, lockingRawDB, tracesDB, lockingBlocksDB, sessionsManager)
 	if err != nil {
 		t.Fatalf("Failed to create analyzer: %v", err)
 	}
@@ -403,11 +407,24 @@ func waitForBlock(t *testing.T, blockId string, numExpected int, blockProccessed
 	}()
 }
 
+func assertHasAssertion(t *logspb.Trace) string {
+	if len(t.Assertions) == 0 {
+		return "Expected trace to have at least 1 assertion"
+	}
+	return ""
+}
+
+type assertTrace func(t *logspb.Trace) string
+
 func Test_CombineGenerateEntries(t *testing.T) {
 	type testCase struct {
-		name             string
-		linesFile        string
+		name      string
+		linesFile string
+		// Optional function to generate some logs to
+		logFunc          func(log logr.Logger)
 		expectedEvalMode bool
+
+		assertions []assertTrace
 	}
 
 	cases := []testCase{
@@ -415,6 +432,18 @@ func Test_CombineGenerateEntries(t *testing.T) {
 			name:             "basic",
 			linesFile:        "generate_trace_lines.jsonl",
 			expectedEvalMode: false,
+			logFunc: func(log logr.Logger) {
+				assertion := &v1alpha1.Assertion{
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Detail: "",
+					Id:     "1234",
+				}
+				log.Info(logs.Level1Assertion, "assertion", assertion)
+			},
+			assertions: []assertTrace{
+				assertHasAssertion,
+			},
 		},
 		{
 			name:             "evalMode",
@@ -430,21 +459,66 @@ func Test_CombineGenerateEntries(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			entries := make([]*api.LogEntry, 0, 10)
-			testFile, err := os.Open(filepath.Join(cwd, "test_data", c.linesFile))
-			if err != nil {
-				t.Fatalf("Failed to open test file: %v", err)
+
+			logFiles := []string{
+				filepath.Join(cwd, "test_data", c.linesFile),
 			}
-			d := json.NewDecoder(testFile)
-			for {
-				e := &api.LogEntry{}
-				err := d.Decode(e)
+
+			if c.logFunc != nil {
+				// Create a logger to write the logs to a file
+				f, err := os.CreateTemp("", "testlogs.jsonl")
 				if err != nil {
-					if err == io.EOF {
-						break
-					}
-					t.Fatalf("Failed to unmarshal log entry: %v", err)
+					t.Fatalf("Failed to create temp file: %v", err)
 				}
-				entries = append(entries, e)
+				logFile := f.Name()
+				if err := f.Close(); err != nil {
+					t.Fatalf("Failed to close file: %v", err)
+				}
+
+				t.Log("Log file:", logFile)
+
+				config := zap.NewProductionConfig()
+				// N.B. This needs to be kept in sync with the fields set in app.go otherwise our test won't use
+				// the same fields as in production.
+				config.OutputPaths = []string{f.Name()}
+				config.EncoderConfig.LevelKey = "severity"
+				config.EncoderConfig.TimeKey = "time"
+				config.EncoderConfig.MessageKey = "message"
+				// We attach the function key to the logs because that is useful for identifying the function that generated the log.
+				config.EncoderConfig.FunctionKey = "function"
+
+				logFiles = append(logFiles, logFile)
+
+				testLog, err := config.Build()
+				if err != nil {
+					t.Fatalf("Failed to create logger: %v", err)
+				}
+
+				zTestLog := zapr.NewLogger(testLog)
+
+				c.logFunc(zTestLog)
+
+				testLog.Sync()
+
+			}
+
+			for _, logFile := range logFiles {
+				testFile, err := os.Open(logFile)
+				if err != nil {
+					t.Fatalf("Failed to open test file: %v", err)
+				}
+				d := json.NewDecoder(testFile)
+				for {
+					e := &api.LogEntry{}
+					err := d.Decode(e)
+					if err != nil {
+						if err == io.EOF {
+							break
+						}
+						t.Fatalf("Failed to unmarshal log entry: %v", err)
+					}
+					entries = append(entries, e)
+				}
 			}
 			trace, err := combineGenerateTrace(context.Background(), entries)
 			if err != nil {
@@ -468,6 +542,74 @@ func Test_CombineGenerateEntries(t *testing.T) {
 
 			if trace.EvalMode != c.expectedEvalMode {
 				t.Errorf("Expected EvalMode to be %v but got %v", c.expectedEvalMode, trace.EvalMode)
+			}
+
+			for _, assert := range c.assertions {
+				if msg := assert(trace); msg != "" {
+					t.Errorf(msg)
+				}
+			}
+		})
+	}
+}
+
+func Test_DedupeAssertions(t *testing.T) {
+	type testCase struct {
+		name     string
+		input    []*v1alpha1.Assertion
+		expected []*v1alpha1.Assertion
+	}
+
+	cases := []testCase{
+		{
+			name: "basic",
+			input: []*v1alpha1.Assertion{
+				{
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Id:     "1",
+				},
+				{
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Id:     "1",
+				},
+				{
+					Name:   v1alpha1.Assertion_ENDS_WITH_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Id:     "2",
+				},
+			},
+			expected: []*v1alpha1.Assertion{
+				{
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Id:     "1",
+				},
+				{
+					Name:   v1alpha1.Assertion_ENDS_WITH_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Id:     "2",
+				},
+			},
+		},
+		{
+			name:     "nil",
+			input:    nil,
+			expected: []*v1alpha1.Assertion{},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			trace := &logspb.Trace{
+				Assertions: c.input,
+			}
+
+			dedupeAssertions(trace)
+
+			if d := cmp.Diff(c.expected, trace.Assertions, cmpopts.IgnoreUnexported(v1alpha1.Assertion{})); d != "" {
+				t.Errorf("Unexpected diff:\n%s", d)
 			}
 		})
 	}
