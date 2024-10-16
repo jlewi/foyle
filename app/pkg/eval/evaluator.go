@@ -94,7 +94,14 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 		return errors.Wrapf(err, "Failed to create OpenTelemetry interceptor")
 	}
 
-	aiClient := newAIServiceClient(experiment.Spec.AgentAddress, connect.WithInterceptors(otelInterceptor))
+	// Handle retries for the AI service.
+	// This should help with requests ocassionally timing out.
+	retryer := &agent.RetryInterceptor{
+		MaxRetries: 3,
+		Backoff:    5 * time.Second,
+	}
+
+	aiClient := newAIServiceClient(experiment.Spec.AgentAddress, connect.WithInterceptors(otelInterceptor, retryer))
 
 	logsClient := logspbconnect.NewLogsServiceClient(
 		newHTTPClient(),
