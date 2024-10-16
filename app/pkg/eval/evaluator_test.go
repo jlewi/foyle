@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
 	"google.golang.org/protobuf/encoding/protojson"
 	"gopkg.in/yaml.v3"
@@ -271,4 +274,49 @@ func Test_buildExperimentReport(t *testing.T) {
 		t.Fatalf("Error marshalling report; %v", err)
 	}
 	t.Logf("Report: %v", string(reportJson))
+}
+
+func Test_AccumulateAssertionCounts(t *testing.T) {
+	type testCase struct {
+		name       string
+		stats      map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts
+		assertions []*v1alpha1.Assertion
+		expected   map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts
+	}
+
+	cases := []testCase{
+		{
+			name:  "basic",
+			stats: map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts{},
+			assertions: []*v1alpha1.Assertion{
+				{
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+				},
+				{
+					Name:   v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
+					Result: v1alpha1.AssertResult_FAILED,
+				},
+			},
+			expected: map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts{
+				v1alpha1.Assertion_ONE_CODE_CELL: {
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Passed: 1,
+				},
+				v1alpha1.Assertion_CODE_AFTER_MARKDOWN: {
+					Name:   v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
+					Failed: 1,
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			accumulateAssertionCounts(c.stats, c.assertions)
+			if d := cmp.Diff(c.expected, c.stats, cmpopts.IgnoreUnexported(v1alpha1.AssertionCounts{})); d != "" {
+				t.Fatalf("Unexpected diff:\n%+v", d)
+			}
+		})
+	}
 }
