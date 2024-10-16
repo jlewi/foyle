@@ -199,7 +199,7 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 		if len(blocks) == 0 {
 			assertBlocks.Result = v1alpha1.AssertResult_FAILED
 		}
-		log.Info(logs.Level1Assertion, "assertion", assertion)
+		log.Info(logs.Level1Assertion, "assertion", assertBlocks)
 		return blocks, nil
 	}
 	err := errors.Errorf("Failed to generate a chat completion after %d tries", maxTries)
@@ -450,6 +450,12 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 	// Terminate because the request got cancelled
 	case <-ctx.Done():
 		log.Info("Context cancelled; stopping streaming request", "err", ctx.Err())
+		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			// N.B. If the context was cancelled then we should return a DeadlineExceeded error to indicate we hit
+			// a timeout on the server.
+			// My assumption is if the client terminates the connection there is a different error.
+			return connect.NewError(connect.CodeDeadlineExceeded, errors.Wrapf(ctx.Err(), "The request context was cancelled. This usually happens because the read or write timeout of the HTTP server was reched."))
+		}
 		// Cancel functions will be called when this function returns
 		return ctx.Err()
 	case s := <-statusChan:
@@ -486,6 +492,13 @@ func (a *Agent) GenerateCells(ctx context.Context, req *connect.Request[v1alpha1
 	agentResp, err := a.Generate(ctx, agentReq)
 	if err != nil {
 		log.Error(err, "Agent.Generate failed")
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			// N.B. If the context was cancelled then we should return a DeadlineExceeded error to indicate we hit
+			// a timeout on the server.
+			// My assumption is if the client terminates the connection there is a different error.
+			err := errors.Wrapf(err, "Agent.Generate failed; traceId %s. \"The request context was cancelled. This usually happens because the read or write timeout of the HTTP server was reached.", span.SpanContext().TraceID().String())
+			return nil, connect.NewError(connect.CodeDeadlineExceeded, err)
+		}
 		err := errors.Wrapf(err, "Agent.Generate failed; traceId %s", span.SpanContext().TraceID().String())
 		return nil, err
 	}
@@ -642,12 +655,7 @@ func (s *streamState) getContextID() string {
 
 // shouldTrigger returns true if the agent should trigger a completion for the current document.
 func shouldTrigger(doc *v1alpha1.Doc, selectedIndex int32) bool {
-	// We should trigger if the last cell is a code cell
-	if len(doc.Blocks) == 0 {
-		return false
-	}
-
-	return true
+	return len(doc.Blocks) != 0
 }
 
 // dropResponse returns true if the response should be dropped rather than being sent to the client.
