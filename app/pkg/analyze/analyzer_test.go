@@ -498,8 +498,9 @@ func Test_CombineGenerateEntries(t *testing.T) {
 
 				c.logFunc(zTestLog)
 
-				testLog.Sync()
-
+				if err := testLog.Sync(); err != nil {
+					t.Fatalf("Failed to sync log: %v", err)
+				}
 			}
 
 			for _, logFile := range logFiles {

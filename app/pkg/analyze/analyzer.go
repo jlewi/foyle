@@ -136,7 +136,7 @@ func initOffsets(logOffsetsFile string) (*logspb.LogsWaterMark, error) {
 	watermark := &logspb.LogsWaterMark{}
 
 	if err := protojson.Unmarshal(raw, watermark); err != nil {
-		log.Error(err, "Failed to unmarshal watermarks file %s; watermarks will be reinitialized", logOffsetsFile)
+		log.Error(err, "Failed to unmarshal watermarks; watermarks will be reinitialized", "file", logOffsetsFile)
 	}
 	return watermark, nil
 }
