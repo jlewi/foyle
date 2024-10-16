@@ -689,7 +689,7 @@ func (e *Evaluator) buildExperimentReport(ctx context.Context, name string, mana
 		}
 	}
 
-	percentiles, err := computePercentilesOfInts(generateTimes, []float64{.9, .95})
+	percentiles, err := computePercentilesOfInts(generateTimes, []float64{.5, .75, .9, .95})
 	if err != nil {
 		return r, errors.Wrapf(err, "Failed to compute percentiles")
 	}
