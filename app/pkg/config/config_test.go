@@ -10,30 +10,34 @@ import (
 
 func Test_ConfigDefaultConfig(t *testing.T) {
 	type testCase struct {
-		name             string
-		configFile       string
-		expectedRAG      bool
-		expectedHTTPPort int
+		name                    string
+		configFile              string
+		expectedRAG             bool
+		expectedHTTPPort        int
+		expectedMaxDelaySeconds int
 	}
 
 	cases := []testCase{
 		{
-			name:             "config-file-does-not-exist",
-			configFile:       "doesnotexist.yaml",
-			expectedRAG:      defaultRagEnabled,
-			expectedHTTPPort: defaultHTTPPort,
+			name:                    "config-file-does-not-exist",
+			configFile:              "doesnotexist.yaml",
+			expectedRAG:             defaultRagEnabled,
+			expectedHTTPPort:        defaultHTTPPort,
+			expectedMaxDelaySeconds: 30,
 		},
 		{
-			name:             "empty-file",
-			configFile:       "empty.yaml",
-			expectedRAG:      defaultRagEnabled,
-			expectedHTTPPort: defaultHTTPPort,
+			name:                    "empty-file",
+			configFile:              "empty.yaml",
+			expectedRAG:             defaultRagEnabled,
+			expectedHTTPPort:        defaultHTTPPort,
+			expectedMaxDelaySeconds: 30,
 		},
 		{
-			name:             "partial",
-			configFile:       "partial.yaml",
-			expectedRAG:      defaultRagEnabled,
-			expectedHTTPPort: defaultHTTPPort,
+			name:                    "partial",
+			configFile:              "partial.yaml",
+			expectedRAG:             defaultRagEnabled,
+			expectedHTTPPort:        defaultHTTPPort,
+			expectedMaxDelaySeconds: 30,
 		},
 	}
 

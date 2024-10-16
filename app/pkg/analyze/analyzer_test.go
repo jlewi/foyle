@@ -263,7 +263,7 @@ func Test_Analyzer(t *testing.T) {
 	}
 
 	logOffsetsFile := filepath.Join(rawDir, "log_offsets.json")
-	a, err := NewAnalyzer(logOffsetsFile, lockingRawDB, tracesDB, lockingBlocksDB, sessionsManager)
+	a, err := NewAnalyzer(logOffsetsFile, 3*time.Second, lockingRawDB, tracesDB, lockingBlocksDB, sessionsManager)
 	if err != nil {
 		t.Fatalf("Failed to create analyzer: %v", err)
 	}
@@ -434,7 +434,7 @@ func Test_CombineGenerateEntries(t *testing.T) {
 			expectedEvalMode: false,
 			logFunc: func(log logr.Logger) {
 				assertion := &v1alpha1.Assertion{
-					Name:   "testassertion",
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
 					Result: v1alpha1.AssertResult_PASSED,
 					Detail: "",
 					Id:     "1234",
@@ -498,8 +498,9 @@ func Test_CombineGenerateEntries(t *testing.T) {
 
 				c.logFunc(zTestLog)
 
-				testLog.Sync()
-
+				if err := testLog.Sync(); err != nil {
+					t.Fatalf("Failed to sync log: %v", err)
+				}
 			}
 
 			for _, logFile := range logFiles {
@@ -548,6 +549,68 @@ func Test_CombineGenerateEntries(t *testing.T) {
 				if msg := assert(trace); msg != "" {
 					t.Errorf(msg)
 				}
+			}
+		})
+	}
+}
+
+func Test_DedupeAssertions(t *testing.T) {
+	type testCase struct {
+		name     string
+		input    []*v1alpha1.Assertion
+		expected []*v1alpha1.Assertion
+	}
+
+	cases := []testCase{
+		{
+			name: "basic",
+			input: []*v1alpha1.Assertion{
+				{
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Id:     "1",
+				},
+				{
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Id:     "1",
+				},
+				{
+					Name:   v1alpha1.Assertion_ENDS_WITH_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Id:     "2",
+				},
+			},
+			expected: []*v1alpha1.Assertion{
+				{
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Id:     "1",
+				},
+				{
+					Name:   v1alpha1.Assertion_ENDS_WITH_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+					Id:     "2",
+				},
+			},
+		},
+		{
+			name:     "nil",
+			input:    nil,
+			expected: []*v1alpha1.Assertion{},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			trace := &logspb.Trace{
+				Assertions: c.input,
+			}
+
+			dedupeAssertions(trace)
+
+			if d := cmp.Diff(c.expected, trace.Assertions, cmpopts.IgnoreUnexported(v1alpha1.Assertion{})); d != "" {
+				t.Errorf("Unexpected diff:\n%s", d)
 			}
 		})
 	}

@@ -44,6 +44,9 @@ type Judge struct {
 }
 
 func (j *Judge) Score(ctx context.Context, result *v1alpha1.EvalResult) error {
+	ctx, span := tracer().Start(ctx, "(*Judge).Score")
+	defer span.End()
+
 	if len(result.GetExample().ExpectedCells) != 1 {
 		return errors.New("expected a single expected cell")
 	}

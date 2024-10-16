@@ -394,7 +394,8 @@ func (a *App) SetupAnalyzer() (*analyze.Analyzer, error) {
 	a.sessionsManager = manager
 	a.sessionsDB = db
 
-	analyzer, err := analyze.NewAnalyzer(a.Config.GetLogOffsetsFile(), a.LockingLogEntriesDB, a.TracesDB, a.LockingBlocksDB, manager)
+	maxDelay := time.Duration(a.Config.GetLogsMaxDelaySeconds()) * time.Second
+	analyzer, err := analyze.NewAnalyzer(a.Config.GetLogOffsetsFile(), maxDelay, a.LockingLogEntriesDB, a.TracesDB, a.LockingBlocksDB, manager)
 	if err != nil {
 		return nil, err
 	}

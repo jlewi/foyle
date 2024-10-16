@@ -193,6 +193,9 @@ type Logging struct {
 	// Use stderr to write to stderr.
 	// Use gcplogs:///projects/${PROJECT}/logs/${LOGNAME} to write to Google Cloud Logging
 	Sinks []LogSink `json:"sinks,omitempty" yaml:"sinks,omitempty"`
+
+	// MaxDelaySeconds is the maximum delay in seconds to wait before processing the logs.
+	MaxDelaySeconds int `json:"maxDelaySeconds,omitempty" yaml:"maxDelaySeconds,omitempty"`
 }
 
 type LogSink struct {
@@ -389,6 +392,7 @@ func InitViperInstance(v *viper.Viper, cmd *cobra.Command) error {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv() // read in environment variables that match
 
+	setLoggingDefaults(v)
 	setAgentDefaults(v)
 	setServerDefaults(v)
 
@@ -438,6 +442,10 @@ func (c *Config) APIPrefix() string {
 // APIBaseURL returns the base URL for the API
 func (c *Config) APIBaseURL() string {
 	return fmt.Sprintf("http://%s:%d/%s", c.Server.BindAddress, c.Server.HttpPort, c.APIPrefix())
+}
+
+func (c *Config) GetLogsMaxDelaySeconds() int {
+	return c.Logging.MaxDelaySeconds
 }
 
 // GetConfig returns a configuration created from the viper configuration.
@@ -506,6 +514,9 @@ func (c *Config) Write(cfgFile string) error {
 	return yaml.NewEncoder(f).Encode(c)
 }
 
+func setLoggingDefaults(v *viper.Viper) {
+	v.SetDefault("logging.maxDelaySeconds", 30)
+}
 func setServerDefaults(v *viper.Viper) {
 	v.SetDefault("server.bindAddress", "0.0.0.0")
 	v.SetDefault("server.httpPort", defaultHTTPPort)
