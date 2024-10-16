@@ -14,6 +14,11 @@ func BlocksToCells(blocks []*v1alpha1.Block) ([]*parserv1.Cell, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Set interactive to false because we don't want to render the output as an interactive cell.
+		// This is a hack for https://github.com/jlewi/foyle/issues/286
+		// We should arguably try to learn this
+		// TODO(jeremy): we should use a constant
+		cell.Metadata["interactive"] = "false"
 		cells = append(cells, cell)
 	}
 	return cells, nil
