@@ -142,7 +142,7 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 	log := logs.FromContext(ctx)
 
 	cells := preprocessDoc(req)
-	t := docs.NewTailer(cells, MaxDocChars)
+	t := docs.NewTailer(ctx, cells, MaxDocChars)
 
 	exampleArgs := make([]Example, 0, len(examples))
 	for _, example := range examples {
@@ -156,6 +156,10 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 		args := promptArgs{
 			Document: docText,
 			Examples: exampleArgs,
+		}
+
+		if len(strings.TrimSpace(docText)) == 0 {
+			return nil, errors.New("Unable to generate a completion because the document is empty")
 		}
 
 		var sb strings.Builder
@@ -178,6 +182,8 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 		}
 
 		// Level1 assertion that docText is a non-empty string
+		// TODO(jeremy): This should be redundant now that we are checking for an empty document before calling the
+		// completer and throw an error if we have an empty document. So we could probably remove this assertion.
 		assertion := &v1alpha1.Assertion{
 			Name:   v1alpha1.Assertion_NON_EMPTY_DOC,
 			Result: v1alpha1.AssertResult_PASSED,

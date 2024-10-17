@@ -94,6 +94,10 @@ message Assertion {
     AT_LEAST_ONE_BLOCK = 5;
     // AT_LEAST_ONE_POST_PROCESSED asserts that at at least one block is returned after post-processing
     AT_LEAST_ONE_BLOCK_POST_PROCESSED = 6;
+
+    // AT_LEAST_ONE_FULL_INPUT_CELL asserts that at at least one cell is included without truncation in the input
+    // prompt.
+    AT_LEAST_ONE_FULL_INPUT_CELL = 7;
   }
   // Name of the assertion
   Name name = 1;

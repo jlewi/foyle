@@ -1,7 +1,11 @@
 package docs
 
 import (
+	"context"
 	"strings"
+
+	"github.com/jlewi/foyle/app/pkg/logs"
+	"github.com/jlewi/foyle/app/pkg/runme/ulid"
 
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )
@@ -17,20 +21,37 @@ type Tailer struct {
 	firstBlock int
 }
 
-func NewTailer(blocks []*v1alpha1.Block, maxCharLen int) *Tailer {
+func NewTailer(ctx context.Context, blocks []*v1alpha1.Block, maxCharLen int) *Tailer {
+	log := logs.FromContext(ctx)
 	mdBlocks := make([]string, len(blocks))
 
 	length := 0
 	firstBlock := len(blocks) - 1
+
+	assertion := &v1alpha1.Assertion{
+		Name:   v1alpha1.Assertion_AT_LEAST_ONE_FULL_INPUT_CELL,
+		Result: v1alpha1.AssertResult_PASSED,
+		Detail: "",
+		Id:     ulid.GenerateID(),
+	}
 	for ; firstBlock >= 0; firstBlock-- {
 		block := blocks[firstBlock]
 		md := BlockToMarkdown(block)
 		if length+len(md) > maxCharLen {
-			break
+			if length > 0 {
+				// If adding the block would exceed the max length and we already have at least one block then, break
+				break
+			} else {
+				// Since we haven't added any blocks yet, we need to add a truncated version of the last block
+				assertion.Result = v1alpha1.AssertResult_FAILED
+				md = tailLines(md, maxCharLen)
+			}
 		}
+		length += len(md)
 		mdBlocks[firstBlock] = md
 	}
 
+	log.Info(logs.Level1Assertion, "assertion", assertion)
 	return &Tailer{
 		mdBlocks: mdBlocks,
 	}
@@ -56,4 +77,30 @@ func (p *Tailer) Shorten() bool {
 
 	p.firstBlock += 1
 	return true
+}
+
+// tailLines should always return a non-empty string if the input is non-empty.
+// s is longer than maxLen then it will attempt to return the last n lines of s.
+func tailLines(s string, maxLen int) string {
+	lines := strings.Split(s, "\n")
+
+	startIndex := len(lines) - 1
+	//if startIndex < 0 {}
+
+	length := len(lines[len(lines)-1])
+
+	for ; startIndex >= 1; startIndex-- {
+		nextIndex := startIndex - 1
+		if len(lines[nextIndex])+length > maxLen {
+			break
+		}
+
+		length += len(lines[nextIndex])
+	}
+
+	if startIndex < 0 {
+		startIndex = 0
+	}
+
+	return strings.Join(lines[startIndex:], "\n")
 }
