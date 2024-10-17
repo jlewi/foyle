@@ -169,7 +169,7 @@ message LogEvent {
 
   enum ExecuteStatus {
     UNKNOWN = 0;
-    SUCCESS = 1;
+    SUCCEEDED = 1;
     FAILED = 2;
   }
 
