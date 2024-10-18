@@ -74,6 +74,24 @@ message StreamGenerateRequest {
   // The context ID is also returned in the response.
   // The client can use this to detect when the context has changed and the response is no longer valid.
   string context_id = 3;
+
+  enum Trigger {
+    UNKNOWN = 0;
+
+    // Cell text change indicates the trigger is a change in the text of a cell.
+    CELL_TEXT_CHANGE = 1;
+    // Trigger indicates the output of one or more cells changes
+    CELL_OUTPUT_CHANGE = 2;
+
+    // Trigger due to the cell focus changing
+    CELL_FOCUS_CHANGE = 3;
+
+    // Trigger due to a cell being executed
+    CELL_EXECUTE = 4;
+  }
+
+  // Trigger indicates the event in vscode that triggered the generation.
+  Trigger trigger = 4;
 }
 
 message FullContext {

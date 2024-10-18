@@ -144,6 +144,9 @@ func (m *StreamGenerateRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.Obj
 	keyName = "context_id" // field context_id = 3
 	enc.AddString(keyName, m.ContextId)
 
+	keyName = "trigger" // field trigger = 4
+	enc.AddString(keyName, m.Trigger.String())
+
 	return nil
 }
 
