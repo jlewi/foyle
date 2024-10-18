@@ -424,8 +424,8 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 			if !shouldTrigger(doc, selectedCell) {
 				continue
 			}
-
-			log.Info("Received request", zap.Object("request", req))
+			
+			log.Info("Received request", logs.ZapProto("request", req))
 			// Serialize the doc and make it available for processing
 			func() {
 				mu.Lock()
