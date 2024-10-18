@@ -406,6 +406,9 @@ func (m *LogEvent) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) e
 	keyName = "event_id" // field event_id = 6
 	enc.AddString(keyName, m.EventId)
 
+	keyName = "execute_status" // field execute_status = 7
+	enc.AddString(keyName, m.ExecuteStatus.String())
+
 	return nil
 }
 
