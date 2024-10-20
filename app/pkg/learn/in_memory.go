@@ -6,6 +6,8 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/jlewi/foyle/app/pkg/docs"
+
 	"github.com/jlewi/foyle/app/pkg/llms"
 
 	"github.com/jlewi/monogo/files"
@@ -13,7 +15,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/jlewi/foyle/app/pkg/config"
-	"github.com/jlewi/foyle/app/pkg/docs"
 	"github.com/jlewi/foyle/app/pkg/logs"
 	"github.com/jlewi/foyle/app/pkg/oai"
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
@@ -71,21 +72,26 @@ func NewInMemoryExampleDB(cfg config.Config, vectorizer llms.Vectorizer) (*InMem
 	return db, nil
 }
 
-func (db *InMemoryExampleDB) GetExamples(ctx context.Context, doc *v1alpha1.Doc, maxResults int) ([]*v1alpha1.Example, error) {
+func (db *InMemoryExampleDB) GetExamples(ctx context.Context, req *v1alpha1.GenerateRequest, maxResults int) ([]*v1alpha1.Example, error) {
 	log := logs.FromContext(ctx)
-	query := docs.DocToMarkdown(doc)
 
 	if len(db.examples) == 0 {
-		// TODO(jeremy): What should we do in this case?
-		return nil, errors.New("No examples available")
+		// Since there are no examples just return an empty list
+		return []*v1alpha1.Example{}, nil
+	}
+
+	blocks, err := docs.CreateQuery(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create query")
 	}
 
 	// Compute the embedding for the query.
-	qVec, err := db.vectorizer.Embed(ctx, query)
+	qVecData, err := db.vectorizer.Embed(ctx, blocks)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to compute embedding for query")
 	}
 
+	qVec := llms.VectorToVecDense(qVecData)
 	// Acquire a lock on the data so we can safely read it.
 	db.lock.RLock()
 	defer db.lock.RUnlock()

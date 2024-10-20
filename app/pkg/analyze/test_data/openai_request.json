@@ -1,0 +1,15 @@
+{
+  "max_tokens": 2000,
+  "messages": [
+    {
+      "content": "You are a helpful AI assistant for software developers. You are helping software engineers write \nmarkdown documents to deploy and operate software. Your job is to help users with tasks related to building, deploying,\nand operating software. You should interpret any questions or commands in that context. You job is to suggest\ncommands the user can execute to accomplish their goals.",
+      "role": "system"
+    },
+    {
+      "content": "Continue writing the markdown document by adding a code block with the commands a user should execute.\nFollow these rules\n\n* Set the language inside the code block to bash\n* Use the text at the end of the document to determine what commands to execute next\n* Use the existing text and code blocks in the document to learn phrases that are predictive of specific commands\n* Only respond with a single code block\n* You can put multiple commands into a code block\n* If the text at the end of the document doesn't clearly describe a command to execute simply respond with the </output> tag\n\n\nHere are a bunch of examples of input documents along with the expected output.\n\n<example>\n<input>\nGrab a snapshot of the HC query for model errors\n\n</input>\n<output>\n```bash\n/Users/jlewi/git_hccli/hccli querytourl --query-file=/tmp/query.json --dataset=foyle \n```\n\n</output>\n</example>\n<example>\n<input>\nGrab a snapshot of the HC query for model errors\n\n</input>\n<output>\n```bash\n/Users/jlewi/git_hccli/hccli querytourl --query-file=/tmp/query.json --dataset=foyle \n```\n\n</output>\n</example>\n<example>\n<input>\nGrab a snapshot of the HC query for model errors\n\n</input>\n<output>\n```bash\n/Users/jlewi/git_hccli/hccli querytourl --help \n```\n\n</output>\n</example>\nHere's the actual document containing the problem or task to be solved:\n\n<input>\nH\n\n</input>\n<output>\n",
+      "role": "user"
+    }
+  ],
+  "model": "gpt-4o",
+  "temperature": 0.9
+}

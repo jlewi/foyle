@@ -86,6 +86,12 @@ func (m *EvalResult) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder)
 	keyName = "judge_explanation" // field judge_explanation = 13
 	enc.AddString(keyName, m.JudgeExplanation)
 
+	keyName = "generate_time_ms" // field generate_time_ms = 14
+	enc.AddInt64(keyName, m.GenerateTimeMs)
+
+	keyName = "block_log_status" // field block_log_status = 15
+	enc.AddString(keyName, m.BlockLogStatus.String())
+
 	return nil
 }
 
@@ -98,13 +104,16 @@ func (m *Assertion) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) 
 	}
 
 	keyName = "name" // field name = 1
-	enc.AddString(keyName, m.Name)
+	enc.AddString(keyName, m.Name.String())
 
 	keyName = "result" // field result = 2
 	enc.AddString(keyName, m.Result.String())
 
 	keyName = "detail" // field detail = 3
 	enc.AddString(keyName, m.Detail)
+
+	keyName = "id" // field id = 4
+	enc.AddString(keyName, m.Id)
 
 	return nil
 }
@@ -256,6 +265,135 @@ func (m *AssertionTableResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Ob
 		}
 		return nil
 	}))
+
+	return nil
+}
+
+func (m *GetEvalResultRequest) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "id" // field id = 1
+	enc.AddString(keyName, m.Id)
+
+	return nil
+}
+
+func (m *GetEvalResultResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "reportHTML" // field reportHTML = 1
+	enc.AddString(keyName, m.ReportHTML)
+
+	return nil
+}
+
+func (m *ExperimentReport) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "name" // field name = 1
+	enc.AddString(keyName, m.Name)
+
+	keyName = "num_examples" // field num_examples = 2
+	enc.AddInt64(keyName, m.NumExamples)
+
+	keyName = "num_errors" // field num_errors = 3
+	enc.AddInt64(keyName, m.NumErrors)
+
+	keyName = "cells_match_counts" // field cells_match_counts = 4
+	enc.AddObject(keyName, go_uber_org_zap_zapcore.ObjectMarshalerFunc(func(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+		for mk, mv := range m.CellsMatchCounts {
+			key := mk
+			_ = key
+			enc.AddInt32(key, mv)
+		}
+		return nil
+	}))
+
+	keyName = "assertion_counts" // field assertion_counts = 5
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.AssertionCounts {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	keyName = "generate_latency_stats" // field generate_latency_stats = 6
+	enc.AddArray(keyName, go_uber_org_zap_zapcore.ArrayMarshalerFunc(func(aenc go_uber_org_zap_zapcore.ArrayEncoder) error {
+		for _, rv := range m.GenerateLatencyStats {
+			_ = rv
+			if rv != nil {
+				var vv interface{} = rv
+				if marshaler, ok := vv.(go_uber_org_zap_zapcore.ObjectMarshaler); ok {
+					aenc.AppendObject(marshaler)
+				}
+			}
+		}
+		return nil
+	}))
+
+	return nil
+}
+
+func (m *AssertionCounts) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "name" // field name = 1
+	enc.AddString(keyName, m.Name.String())
+
+	keyName = "passed" // field passed = 2
+	enc.AddInt32(keyName, m.Passed)
+
+	keyName = "failed" // field failed = 3
+	enc.AddInt32(keyName, m.Failed)
+
+	keyName = "unknown" // field unknown = 4
+	enc.AddInt32(keyName, m.Unknown)
+
+	keyName = "skipped" // field skipped = 5
+	enc.AddInt32(keyName, m.Skipped)
+
+	return nil
+}
+
+func (m *PercentileStat) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+	var keyName string
+	_ = keyName
+
+	if m == nil {
+		return nil
+	}
+
+	keyName = "percentile" // field percentile = 1
+	enc.AddFloat64(keyName, m.Percentile)
+
+	keyName = "value" // field value = 2
+	enc.AddFloat64(keyName, m.Value)
 
 	return nil
 }

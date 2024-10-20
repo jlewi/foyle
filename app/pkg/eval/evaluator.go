@@ -7,6 +7,14 @@ import (
 	"sort"
 	"time"
 
+	"connectrpc.com/otelconnect"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
+	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/go-logr/logr"
+
 	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/agent"
 	"github.com/jlewi/foyle/app/pkg/oai"
@@ -67,6 +75,7 @@ func (e *Evaluator) ReconcileNode(ctx context.Context, node *yaml.RNode) error {
 
 func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) error {
 	log := logs.FromContext(ctx).WithValues("experiment", experiment.Metadata.Name)
+	ctx = logr.NewContext(ctx, log)
 
 	if experiment.Spec.AgentAddress == "" {
 		return errors.New("AgentAddress is required")
@@ -80,11 +89,24 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 		return errors.New("EvalDir is required")
 	}
 
-	aiClient := newAIServiceClient(experiment.Spec.AgentAddress)
+	otelInterceptor, err := otelconnect.NewInterceptor()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to create OpenTelemetry interceptor")
+	}
+
+	// Handle retries for the AI service.
+	// This should help with requests ocassionally timing out.
+	retryer := &agent.RetryInterceptor{
+		MaxRetries: 3,
+		Backoff:    5 * time.Second,
+	}
+
+	aiClient := newAIServiceClient(experiment.Spec.AgentAddress, connect.WithInterceptors(otelInterceptor, retryer))
 
 	logsClient := logspbconnect.NewLogsServiceClient(
 		newHTTPClient(),
 		experiment.Spec.AgentAddress,
+		connect.WithInterceptors(otelInterceptor),
 	)
 
 	manager, err := openResultsManager(experiment.Spec.OutputDB)
@@ -136,14 +158,43 @@ func (e *Evaluator) Reconcile(ctx context.Context, experiment api.Experiment) er
 	sortEvalExamplesInTime(examples)
 
 	// Now generate predictions for any results that are missing them.
-	if err := e.processExamples(ctx, examples, lastProcessedTime, aiClient, logsClient, manager); err != nil {
+	if err := e.processExamples(ctx, experiment, examples, lastProcessedTime, aiClient, logsClient, manager); err != nil {
 		return err
 	}
+
+	log.Info("Successfully processed examples")
+
+	report, err := e.buildExperimentReport(ctx, experiment.Metadata.Name, manager, logsClient)
+
+	if err != nil {
+		return err
+	}
+
+	log.Info("Successfully reported results")
+
+	outputDir := filepath.Dir(experiment.Spec.OutputDB)
+
+	reportFile := filepath.Join(outputDir, "report.json")
+
+	opts := protojson.MarshalOptions{
+		Indent:            "  ",
+		EmitDefaultValues: true,
+	}
+	reportJson, err := opts.Marshal(report)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to marshal report")
+	}
+
+	if err := os.WriteFile(reportFile, reportJson, 0644); err != nil {
+		return errors.Wrapf(err, "Failed to write report to file %s", reportFile)
+	}
+
+	log.Info("Successfully wrote report", "file", reportFile)
 
 	return nil
 }
 
-func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, manager *ResultsManager) error {
+func (e *Evaluator) processExamples(ctx context.Context, experiment api.Experiment, examples []*v1alpha1.EvalExample, lastProcessedTime time.Time, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, manager *ResultsManager) error {
 	oLog := logs.FromContext(ctx)
 
 	oaiClient, err := oai.NewClient(e.config)
@@ -158,7 +209,7 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 	}
 
 	// Now iterate over the examples and process them.
-	for _, example := range examples {
+	for eIndex, example := range examples {
 		log := oLog.WithValues("exampleId", example.GetId())
 
 		// TODO(jeremy): Should we just read the row from the database and check if it exists and has been completed?
@@ -169,63 +220,80 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 			log.V(logs.Debug).Info("Skipping example; already processed")
 			continue
 		}
+		log.Info("Processing example", "index", eIndex, "numExamples", len(examples))
 
-		var processErr error
-
-		uErr := manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
-			processErr = e.processResult(ctx, result, example, client, logsClient, judge)
-			// We need to return for the transaction to be committed.
-			return nil
-		})
-
-		if processErr != nil {
-			log.Error(processErr, "Failed to process example")
-			// For now we abort on error to see what's going on.
-			return processErr
+		exampleCtx := logr.NewContext(ctx, log)
+		if err := e.processExample(exampleCtx, experiment.Metadata.Name, example, client, logsClient, manager, judge); err != nil {
+			return err
 		}
+	}
+	return nil
+}
 
-		if uErr != nil {
-			log.Error(uErr, "Failed to update result")
-			// For now we abort on error to see what's going on.
-			return uErr
-		}
+func (e *Evaluator) processExample(originalCtx context.Context, name string, example *v1alpha1.EvalExample, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, manager *ResultsManager, judge *Judge) error {
+	log := logs.FromContext(originalCtx).WithValues("exampleId", example.GetId())
+	// We need to start a new trace for this example
+	tp := tracer()
+	traceCtx, traceSpan := tp.Start(originalCtx, "(*Evaluator).processExample", trace.WithNewRoot(), trace.WithAttributes(attribute.String("experiment", name), attribute.String("exampleId", example.GetId())))
+	traceId := traceSpan.SpanContext().TraceID()
+	log = log.WithValues("traceId", traceId.String())
+	ctx := logr.NewContext(traceCtx, log)
+	defer traceSpan.End()
+	log.Info("Start example")
+	var processErr error
 
-		result, err := manager.Get(ctx, example.GetId())
-		if err != nil {
-			return errors.Wrapf(err, "Failed to get latest result for example %s", example.GetId())
-		}
+	uErr := manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
+		processErr = e.processResult(ctx, result, example, client, logsClient, judge)
+		// We need to return for the transaction to be committed.
+		return nil
+	})
 
-		if result.Error != "" {
-			// Generating a completion failed for this example so we should keep going.
-			// There won't be a blocklog to wait for.
-			continue
-		}
+	if processErr != nil {
+		log.Error(processErr, "Failed to process example")
+		// For now we abort on error to see what's going on.
+		return processErr
+	}
 
-		if err := e.waitForBlockLog(ctx, result, logsClient); err != nil {
-			log.Error(err, "Failed to wait for block log")
-			// For now we abort on error to see what's going on.
-			return errors.Wrapf(err, "Failed to get block log for example %s", example.GetId())
-		}
+	if uErr != nil {
+		log.Error(uErr, "Failed to update result")
+		// For now we abort on error to see what's going on.
+		return uErr
+	}
 
-		var ragErr error
-		// Getting the bestRAG result depends on the trace having been processed so we run after waiting for the BlockLog
-		uErr = manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
-			ragErr = e.reconcileBestRAGResult(ctx, result, logsClient)
-			return nil
-		})
+	result, err := manager.Get(ctx, example.GetId())
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get latest result for example %s", example.GetId())
+	}
 
-		if ragErr != nil {
-			log.Error(ragErr, "Failed to reconcile best RAG result")
-			// For now we abort on error to see what's going on.
-			return ragErr
-		}
+	if result.Error != "" {
+		// Generating a completion failed for this example so we should keep going.
+		// There won't be a blocklog to wait for.
+		return nil
+	}
 
-		if uErr != nil {
-			log.Error(uErr, "Failed to update result")
-			// For now we abort on error to see what's going on.
-			return uErr
-		}
+	if err := e.waitForBlockLog(ctx, result, logsClient); err != nil {
+		log.Error(err, "Failed to wait for block log")
+		// For now we abort on error to see what's going on.
+		return errors.Wrapf(err, "Failed to get block log for example %s", example.GetId())
+	}
 
+	var ragErr error
+	// Getting the bestRAG result depends on the trace having been processed so we run after waiting for the BlockLog
+	uErr = manager.Update(ctx, example.GetId(), func(result *v1alpha1.EvalResult) error {
+		ragErr = e.reconcileBestRAGResult(ctx, result, logsClient)
+		return nil
+	})
+
+	if ragErr != nil {
+		log.Error(ragErr, "Failed to reconcile best RAG result")
+		// For now we abort on error to see what's going on.
+		return ragErr
+	}
+
+	if uErr != nil {
+		log.Error(uErr, "Failed to update result")
+		// For now we abort on error to see what's going on.
+		return uErr
 	}
 	return nil
 }
@@ -233,6 +301,10 @@ func (e *Evaluator) processExamples(ctx context.Context, examples []*v1alpha1.Ev
 // processResult process the result. It is updated in place
 func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResult, example *v1alpha1.EvalExample, client v1alpha1connect.AIServiceClient, logsClient logspbconnect.LogsServiceClient, judge *Judge) error {
 	result.Example = example
+	log := logs.FromContext(ctx).WithValues("exampleId", example.GetId())
+	ctx = logr.NewContext(ctx, log)
+	ctx, span := tracer().Start(ctx, "(*Evaluator).processResult")
+	defer span.End()
 
 	if err := runGenerate(ctx, result, client); err != nil {
 		return err
@@ -265,6 +337,9 @@ func (e *Evaluator) processResult(ctx context.Context, result *v1alpha1.EvalResu
 // example then the result will be nil but result.Error will be set
 func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha1connect.AIServiceClient) error {
 	log := logs.FromContext(ctx)
+	ctx, span := tracer().Start(ctx, "runGenerate")
+	defer span.End()
+
 	// ID for the generate session
 	genSessionID := ulid.GenerateID()
 
@@ -285,11 +360,17 @@ func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alph
 	}
 
 	request := &v1alpha1.GenerateCellsRequest{
-		Notebook: result.Example.GetFullContext().GetNotebook(),
+		Notebook:      result.Example.GetFullContext().GetNotebook(),
+		SelectedIndex: result.Example.GetFullContext().GetSelected(),
 	}
 
+	start := time.Now() // Record the start time
 	resp, err := client.GenerateCells(ctx, connect.NewRequest(request))
+	generateDuration := time.Since(start)
+	result.GenerateTimeMs = generateDuration.Milliseconds()
+
 	if err != nil {
+		log.Error(err, "Failed to generate cells")
 		if connectErr := new(connect.Error); errors.As(err, &connectErr) {
 			// TODO(https://github.com/jlewi/foyle/issues/257)
 			// Currently GenerateCells returns a connect.Error if the completer can't generate a completion
@@ -299,9 +380,12 @@ func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alph
 				// We return nil because the problem is specific to this example so the evaluator should move on
 				// to other examples
 				return nil
+			} else {
+				result.Error = err.Error()
+				// Assume its a problem that could affect other examples so abort it.
+				return err
 			}
 		} else {
-			log.Error(err, "Failed to generate cells")
 			result.Error = err.Error()
 			return err
 		}
@@ -335,6 +419,8 @@ func runGenerate(ctx context.Context, result *v1alpha1.EvalResult, client v1alph
 }
 
 func runExecute(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha1connect.AIServiceClient) error {
+	ctx, span := tracer().Start(ctx, "runExecute")
+	defer span.End()
 	log := logs.FromContext(ctx)
 	// We need to send a LOG event to the agent to simulate the cells being executed.
 	executeEventReq := &v1alpha1.LogEventsRequest{}
@@ -396,6 +482,8 @@ func runExecute(ctx context.Context, result *v1alpha1.EvalResult, client v1alpha
 }
 
 func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalResult, client logspbconnect.LogsServiceClient) error {
+	ctx, span := tracer().Start(ctx, "(*Evaluator).waitForBlockLog")
+	defer span.End()
 	// We need to wait for the block log to be processed.
 	// This is done to
 	// 1. Increase the likelihood we have learned from the block
@@ -425,24 +513,24 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 		return errors.New("Cell ID is empty")
 	}
 
+	log = log.WithValues("blockId", cellID)
 	timeOut := time.Now().Add(3 * time.Minute)
 
 	var blockLog *logspb.BlockLog
 	for time.Now().Before(timeOut) {
-
 		resp, err := client.GetBlockLog(ctx, connect.NewRequest(&logspb.GetBlockLogRequest{
 			Id: cellID,
 		}))
 
 		if err != nil {
-			log.Info("Failed to get block log", "err", err)
+			log.V(logs.Debug).Info("Failed to get block log", "err", err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
 		blockLog = resp.Msg.GetBlockLog()
 		if blockLog.ExecutedBlock == nil || blockLog.GeneratedBlock == nil {
-			log.Info("Block log isn't ready yet")
+			log.V(logs.Debug).Info("Block log isn't ready yet")
 			time.Sleep(5 * time.Second)
 			continue
 		}
@@ -451,13 +539,19 @@ func (e *Evaluator) waitForBlockLog(ctx context.Context, result *v1alpha1.EvalRe
 			return errors.Errorf("BlockLog generated block doesn't match actual cell. This means the result of GenerateCells returned to the evaluator doesn't match the result that the Agent read from the BlockLogs and stored in its BlockLog; want: %s; got %s", result.ActualCells[0].Value, blockLog.GeneratedBlock.GetContents())
 		}
 
+		result.BlockLogStatus = v1alpha1.BlockLogStatus_BLOCK_LOG_STATUS_SUCCESS
 		return nil
 	}
 
-	return errors.New("Timed out waiting for block log. This could indicate we aren't properly sending the events needed to generate a BlockLog suitable for learning.")
+	log.Info("Timeout waiting for block log")
+	result.BlockLogStatus = v1alpha1.BlockLogStatus_BLOCK_LOG_STATUS_TIMEOUT
+	return nil
 }
 
 func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, evalResult *v1alpha1.EvalResult, client logspbconnect.LogsServiceClient) error {
+	ctx, span := tracer().Start(ctx, "(*Evaluator).reconcileBestRAGResult")
+	defer span.End()
+
 	if evalResult.GenTraceId == "" {
 		return errors.WithStack(errors.New("GenTraceId is empty"))
 	}
@@ -520,6 +614,142 @@ func (e *Evaluator) reconcileBestRAGResult(ctx context.Context, evalResult *v1al
 	}
 
 	return nil
+}
+
+// buildExperimentReport generates a report of the experiment results. These are aggregate statistics for the
+// experiment
+func (e *Evaluator) buildExperimentReport(ctx context.Context, name string, manager *ResultsManager, logsClient logspbconnect.LogsServiceClient) (*v1alpha1.ExperimentReport, error) {
+	log := logs.FromContext(ctx)
+	r := &v1alpha1.ExperimentReport{
+		Name: name,
+	}
+
+	numExamples, err := manager.queries.CountResults(ctx)
+	if err != nil {
+		return r, errors.Wrapf(err, "Failed to count number of examples")
+	}
+
+	r.NumExamples = numExamples
+
+	errCount, err := manager.queries.CountErrors(ctx)
+	if err != nil {
+		return r, errors.Wrapf(err, "Failed to count errors")
+	}
+
+	r.NumErrors = errCount
+
+	// Get the counts based on cellsMatchResult
+	counts, err := manager.queries.CountByCellsMatchResult(ctx)
+	if err != nil {
+		return r, errors.Wrapf(err, "Failed to count cellsMatchResult")
+	}
+
+	r.CellsMatchCounts = make(map[string]int32)
+
+	for _, c := range counts {
+		if c.MatchResult == nil {
+			// N.B. I think for unknown it ends up being a nil value. I suspect this is because default values are
+			// elided when marshalling to JSON. We should fix that by changing the JSON serialization.
+			key := v1alpha1.CellsMatchResult_UNKNOWN_CellsMatchResult.String()
+			if _, ok := r.CellsMatchCounts[key]; !ok {
+				r.CellsMatchCounts[key] = 0
+			}
+			r.CellsMatchCounts[key] = r.CellsMatchCounts[key] + int32(c.Count)
+			continue
+		}
+		s, ok := c.MatchResult.(string)
+		if !ok {
+			return r, errors.New("Failed to convert cellsMatchResult to string")
+		}
+		r.CellsMatchCounts[s] = int32(c.Count)
+	}
+
+	// Compute the 90th, 95th, 99th Percentile of generate time
+	// And assertionstats
+	assertionStats := make(map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts)
+	generateTimes := make([]int, 0, numExamples)
+	var cursor *time.Time
+	for {
+		var listErr error
+		var results []*v1alpha1.EvalResult
+		results, cursor, listErr = manager.ListResults(ctx, cursor, 100)
+		if listErr != nil {
+			return r, errors.Wrapf(listErr, "Failed to list results")
+		}
+
+		if len(results) == 0 {
+			break
+		}
+		for _, result := range results {
+			generateTimes = append(generateTimes, int(result.GenerateTimeMs))
+
+			// Get the Level1 assertions for this trace
+			if result.GetGenTraceId() != "" {
+				assertions, err := getAssertions(ctx, result.GetGenTraceId(), logsClient)
+				if err != nil {
+					log.Error(err, "Failed to get assertions", "targetTraceId", result.GetGenTraceId(), "exampleId", result.GetExample().GetId())
+					continue
+				}
+
+				accumulateAssertionCounts(assertionStats, assertions)
+			}
+		}
+	}
+
+	percentiles, err := computePercentilesOfInts(generateTimes, []float64{.5, .75, .9, .95})
+	if err != nil {
+		return r, errors.Wrapf(err, "Failed to compute percentiles")
+	}
+
+	r.GenerateLatencyStats = percentiles
+
+	// Add the assertions in sorted order based on key
+	statKeys := make([]string, 0, len(assertionStats))
+	for k := range assertionStats {
+		statKeys = append(statKeys, k.String())
+	}
+
+	r.AssertionCounts = make([]*v1alpha1.AssertionCounts, 0, len(assertionStats))
+	for _, key := range statKeys {
+		stat := assertionStats[v1alpha1.Assertion_Name(v1alpha1.Assertion_Name_value[key])]
+		r.AssertionCounts = append(r.AssertionCounts, stat)
+	}
+	return r, nil
+}
+
+// accumulateAssertionCounts accumulates assertions into the stats map
+func accumulateAssertionCounts(stats map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts, assertions []*v1alpha1.Assertion) {
+	for _, assertion := range assertions {
+		if _, ok := stats[assertion.GetName()]; !ok {
+			stats[assertion.GetName()] = &v1alpha1.AssertionCounts{
+				Name: assertion.GetName(),
+			}
+		}
+
+		switch assertion.GetResult() {
+		case v1alpha1.AssertResult_PASSED:
+			stats[assertion.GetName()].Passed++
+		case v1alpha1.AssertResult_FAILED:
+			stats[assertion.GetName()].Failed++
+		case v1alpha1.AssertResult_UNKNOWN_AssertResult:
+			stats[assertion.GetName()].Unknown++
+		case v1alpha1.AssertResult_SKIPPED:
+			stats[assertion.GetName()].Skipped++
+		}
+	}
+}
+
+func getAssertions(ctx context.Context, traceId string, client logspbconnect.LogsServiceClient) ([]*v1alpha1.Assertion, error) {
+	resp, err := client.GetTrace(ctx, connect.NewRequest(&logspb.GetTraceRequest{
+		Id: traceId,
+	}))
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to get trace %s", traceId)
+	}
+
+	trace := resp.Msg.GetTrace()
+	return trace.Assertions, nil
 }
 
 // isSortedByTimeDescending checks if the slice is sorted by Time in descending order
@@ -588,11 +818,12 @@ func sortEvalExamplesInTime(examples []*v1alpha1.EvalExample) {
 	})
 }
 
-func newAIServiceClient(baseURL string) v1alpha1connect.AIServiceClient {
+func newAIServiceClient(baseURL string, opts ...connect.ClientOption) v1alpha1connect.AIServiceClient {
 	// Create a new client
 	client := v1alpha1connect.NewAIServiceClient(
 		newHTTPClient(),
 		baseURL,
+		opts...,
 	)
 	return client
 }

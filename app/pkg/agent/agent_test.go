@@ -12,6 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/sashabaranov/go-openai"
 
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
@@ -336,6 +340,156 @@ func Test_ShouldTrigger(t *testing.T) {
 			actual := shouldTrigger(c.doc, c.selectedIndex)
 			if actual != c.expected {
 				t.Fatalf("Expected %v but got %v", c.expected, actual)
+			}
+		})
+	}
+}
+
+func Test_PostProcessBlocks(t *testing.T) {
+	type testCase struct {
+		name     string
+		blocks   []*v1alpha1.Block
+		expected []*v1alpha1.Block
+	}
+
+	cases := []testCase{
+		{
+			name: "output-tag-in-codeblocks",
+			blocks: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Contents: "</output>",
+				},
+			},
+			expected: []*v1alpha1.Block{},
+		},
+		{
+			name: "whitespace-only-block",
+			blocks: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Contents: "   ",
+				},
+			},
+			expected: []*v1alpha1.Block{},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual, err := postProcessBlocks(c.blocks)
+			if err != nil {
+				t.Fatalf("Error post processing blocks; %v", err)
+			}
+			if d := cmp.Diff(c.expected, actual); d != "" {
+				t.Errorf("Unexpected diff:\n%s", d)
+			}
+		})
+	}
+}
+
+func Test_dropResponse(t *testing.T) {
+	type testCase struct {
+		name     string
+		response *v1alpha1.StreamGenerateResponse
+		expected bool
+	}
+
+	cases := []testCase{
+		{
+			name: "basic",
+			response: &v1alpha1.StreamGenerateResponse{
+				Cells: []*parserv1.Cell{
+					{
+						Kind:  parserv1.CellKind_CELL_KIND_CODE,
+						Value: "print('Hello, World!')",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "empty",
+			response: &v1alpha1.StreamGenerateResponse{
+				Cells: []*parserv1.Cell{},
+			},
+			expected: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := dropResponse(c.response)
+			if result != c.expected {
+				t.Errorf("Expected %v; got %v", c.expected, result)
+			}
+		})
+	}
+}
+
+func Test_peprocessDoc(t *testing.T) {
+	type testCase struct {
+		name     string
+		input    *v1alpha1.GenerateRequest
+		expected []*v1alpha1.Block
+	}
+
+	doc := &v1alpha1.Doc{
+		Blocks: []*v1alpha1.Block{
+			{
+				Kind:     v1alpha1.BlockKind_MARKUP,
+				Contents: "cell 0",
+			},
+			{
+				Kind:     v1alpha1.BlockKind_CODE,
+				Contents: "cell 1",
+			},
+			{
+				Kind:     v1alpha1.BlockKind_MARKUP,
+				Contents: "cell 2",
+			},
+		},
+	}
+	cases := []testCase{
+		{
+			name: "basic",
+			input: &v1alpha1.GenerateRequest{
+				Doc:           doc,
+				SelectedIndex: 0,
+			},
+			expected: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "cell 0",
+				},
+			},
+		},
+		{
+			name: "middle",
+			input: &v1alpha1.GenerateRequest{
+				Doc:           doc,
+				SelectedIndex: 1,
+			},
+			expected: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "cell 0",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Contents: "cell 1",
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := preprocessDoc(c.input)
+
+			opts := cmpopts.IgnoreUnexported(v1alpha1.Block{})
+			if d := cmp.Diff(c.expected, actual, opts); d != "" {
+				t.Errorf("Unexpected diff:\n%s", d)
 			}
 		})
 	}

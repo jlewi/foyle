@@ -44,6 +44,9 @@ type Judge struct {
 }
 
 func (j *Judge) Score(ctx context.Context, result *v1alpha1.EvalResult) error {
+	ctx, span := tracer().Start(ctx, "(*Judge).Score")
+	defer span.End()
+
 	if len(result.GetExample().ExpectedCells) != 1 {
 		return errors.New("expected a single expected cell")
 	}
@@ -95,6 +98,7 @@ func (j *Judge) Score(ctx context.Context, result *v1alpha1.EvalResult) error {
 	// TODO(jeremy): Use ResponseFormat to enforce JSON output
 	// https://platform.openai.com/docs/guides/structured-outputs/how-to-use?context=without_parse
 	request := openai.ChatCompletionRequest{
+		// TODO(jeremy): Should we use gpt4 mini
 		Model:       openai.GPT4o20240806,
 		Messages:    messages,
 		MaxTokens:   2000,

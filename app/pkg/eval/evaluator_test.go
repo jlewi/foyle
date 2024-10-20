@@ -6,6 +6,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"github.com/jlewi/foyle/protos/go/foyle/logs/logspbconnect"
+	"google.golang.org/protobuf/encoding/protojson"
+	"gopkg.in/yaml.v3"
+
 	"connectrpc.com/connect"
 	"github.com/go-logr/zapr"
 	"github.com/jlewi/foyle/app/pkg/agent"
@@ -221,4 +228,95 @@ func experimentForTesting() (*api.Experiment, error) {
 			OutputDB:     dbFile,
 		},
 	}, nil
+}
+
+func Test_buildExperimentReport(t *testing.T) {
+	// N.B. This is an integration test because it depends on an actual set of experiment results.
+	// It also potentially needs a running agent that we can use to access the traces of
+	if os.Getenv("GITHUB_ACTIONS") != "" {
+		t.Skipf("Test is skipped in GitHub actions")
+	}
+
+	experimentFile := "/Users/jlewi/foyle_experiments/20241014-timing/experiment.yaml"
+	experimentBytes, err := os.ReadFile(experimentFile)
+	if err != nil {
+		t.Fatalf("Error reading experiment file; %v", err)
+	}
+
+	experiment := &api.Experiment{}
+	if err := yaml.Unmarshal(experimentBytes, experiment); err != nil {
+		t.Fatalf("Error unmarshalling experiment; %v", err)
+	}
+
+	resultsManager, err := openResultsManager(experiment.Spec.OutputDB)
+
+	if err != nil {
+		t.Fatalf("Error opening results manager; %v", err)
+	}
+
+	logsClient := logspbconnect.NewLogsServiceClient(
+		newHTTPClient(),
+		experiment.Spec.AgentAddress,
+	)
+
+	e := &Evaluator{}
+	report, err := e.buildExperimentReport(context.Background(), "testexperiment", resultsManager, logsClient)
+	if err != nil {
+		t.Fatalf("Error building report; %v", err)
+	}
+
+	opts := protojson.MarshalOptions{
+		Indent:            "  ",
+		EmitDefaultValues: true,
+	}
+	reportJson, err := opts.Marshal(report)
+	if err != nil {
+		t.Fatalf("Error marshalling report; %v", err)
+	}
+	t.Logf("Report: %v", string(reportJson))
+}
+
+func Test_AccumulateAssertionCounts(t *testing.T) {
+	type testCase struct {
+		name       string
+		stats      map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts
+		assertions []*v1alpha1.Assertion
+		expected   map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts
+	}
+
+	cases := []testCase{
+		{
+			name:  "basic",
+			stats: map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts{},
+			assertions: []*v1alpha1.Assertion{
+				{
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Result: v1alpha1.AssertResult_PASSED,
+				},
+				{
+					Name:   v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
+					Result: v1alpha1.AssertResult_FAILED,
+				},
+			},
+			expected: map[v1alpha1.Assertion_Name]*v1alpha1.AssertionCounts{
+				v1alpha1.Assertion_ONE_CODE_CELL: {
+					Name:   v1alpha1.Assertion_ONE_CODE_CELL,
+					Passed: 1,
+				},
+				v1alpha1.Assertion_CODE_AFTER_MARKDOWN: {
+					Name:   v1alpha1.Assertion_CODE_AFTER_MARKDOWN,
+					Failed: 1,
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			accumulateAssertionCounts(c.stats, c.assertions)
+			if d := cmp.Diff(c.expected, c.stats, cmpopts.IgnoreUnexported(v1alpha1.AssertionCounts{})); d != "" {
+				t.Fatalf("Unexpected diff:\n%+v", d)
+			}
+		})
+	}
 }

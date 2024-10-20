@@ -59,6 +59,7 @@ type LogsServiceClient interface {
 	// GetLLMLogs returns the logs associated with an LLM call.
 	// These will include the rendered prompt and response. Unlike GetTraceRequest this has the
 	// actual prompt and response of the LLM.
+	// TODO(jeremy): Can we deprecate this once we start adding the LLM request/response to the trace as an LLMSpan?
 	GetLLMLogs(context.Context, *connect.Request[logs.GetLLMLogsRequest]) (*connect.Response[logs.GetLLMLogsResponse], error)
 	Status(context.Context, *connect.Request[logs.GetLogsStatusRequest]) (*connect.Response[logs.GetLogsStatusResponse], error)
 }
@@ -135,6 +136,7 @@ type LogsServiceHandler interface {
 	// GetLLMLogs returns the logs associated with an LLM call.
 	// These will include the rendered prompt and response. Unlike GetTraceRequest this has the
 	// actual prompt and response of the LLM.
+	// TODO(jeremy): Can we deprecate this once we start adding the LLM request/response to the trace as an LLMSpan?
 	GetLLMLogs(context.Context, *connect.Request[logs.GetLLMLogsRequest]) (*connect.Response[logs.GetLLMLogsResponse], error)
 	Status(context.Context, *connect.Request[logs.GetLogsStatusRequest]) (*connect.Response[logs.GetLogsStatusResponse], error)
 }

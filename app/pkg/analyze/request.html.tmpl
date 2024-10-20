@@ -24,6 +24,10 @@
         .role {
             font-weight: bold;
         }
+        h2.example-header {
+                    color: #2c3e50;
+                    font-size: 1.5em;
+        }
     </style>
 </head>
 <body>
@@ -48,7 +52,7 @@
 
     {{range .Messages}}
     <div class="message">
-        <h3 class="role">Role{{.Role}}</h3>
+        <h3 class="role">Role: {{.Role}}</h3>
         <div>{{.Content }}</div>
     </div>
     {{end}}

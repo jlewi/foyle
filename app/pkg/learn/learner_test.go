@@ -32,7 +32,7 @@ func Test_Learner(t *testing.T) {
 
 	blocksDB, err := pebble.Open(cfg.GetBlocksDBDir(), &pebble.Options{})
 	if err != nil {
-		t.Fatalf("could not open blocks database %s", cfg.GetBlocksDBDir())
+		t.Fatalf("could not open blocks database %+v", cfg.GetBlocksDBDir())
 	}
 	defer blocksDB.Close()
 

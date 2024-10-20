@@ -193,6 +193,9 @@ type Logging struct {
 	// Use stderr to write to stderr.
 	// Use gcplogs:///projects/${PROJECT}/logs/${LOGNAME} to write to Google Cloud Logging
 	Sinks []LogSink `json:"sinks,omitempty" yaml:"sinks,omitempty"`
+
+	// MaxDelaySeconds is the maximum delay in seconds to wait before processing the logs.
+	MaxDelaySeconds int `json:"maxDelaySeconds,omitempty" yaml:"maxDelaySeconds,omitempty"`
 }
 
 type LogSink struct {
@@ -363,6 +366,7 @@ func (c *Config) DeepCopy() Config {
 func InitViper(cmd *cobra.Command) error {
 	// N.B. we need to set globalV because the subsequent call GetConfig will use that viper instance.
 	// Would it make sense to combine InitViper and Get into one command that returns a config object?
+	// TODO(jeremy): Could we just use viper.GetViper() to get the global instance?
 	globalV = viper.New()
 	return InitViperInstance(globalV, cmd)
 }
@@ -388,6 +392,7 @@ func InitViperInstance(v *viper.Viper, cmd *cobra.Command) error {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv() // read in environment variables that match
 
+	setLoggingDefaults(v)
 	setAgentDefaults(v)
 	setServerDefaults(v)
 
@@ -407,6 +412,7 @@ func InitViperInstance(v *viper.Viper, cmd *cobra.Command) error {
 
 	// Ensure the path for the config file path is set
 	// Required since we use viper to persist the location of the config file so can save to it.
+	// This allows us to overwrite the config file location with the --config flag.
 	cfgFile := v.GetString(ConfigFlagName)
 	if cfgFile != "" {
 		v.SetConfigFile(cfgFile)
@@ -436,6 +442,10 @@ func (c *Config) APIPrefix() string {
 // APIBaseURL returns the base URL for the API
 func (c *Config) APIBaseURL() string {
 	return fmt.Sprintf("http://%s:%d/%s", c.Server.BindAddress, c.Server.HttpPort, c.APIPrefix())
+}
+
+func (c *Config) GetLogsMaxDelaySeconds() int {
+	return c.Logging.MaxDelaySeconds
 }
 
 // GetConfig returns a configuration created from the viper configuration.
@@ -504,6 +514,9 @@ func (c *Config) Write(cfgFile string) error {
 	return yaml.NewEncoder(f).Encode(c)
 }
 
+func setLoggingDefaults(v *viper.Viper) {
+	v.SetDefault("logging.maxDelaySeconds", 30)
+}
 func setServerDefaults(v *viper.Viper) {
 	v.SetDefault("server.bindAddress", "0.0.0.0")
 	v.SetDefault("server.httpPort", defaultHTTPPort)

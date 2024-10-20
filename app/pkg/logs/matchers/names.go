@@ -6,15 +6,26 @@ package matchers
 import "strings"
 
 const (
-	OAIComplete    = "github.com/jlewi/foyle/app/pkg/oai.(*Completer).Complete"
-	LogEvents      = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).LogEvents"
-	StreamGenerate = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).StreamGenerate"
+	OAIComplete       = "github.com/jlewi/foyle/app/pkg/oai.(*Completer).Complete"
+	AnthropicComplete = "github.com/jlewi/foyle/app/pkg/anthropic.(*Completer).Complete"
+	LogEvents         = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).LogEvents"
+	StreamGenerate    = "github.com/jlewi/foyle/app/pkg/agent.(*Agent).StreamGenerate"
+
+	RequestField = "request"
+	// ResponseField is the field storing the response of the LLM.
+	// TODO(jeremy): The use of the abbreviation resp is inconsistent with the name of the field request but its what
+	// we used.
+	ResponseField = "resp"
 )
 
 type Matcher func(name string) bool
 
 func IsOAIComplete(name string) bool {
 	return strings.HasPrefix(name, OAIComplete)
+}
+
+func IsAnthropicComplete(name string) bool {
+	return strings.HasPrefix(name, AnthropicComplete)
 }
 
 func IsLogEvent(fname string) bool {

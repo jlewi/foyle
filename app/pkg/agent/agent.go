@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jlewi/foyle/app/pkg/runme/ulid"
+
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -92,7 +94,7 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 	var examples []*v1alpha1.Example
 	if a.config.UseRAG() {
 		var err error
-		examples, err = a.db.GetExamples(ctx, req.Doc, a.config.RagMaxResults())
+		examples, err = a.db.GetExamples(ctx, req, a.config.RagMaxResults())
 		if err != nil {
 			// Fail gracefully; keep going without examples
 			log.Error(err, "Failed to get examples")
@@ -113,6 +115,8 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 		log.Error(err, "Agent.Generate failed to post process blocks")
 		return nil, err
 	}
+
+	log.Info(logs.Level1Assertion, "assertion", logs.BuildAssertion(v1alpha1.Assertion_AT_LEAST_ONE_BLOCK_POST_PROCESSED, len(postProcessed) > 0))
 
 	// Attach block ids to any blocks generated.
 	// N.B. This is kind of a last resort to make sure all blocks have an ID set. In general, we want to set blockIds
@@ -137,7 +141,8 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateRequest, examples []*v1alpha1.Example) ([]*v1alpha1.Block, error) {
 	log := logs.FromContext(ctx)
 
-	t := docs.NewTailer(req.Doc.GetBlocks(), MaxDocChars)
+	cells := preprocessDoc(req)
+	t := docs.NewTailer(ctx, cells, MaxDocChars)
 
 	exampleArgs := make([]Example, 0, len(examples))
 	for _, example := range examples {
@@ -147,9 +152,14 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 		})
 	}
 	for try := 0; try < maxTries; try++ {
+		docText := t.Text()
 		args := promptArgs{
-			Document: t.Text(),
+			Document: docText,
 			Examples: exampleArgs,
+		}
+
+		if len(strings.TrimSpace(docText)) == 0 {
+			return nil, errors.New("Unable to generate a completion because the document is empty")
 		}
 
 		var sb strings.Builder
@@ -171,6 +181,31 @@ func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateR
 			return nil, errors.Wrapf(err, "CreateChatCompletion failed")
 		}
 
+		// Level1 assertion that docText is a non-empty string
+		// TODO(jeremy): This should be redundant now that we are checking for an empty document before calling the
+		// completer and throw an error if we have an empty document. So we could probably remove this assertion.
+		assertion := &v1alpha1.Assertion{
+			Name:   v1alpha1.Assertion_NON_EMPTY_DOC,
+			Result: v1alpha1.AssertResult_PASSED,
+			Id:     ulid.GenerateID(),
+		}
+
+		if len(strings.TrimSpace(docText)) == 0 {
+			assertion.Result = v1alpha1.AssertResult_FAILED
+		}
+
+		log.Info(logs.Level1Assertion, "assertion", assertion)
+
+		assertBlocks := &v1alpha1.Assertion{
+			Name:   v1alpha1.Assertion_AT_LEAST_ONE_BLOCK,
+			Result: v1alpha1.AssertResult_PASSED,
+			Id:     ulid.GenerateID(),
+		}
+
+		if len(blocks) == 0 {
+			assertBlocks.Result = v1alpha1.AssertResult_FAILED
+		}
+		log.Info(logs.Level1Assertion, "assertion", assertBlocks)
 		return blocks, nil
 	}
 	err := errors.Errorf("Failed to generate a chat completion after %d tries", maxTries)
@@ -224,7 +259,8 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					// This should be safe because each time we update pendingDoc we update it to point to
 					// a new doc object. So the other thread won't be modifying the doc pendingDoc points to
 					r := &v1alpha1.GenerateRequest{
-						Doc: pendingDoc,
+						Doc:           pendingDoc,
+						SelectedIndex: selectedCell,
 					}
 					pendingDoc = nil
 					return r
@@ -234,7 +270,7 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					continue
 				}
 
-				response, err := a.createCompletion(ctx, generateRequest, notebookUri, selectedCell, state.getContextID())
+				response, err := a.createCompletion(ctx, generateRequest, notebookUri, state.getContextID())
 
 				if err != nil {
 					log.Error(err, "createCompletion failed")
@@ -242,6 +278,11 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					// The next request?
 					statusChan <- status.Newf(codes.Internal, err.Error())
 					return
+				}
+
+				if dropResponse(response) {
+					log.V(logs.Debug).Info("Dropping response", zap.Object("response", response))
+					continue
 				}
 
 				log.V(logs.Debug).Info("Sending response", zap.Object("response", response))
@@ -415,6 +456,12 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 	// Terminate because the request got cancelled
 	case <-ctx.Done():
 		log.Info("Context cancelled; stopping streaming request", "err", ctx.Err())
+		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			// N.B. If the context was cancelled then we should return a DeadlineExceeded error to indicate we hit
+			// a timeout on the server.
+			// My assumption is if the client terminates the connection there is a different error.
+			return connect.NewError(connect.CodeDeadlineExceeded, errors.Wrapf(ctx.Err(), "The request context was cancelled. This usually happens because the read or write timeout of the HTTP server was reched."))
+		}
 		// Cancel functions will be called when this function returns
 		return ctx.Err()
 	case s := <-statusChan:
@@ -443,13 +490,22 @@ func (a *Agent) GenerateCells(ctx context.Context, req *connect.Request[v1alpha1
 		return nil, err
 	}
 	agentReq := &v1alpha1.GenerateRequest{
-		Doc: doc,
+		Doc:           doc,
+		SelectedIndex: req.Msg.GetSelectedIndex(),
 	}
 
 	// Call the agent
 	agentResp, err := a.Generate(ctx, agentReq)
 	if err != nil {
 		log.Error(err, "Agent.Generate failed")
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			// N.B. If the context was cancelled then we should return a DeadlineExceeded error to indicate we hit
+			// a timeout on the server.
+			// My assumption is if the client terminates the connection there is a different error.
+			err := errors.Wrapf(err, "Agent.Generate failed; traceId %s. \"The request context was cancelled. This usually happens because the read or write timeout of the HTTP server was reached.", span.SpanContext().TraceID().String())
+			return nil, connect.NewError(connect.CodeDeadlineExceeded, err)
+		}
+		err := errors.Wrapf(err, "Agent.Generate failed; traceId %s", span.SpanContext().TraceID().String())
 		return nil, err
 	}
 
@@ -470,11 +526,12 @@ func (a *Agent) GenerateCells(ctx context.Context, req *connect.Request[v1alpha1
 }
 
 // createCompletion is a helper function to create a single completion as part of a stream.
-func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.GenerateRequest, notebookUri string, selectedCell int32, contextID string) (*v1alpha1.StreamGenerateResponse, error) {
+func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.GenerateRequest, notebookUri string, contextID string) (*v1alpha1.StreamGenerateResponse, error) {
 	span := trace.SpanFromContext(ctx)
 	log := logs.FromContext(ctx)
 	traceId := span.SpanContext().TraceID()
 	tp := tracer()
+
 	// We need to generate a new ctx with a new trace ID because we want one trace per completion
 	// We need to use withNewRoot because we want to make it a new trace and not rooted at the current one
 	generateCtx, generateSpan := tp.Start(ctx, "CreateCompletion", trace.WithNewRoot(), trace.WithAttributes(attribute.String("streamTraceID", traceId.String()), attribute.String("contextID", contextID)))
@@ -496,7 +553,7 @@ func (a *Agent) createCompletion(ctx context.Context, generateRequest *v1alpha1.
 	response := &v1alpha1.StreamGenerateResponse{
 		Cells:       cells,
 		NotebookUri: notebookUri,
-		InsertAt:    selectedCell + 1,
+		InsertAt:    generateRequest.GetSelectedIndex() + 1,
 		ContextId:   contextID,
 	}
 
@@ -556,12 +613,28 @@ func postProcessBlocks(blocks []*v1alpha1.Block) ([]*v1alpha1.Block, error) {
 	// Post process the blocks
 	results := make([]*v1alpha1.Block, 0, len(blocks))
 	for _, block := range blocks {
-		if block.GetKind() == v1alpha1.BlockKind_CODE {
-			results = append(results, block)
-			return results, nil
+		if block.GetKind() != v1alpha1.BlockKind_CODE {
+			continue
 		}
+		// The model sometimes returns just the "</output>" tag but inside a coude block.
+		// We want to ignore such blocks.
+		if isOutputTag(block.Contents) {
+			continue
+		}
+
+		// If the block is empty filter it out.
+		if strings.TrimSpace(block.Contents) == "" {
+			continue
+		}
+		results = append(results, block)
+		return results, nil
 	}
 	return results, nil
+}
+
+func isOutputTag(contents string) bool {
+	trimmed := strings.TrimSpace(contents)
+	return trimmed == "</output>"
 }
 
 // streamState is a structure to keep track of the state for a stream and deal with concurrency
@@ -595,4 +668,25 @@ func shouldTrigger(doc *v1alpha1.Doc, selectedIndex int32) bool {
 	// For now only trigger completion if the selected cell is a markup cell.
 	selectedCell := doc.Blocks[selectedIndex]
 	return selectedCell.GetKind() == v1alpha1.BlockKind_MARKUP
+}
+
+// dropResponse returns true if the response should be dropped rather than being sent to the client.
+// The reason for doing this is because if a previous generation generated a "good" response we don't want
+// to overwrite it with this one
+func dropResponse(response *v1alpha1.StreamGenerateResponse) bool {
+	if response == nil {
+		return true
+	}
+	// We don't want to send empty cells because that will cause the client to remove any previously suggested cells
+	if len(response.Cells) == 0 {
+		return true
+	}
+	return false
+}
+
+// preprocessDoc does some preprocessing of the doc.
+func preprocessDoc(req *v1alpha1.GenerateRequest) []*v1alpha1.Block {
+	// We want to remove all cells after the selected cell because our prompt doesn't know how to take them into account.
+	cells := req.Doc.Blocks[:req.SelectedIndex+1]
+	return cells
 }

@@ -10,6 +10,61 @@ import (
 	"time"
 )
 
+const countByCellsMatchResult = `-- name: CountByCellsMatchResult :many
+SELECT json_extract(proto_json, '$.cellsMatchResult') as match_result, COUNT(*) as count FROM results GROUP BY match_result
+`
+
+type CountByCellsMatchResultRow struct {
+	MatchResult interface{}
+	Count       int64
+}
+
+func (q *Queries) CountByCellsMatchResult(ctx context.Context) ([]CountByCellsMatchResultRow, error) {
+	rows, err := q.db.QueryContext(ctx, countByCellsMatchResult)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountByCellsMatchResultRow
+	for rows.Next() {
+		var i CountByCellsMatchResultRow
+		if err := rows.Scan(&i.MatchResult, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const countErrors = `-- name: CountErrors :one
+SELECT COUNT(*) FROM results WHERE json_extract(proto_json, '$.error') IS NOT NULL
+`
+
+func (q *Queries) CountErrors(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countErrors)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countResults = `-- name: CountResults :one
+SELECT COUNT(*) FROM results
+`
+
+// Count the total number of results
+func (q *Queries) CountResults(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countResults)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getResult = `-- name: GetResult :one
 SELECT id, time, proto_json FROM results
 WHERE id = ?

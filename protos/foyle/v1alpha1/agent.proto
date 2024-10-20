@@ -9,6 +9,8 @@ option go_package = "github.com/jlewi/foyle/protos/go/foyle/v1alpha1";
 
 message GenerateRequest {
   Doc doc = 1;
+  // The index of the selected cell.
+  int32 selected_index = 2;
 }
 
 message GenerateResponse {
@@ -112,6 +114,8 @@ message StreamGenerateResponse {
 
 message GenerateCellsRequest {
   runme.parser.v1.Notebook notebook = 1;
+  // The index of the selected cell.
+  int32 selected_index = 2;
 }
 
 message GenerateCellsResponse {
@@ -162,6 +166,15 @@ message LogEvent {
 
   // A unique ID for the event
   string event_id = 6;
+
+  enum ExecuteStatus {
+    UNKNOWN = 0;
+    SUCCEEDED = 1;
+    FAILED = 2;
+  }
+
+  // The status of the execution. This is only set for execute events
+  ExecuteStatus execute_status = 7;
 }
 
 enum LogEventType {

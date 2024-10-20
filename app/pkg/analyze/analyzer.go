@@ -83,13 +83,13 @@ type Analyzer struct {
 }
 
 // NewAnalyzer creates a new Analyzer.
-func NewAnalyzer(logOffsetsFile string, rawLogsDB *dbutil.LockingDB[*logspb.LogEntries], tracesDB *pebble.DB, blocksDB *dbutil.LockingDB[*logspb.BlockLog], sessions *SessionsManager) (*Analyzer, error) {
+func NewAnalyzer(logOffsetsFile string, maxDelay time.Duration, rawLogsDB *dbutil.LockingDB[*logspb.LogEntries], tracesDB *pebble.DB, blocksDB *dbutil.LockingDB[*logspb.BlockLog], sessions *SessionsManager) (*Analyzer, error) {
 	logOffsets, err := initOffsets(logOffsetsFile)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create a rate limiting queue for processing files. We rate limit to each file every 30 seconds. This is because
+	// Create a rate limiting queue for processing files. We rate limit to each file every N seconds. This is because
 	// The logs are constantly being written to and we don't want to process the files too quickly.
 	// We are potentially writing to multiple files at the same time e.g. the Analyzer logs and then a different
 	// log file for each instance of RunMe. So we need to track different backoffs for each file which the rate limiter
@@ -97,7 +97,15 @@ func NewAnalyzer(logOffsetsFile string, rawLogsDB *dbutil.LockingDB[*logspb.LogE
 	// In that case, after we detect the start of a trace we would want to retry on a very short interval with backoff
 	// to detect the end of the trace as quickly as possible. Right now we don't do that and in fact we never call
 	// forget so we will basically max out the retry limit at the max delay.
-	fileQueue := workqueue.NewRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 30*time.Second))
+	// The Max delay is configurable because in some cases (e.g. evaluation, https://github.com/jlewi/foyle/issues/301)
+	// We want to minimize the time between when a log entry is written and when we process it so the trace is available.
+
+	if maxDelay <= 0 {
+		return nil, errors.New("Max delay must be greater than 0")
+	}
+
+	baseDelay := time.Second
+	fileQueue := workqueue.NewRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(baseDelay, maxDelay))
 
 	sessBuilder, err := NewSessionBuilder(sessions)
 	if err != nil {
@@ -128,7 +136,7 @@ func initOffsets(logOffsetsFile string) (*logspb.LogsWaterMark, error) {
 	watermark := &logspb.LogsWaterMark{}
 
 	if err := protojson.Unmarshal(raw, watermark); err != nil {
-		log.Error(err, "Failed to unmarshal watermarks file %s; watermarks will be reinitialized", logOffsetsFile)
+		log.Error(err, "Failed to unmarshal watermarks; watermarks will be reinitialized", "file", logOffsetsFile)
 	}
 	return watermark, nil
 }
@@ -742,12 +750,14 @@ func combineEntriesForTrace(ctx context.Context, entries []*api.LogEntry) (*logs
 }
 
 func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb.Trace, error) {
+	log := logs.FromContext(ctx)
 	gTrace := &logspb.GenerateTrace{}
 	trace := &logspb.Trace{
 		Data: &logspb.Trace_Generate{
 			Generate: gTrace,
 		},
-		Spans: make([]*logspb.Span, 0, 10),
+		Spans:      make([]*logspb.Span, 0, 10),
+		Assertions: make([]*v1alpha1.Assertion, 0),
 	}
 	evalMode := false
 	for _, e := range entries {
@@ -762,6 +772,16 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb
 			if mode {
 				evalMode = mode
 			}
+		}
+
+		if e.Message() == logs.Level1Assertion {
+			assertion := &v1alpha1.Assertion{}
+			if !e.GetProto("assertion", assertion) {
+				log.Error(errors.New("Failed to decode assertion"), "Failed to decode assertion", "entry", e)
+				continue
+			}
+			trace.Assertions = append(trace.Assertions, assertion)
+			continue
 		}
 
 		if gTrace.Request == nil && strings.HasSuffix(e.Function(), "agent.(*Agent).Generate") {
@@ -796,5 +816,23 @@ func combineGenerateTrace(ctx context.Context, entries []*api.LogEntry) (*logspb
 	trace.EvalMode = evalMode
 
 	combineSpans(trace)
+	dedupeAssertions(trace)
 	return trace, nil
+}
+
+// dedupeAssertions since our processing has at least once semantics we could wind up with duplicate copies
+// of an assertion
+func dedupeAssertions(trace *logspb.Trace) {
+	newAssertions := make([]*v1alpha1.Assertion, 0, len(trace.Assertions))
+	seen := make(map[string]bool)
+
+	for _, a := range trace.Assertions {
+		if seen[a.GetId()] {
+			continue
+		}
+		newAssertions = append(newAssertions, a)
+		seen[a.GetId()] = true
+	}
+
+	trace.Assertions = newAssertions
 }
