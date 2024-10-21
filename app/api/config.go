@@ -22,6 +22,9 @@ type AgentConfig struct {
 	// EvalMode is whether to run in evaluation mode or not.
 	// In EvalMode logs are specially marked so requests won't be used for training.
 	EvalMode bool `json:"evalMode" yaml:"evalMode"`
+
+	// Name is the name assigned to the agent by the user
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
 
 // RAGConfig configures the RAG model

@@ -203,7 +203,7 @@ func (a *App) SetupLogging(logToFile bool) error {
 		for _, sink := range a.Config.Logging.Sinks {
 			project, logName, isLog := gcplogs.ParseURI(sink.Path)
 			if isLog {
-				if err := gcplogs.RegisterSink(project, logName, nil); err != nil {
+				if err := gcplogs.RegisterSink(project, logName, nil); err != nil { // confused as to what a sink is supposed to be
 					return err
 				}
 			}
@@ -284,6 +284,10 @@ func (a *App) createCoreForConsole(paths []string) (zapcore.Core, error) {
 	c.TimeKey = "time"
 	c.MessageKey = "message"
 
+	if a.Config.Agent != nil { // TODO: See if there's a more optimal way to perform this check
+		c.NameKey = a.Config.Agent.Name
+	}
+
 	lvl := a.Config.GetLogLevel()
 	zapLvl := zap.NewAtomicLevel()
 
@@ -338,6 +342,10 @@ func (a *App) createJSONCoreLogger(paths []string) (zapcore.Core, error) {
 	c.MessageKey = "message"
 	// We attach the function key to the logs because that is useful for identifying the function that generated the log.
 	c.FunctionKey = "function"
+
+	if a.Config.Agent != nil {
+		c.NameKey = a.Config.Agent.Name
+	}
 
 	jsonEncoder := zapcore.NewJSONEncoder(c)
 

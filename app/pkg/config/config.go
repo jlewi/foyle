@@ -223,6 +223,13 @@ func (c *Config) GetModel() string {
 	return c.Agent.Model
 }
 
+func (c *Config) GetAgentName() string {
+	if c.Agent == nil || c.Agent.Name == "" {
+		return ""
+	}
+	return c.Agent.Name
+}
+
 func (c *Config) GetLogDir() string {
 	if c.Logging.LogDir != "" {
 		return c.Logging.LogDir
