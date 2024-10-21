@@ -1,0 +1,11 @@
+apiVersion: ""
+kind: ""
+logging:
+    level: info
+    sinks:
+        - json: true
+          path: stderr        
+gitHub:
+    appID: 315982
+    privateKey: gcpsecretmanager:///projects/foyle-dev/secrets/foyle-ghapp-key/versions/latest
+workDir: /tmp/hydros_work_dir

@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: release
+  namespace: foyle-cicd
+spec:
+  template:
+    metadata:
+      labels:
+        component: hydros
+    spec:
+      initContainers:
+      - name: clone
+        image: us-west1-docker.pkg.dev/foyle-public/images/hydros/hydros
+        command:
+        - /hydros
+        - --config=/config/config.yaml
+        - clone
+        - --repo=https://github.com/jlewi/foyle.git
+        # TODO(https://github.com/jlewi/hydros/issues/89): Update clone to use viper configuration
+        - --ghapp-id=315982
+        - --private-key=gcpsecretmanager:///projects/foyle-dev/secrets/foyle-ghapp-key/versions/latest
+        - --work-dir=/tmp/hydros_work_dir
+        resources:
+          limits:
+            cpu: "4"
+            memory: 4Gi
+          requests:
+            cpu: "4"
+            memory: 4Gi
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+        - name: data
+          mountPath: /tmp
+          readOnly: false
+      containers:
+      - image: us-west1-docker.pkg.dev/foyle-public/images/hydros/hydros
+        name: hydros
+        command:
+        - /hydros
+        - --config=/config/config.yaml
+        - apply
+        - /tmp/hydros_work_dir/jlewi/foyle/releasing.yaml
+        resources:
+          limits:
+            cpu: "4"
+            memory: 4Gi
+          requests:
+            cpu: "4"
+            memory: 4Gi
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+        - name: data
+          mountPath: /tmp
+          readOnly: false
+      restartPolicy: OnFailure
+      serviceAccountName: foyle-cicd
+      volumes:
+      - name: config
+        configMap:
+          name: config-8gm57kk49d       
+      - name: data
+        emptyDir: {}
