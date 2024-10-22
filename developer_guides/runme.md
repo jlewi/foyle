@@ -55,6 +55,16 @@ Now we can install the extension using the vscode binary
 /Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --force --install-extension ~/git_vscode-runme/runme-extension.vsix
 ```
 
+```bash {"id":"01JAH5BVWFNHDGGECF7PRE2EE9","interactive":"false"}
+# To check the installed version of the RunMe extension in Visual Studio Code after installation, use the following command:
+BINARY="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+$BINARY --list-extensions --show-versions | grep stateful.runme
+```
+
+```bash {"id":"01JAH14Y3CWES4H2DNBY621N0R","interactive":"false"}
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --force --install-extension ~/git_vscode-runme/runme-X.Y.Z.vsix
+```
+
 ```sh {"id":"01HY264KZTS4J9NHJASJT1GYJ7"}
 ls -la ~/git_vscode-runme/dist
 ```

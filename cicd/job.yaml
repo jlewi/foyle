@@ -38,11 +38,22 @@ spec:
       containers:
       - image: us-west1-docker.pkg.dev/foyle-public/images/hydros/hydros
         name: hydros
+        #image: amd64/busybox
+        # command:
+        # - tail
+        # - -f
+        # - /dev/null
         command:
-        - /hydros
-        - --config=/config/config.yaml
-        - apply
-        - /tmp/hydros_work_dir/jlewi/foyle/releasing.yaml
+         - /hydros
+         - --config=/config/config.yaml
+         - apply
+         - /tmp/hydros_work_dir/github.com/jlewi/foyle/releasing.yaml
+        env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-token-ghcr
+              key: GITHUB_TOKEN
         resources:
           limits:
             cpu: "4"
@@ -62,6 +73,6 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: config-8gm57kk49d       
+          name: config-8gm57kk49d
       - name: data
         emptyDir: {}
