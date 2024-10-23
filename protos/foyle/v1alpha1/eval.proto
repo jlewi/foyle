@@ -81,8 +81,8 @@ enum BlockLogStatus {
   BLOCK_LOG_STATUS_TIMEOUT = 2;
 }
 
+// Assertions should be defined and named so that TRUE indicates things are working as expected
 message Assertion {
-
   enum Name {
     UNKNOWN = 0;
     CODE_AFTER_MARKDOWN = 1;
@@ -98,6 +98,9 @@ message Assertion {
     // AT_LEAST_ONE_FULL_INPUT_CELL asserts that at at least one cell is included without truncation in the input
     // prompt.
     AT_LEAST_ONE_FULL_INPUT_CELL = 7;
+
+    // Markup cells should appear after code cells
+    MARKUP_AFTER_CODE = 8;
   }
   // Name of the assertion
   Name name = 1;

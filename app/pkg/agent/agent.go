@@ -135,6 +135,8 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 	}
 
 	log.Info("Agent.Generate returning response", zap.Object("response", resp))
+
+	assertRequestResponse(ctx, req, resp)
 	return resp, nil
 }
 
@@ -689,4 +691,30 @@ func preprocessDoc(req *v1alpha1.GenerateRequest) []*v1alpha1.Block {
 	// We want to remove all cells after the selected cell because our prompt doesn't know how to take them into account.
 	cells := req.Doc.Blocks[:req.SelectedIndex+1]
 	return cells
+}
+
+// assertRequestResponse runs some assertions that depend on the generateRequest and the response.
+func assertRequestResponse(ctx context.Context, req *v1alpha1.GenerateRequest, resp *v1alpha1.GenerateResponse) {
+	log := logs.FromContext(ctx)
+	assertMarkupAfterCode := &v1alpha1.Assertion{
+		Name:   v1alpha1.Assertion_MARKUP_AFTER_CODE,
+		Result: v1alpha1.AssertResult_SKIPPED,
+		Id:     ulid.GenerateID(),
+	}
+
+	selected := req.Doc.Blocks[req.SelectedIndex]
+	// Assertion only applies if the selected index is a code cell
+	if selected.Kind == v1alpha1.BlockKind_CODE {
+		if len(resp.Blocks) > 0 && resp.Blocks[0].Kind == v1alpha1.BlockKind_MARKUP {
+			assertMarkupAfterCode.Result = v1alpha1.AssertResult_PASSED
+		} else {
+			assertMarkupAfterCode.Result = v1alpha1.AssertResult_FAILED
+		}
+	}
+
+	if len(resp.Blocks) == 0 {
+		assertMarkupAfterCode.Result = v1alpha1.AssertResult_FAILED
+	}
+
+	log.Info(logs.Level1Assertion, "assertion", assertMarkupAfterCode)
 }
