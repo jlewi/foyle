@@ -24,6 +24,11 @@ kubectl -n foyle-cicd get pods -n foyle-cicd
 kubectl -n foyle-cicd get pods -w
 ```
 
-```bash {"id":"01JAX9ENHC429F63VT3RC11A49","interactive":"false"}
-kubectl create cronjob foyle-releaser --image=us-west1-docker.pkg.dev/foyle-public/images/releaser --schedule="0 * * * *" -- /bin/sh -c "kustomize build releaser | kubectl apply -f -"
+* Fetch the logs for the K8s job one-off-release
+* Use gcloud to fetch them from gcloud
+* I noticed that in some k8s the labels k8s-pod weren't attached. I wonder if that happens because the pod and VM didn't live long enough?
+
+```bash {"id":"01JAX9PE1ZQATY0R0RTMVAWSEQ","interactive":"false"}
+# Fetch the logs for the one-off K8s job using gcloud
+gcloud logging read "resource.type=\"k8s_container\" AND labels.\"k8s-pod/batch_kubernetes_io/job-name\"=\"one-off-release\"" --limit=100
 ```
