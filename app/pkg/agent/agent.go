@@ -618,10 +618,11 @@ func postProcessBlocks(blocks []*v1alpha1.Block) ([]*v1alpha1.Block, error) {
 			continue
 		}
 
-		if len(results) > 0 && block.Kind == v1alpha1.BlockKind_MARKUP {
-			// If the previous block is a markup block we want to merge this one without.
-			// This is because the more blocks we show to the user the more confusing it is
-			// TODO(jeremy): log an assertion here?
+		if len(results) > 0 && block.Kind == v1alpha1.BlockKind_MARKUP && results[len(results)-1].Kind == v1alpha1.BlockKind_MARKUP {
+			// If the previous block is a markup block we want to merge this with the previous block.
+			lastBlock := results[len(results)-1]
+			// TODO(jeremy): Do we need to add a newline?
+			lastBlock.Contents += "\n" + block.Contents
 			continue
 		}
 

@@ -384,6 +384,52 @@ func Test_PostProcessBlocks(t *testing.T) {
 			},
 			expected: []*v1alpha1.Block{},
 		},
+		{
+			name: "merge-markup-blocks",
+			blocks: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "first block",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "second block",
+				},
+			},
+			expected: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "first block\nsecond block",
+				},
+			},
+		},
+		{
+			name: "stop-at-code-block",
+			blocks: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "first block",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Contents: "echo hello",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "last block",
+				},
+			},
+			expected: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "first block",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Contents: "echo hello",
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -392,7 +438,7 @@ func Test_PostProcessBlocks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error post processing blocks; %v", err)
 			}
-			if d := cmp.Diff(c.expected, actual); d != "" {
+			if d := cmp.Diff(c.expected, actual, cmpopts.IgnoreUnexported(v1alpha1.Block{})); d != "" {
 				t.Errorf("Unexpected diff:\n%s", d)
 			}
 		})
