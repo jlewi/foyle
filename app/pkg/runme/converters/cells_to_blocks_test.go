@@ -24,7 +24,8 @@ var (
 				Cells: []*parserv1.Cell{
 					{
 						Metadata: map[string]string{
-							"id": "1234",
+							"id":          "1234",
+							"interactive": "false",
 						},
 						Kind:       parserv1.CellKind_CELL_KIND_CODE,
 						LanguageId: "python",
