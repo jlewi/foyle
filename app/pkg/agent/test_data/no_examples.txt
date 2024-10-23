@@ -1,12 +1,89 @@
-Continue writing the markdown document by adding a code block with the commands a user should execute.
+Continue writing the markdown document by adding markdown and code blocks with the commands a user should execute.
+
 Follow these rules
 
+* If the user is asking a question such as "How do I debug workload identity?" or "Why isn't my pod running?"
+  consider outputting a succinct explanation for how to debug the issue or answer any question
+* For any command that needs to be executed by the user, put it inside a code block
 * Set the language inside the code block to bash
 * Use the text at the end of the document to determine what commands to execute next
 * Use the existing text and code blocks in the document to learn phrases that are predictive of specific commands
-* Only respond with a single code block
 * You can put multiple commands into a code block
 * If the text at the end of the document doesn't clearly describe a command to execute simply respond with the </output> tag
+* If a user executed a command, the output of that command will be included in a code block with the language set to output
+* Use the output of previous commands to determine what to do next
+
+Here's an example:
+
+<example>
+<input>
+# Count users
+* Run a SQL query to count the number of users?
+</input>
+<output>
+1. Fetch the schema for the database
+
+```bash
+sqlite3 /path/to/your/database/db.sqlite ".schema"
+```
+
+1. Run the following sql query to count the number of users
+
+```bash
+sqlite3 /path/to/your/database/db.sqlite "SELECT COUNT(DISTINCT customerId) FROM table_name;"
+```
+</output>
+<reasoning>
+The response intermixes markup and code cells providing the steps to count the number of users in a database.
+</reasoning>
+</example>
+
+* You should look at the document to decide if the user is already in the midst of executing a sequence of steps
+* If the user is in the middle of executing a sequence of steps, you should continue the sequence of steps
+* You should continue the sequence by using the output of the previous command(s) to determine what to do next
+
+* If the document ends with the a code block containing the output of a command, look at the markup preceding
+  the code block containing the commands to try to figure out what question/problem the command was trying to solve.
+  * In this case you should respond with markup answering the question based on the output of the commands.
+    an answer to that question based on the output or a suggestion about what to do next.
+
+Here's an example:
+<example>
+<input>
+1. Check the Kubernetes Service Account Configuration
+   Ensure that the Kubernetes service account is annotated with the correct Google Cloud service account.
+
+```bash
+kubectl get serviceaccount default -n default -o yaml
+```
+
+```output
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    iam.gke.io/gcp-service-account: developer@foyle-dev.iam.gserviceaccount.com
+  creationTimestamp: "2024-05-30T02:11:21Z"
+  name: default
+  namespace: default
+  resourceVersion: "155079105"
+  uid: 8c8fe74f-b23d-477c-b8b7-7a8937733fa3
+```
+</input>
+<output>
+The annotation `iam.gke.io/gcp-service-account` is correctly set with the Google Cloud service account.
+Since the annoation is correctly set, the next thing to check is the IAM permissions for the
+Google Cloud service account developer@foyle-dev.iam.gserviceaccount.com.
+</output>
+<reasoning>
+* The input ends with the output of the command `kubectl get serviceaccount default -n default -o yaml`
+* The markup preceding the command indicates that we are running this command to check if its annotated with
+  the correct service account
+* So in this case you respond by analyzing the output to answer the question about the annotations
+* Based on that analysis you suggest the next step to debug the issue
+</reasoning>
+</example>
+
 
 
 Here's the actual document containing the problem or task to be solved:
