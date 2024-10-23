@@ -1,0 +1,82 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: release-cron
+  namespace: foyle-cicd
+spec:
+  schedule: "0 20 * * *"
+  timeZone: "America/Los_Angeles"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            component: hydros
+        spec:
+          initContainers:
+          - name: clone
+            image: us-west1-docker.pkg.dev/foyle-public/images/hydros/hydros
+            command:
+            - /hydros
+            - --config=/config/config.yaml
+            - clone
+            - --repo=https://github.com/jlewi/foyle.git
+            # TODO(https://github.com/jlewi/hydros/issues/89): Update clone to use viper configuration
+            - --ghapp-id=315982
+            - --private-key=gcpsecretmanager:///projects/foyle-dev/secrets/foyle-ghapp-key/versions/latest
+            - --work-dir=/tmp/hydros_work_dir
+            resources:
+              limits:
+                cpu: "4"
+                memory: 4Gi
+              requests:
+                cpu: "4"
+                memory: 4Gi
+            volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: data
+              mountPath: /tmp
+              readOnly: false
+          containers:
+          - image: us-west1-docker.pkg.dev/foyle-public/images/hydros/hydros
+            name: hydros
+            #image: amd64/busybox
+            # command:
+            # - tail
+            # - -f
+            # - /dev/null
+            command:
+            - /hydros
+            - --config=/config/config.yaml
+            - apply
+            - /tmp/hydros_work_dir/github.com/jlewi/foyle/releasing.yaml
+            env:
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-token-ghcr
+                  key: GITHUB_TOKEN
+            resources:
+              limits:
+                cpu: "4"
+                memory: 4Gi
+              requests:
+                cpu: "4"
+                memory: 4Gi
+            volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: data
+              mountPath: /tmp
+              readOnly: false
+          restartPolicy: OnFailure
+          serviceAccountName: foyle-cicd
+          volumes:
+          - name: config
+            configMap:
+              name: config
+          - name: data
+            emptyDir: {}
