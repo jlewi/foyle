@@ -66,6 +66,17 @@ func Test_Generate(t *testing.T) {
 			maxResults: 0,
 		},
 		{
+			name: "test-gcloud-iam",
+			doc: &v1alpha1.Doc{
+				Blocks: []*v1alpha1.Block{
+					{
+						Contents: "How do I debug why workload identity isn't working for a deployment in GKE?",
+					},
+				},
+			},
+			maxResults: 0,
+		},
+		{
 			name: "prdiff",
 			doc: &v1alpha1.Doc{
 				Blocks: []*v1alpha1.Block{
@@ -109,7 +120,7 @@ func Test_Generate(t *testing.T) {
 	}
 
 	cfg.Agent.ModelProvider = api.ModelProviderOpenAI
-	cfg.Agent.Model = openai.GPT3Dot5Turbo0125
+	cfg.Agent.Model = openai.GPT4oMini
 
 	completer, err := oai.NewCompleter(*cfg, client)
 	if err != nil {
@@ -331,7 +342,7 @@ func Test_ShouldTrigger(t *testing.T) {
 				},
 			},
 			selectedIndex: 0,
-			expected:      false,
+			expected:      true,
 		},
 	}
 
@@ -373,6 +384,52 @@ func Test_PostProcessBlocks(t *testing.T) {
 			},
 			expected: []*v1alpha1.Block{},
 		},
+		{
+			name: "merge-markup-blocks",
+			blocks: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "first block",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "second block",
+				},
+			},
+			expected: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "first block\nsecond block",
+				},
+			},
+		},
+		{
+			name: "stop-at-code-block",
+			blocks: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "first block",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Contents: "echo hello",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "last block",
+				},
+			},
+			expected: []*v1alpha1.Block{
+				{
+					Kind:     v1alpha1.BlockKind_MARKUP,
+					Contents: "first block",
+				},
+				{
+					Kind:     v1alpha1.BlockKind_CODE,
+					Contents: "echo hello",
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -381,7 +438,7 @@ func Test_PostProcessBlocks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error post processing blocks; %v", err)
 			}
-			if d := cmp.Diff(c.expected, actual); d != "" {
+			if d := cmp.Diff(c.expected, actual, cmpopts.IgnoreUnexported(v1alpha1.Block{})); d != "" {
 				t.Errorf("Unexpected diff:\n%s", d)
 			}
 		})

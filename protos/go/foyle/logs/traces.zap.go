@@ -7,11 +7,11 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
-	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/runner/v1"
 	_ "google.golang.org/protobuf/types/known/structpb"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
 	_ "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
+	_ "github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
 	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
