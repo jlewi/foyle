@@ -11,14 +11,19 @@ import (
 	"github.com/stateful/runme/v3/pkg/document/editor"
 )
 
+const (
+	truncationMessage = "<...stdout was truncated...>"
+)
+
 // BlockToMarkdown converts a block to markdown
-func BlockToMarkdown(block *v1alpha1.Block) string {
+// maxOutputLength is the maximum length of the output to include. A value of <= 0 means no truncation.
+func BlockToMarkdown(block *v1alpha1.Block, maxOutputLength int) string {
 	sb := strings.Builder{}
-	writeBlockMarkdown(&sb, block)
+	writeBlockMarkdown(&sb, block, maxOutputLength)
 	return sb.String()
 }
 
-func writeBlockMarkdown(sb *strings.Builder, block *v1alpha1.Block) {
+func writeBlockMarkdown(sb *strings.Builder, block *v1alpha1.Block, maxOutputLength int) {
 	switch block.GetKind() {
 	case v1alpha1.BlockKind_CODE:
 		// Code just gets written as a code block
@@ -33,7 +38,6 @@ func writeBlockMarkdown(sb *strings.Builder, block *v1alpha1.Block) {
 	// Handle the outputs
 	for _, output := range block.GetOutputs() {
 		for _, oi := range output.Items {
-
 			if oi.GetMime() == StatefulRunmeOutputItemsMimeType || oi.GetMime() == StatefulRunmeTerminalMimeType {
 				// See: https://github.com/jlewi/foyle/issues/286. This output item contains a JSON dictionary
 				// with a bunch of meta information that seems specific to Runme/stateful and not necessarily
@@ -45,11 +49,26 @@ func writeBlockMarkdown(sb *strings.Builder, block *v1alpha1.Block) {
 				// renderers. https://github.com/stateful/vscode-runme/blob/3e36b16e3c41ad0fa38f0197f1713135e5edb27b/src/constants.ts#L6
 				// So for now we want to error on including useless data rather than silently dropping useful data.
 				// In the future we may want to revisit that.
+				//
+				// N.B. On the other hand our code for truncating long outputs is based on searching for the mime
+				// type application/vnd.code.notebook.stdout so we need to be careful to ensure that we don't
 				continue
 			}
 
 			sb.WriteString("```" + OUTPUTLANG + "\n")
-			sb.WriteString(oi.GetTextData())
+			textData := oi.GetTextData()
+			if 0 < maxOutputLength && len(textData) > maxOutputLength {
+				textData = textData[:maxOutputLength]
+				sb.WriteString(textData)
+				// Don't write a newline before writing truncation because that is more likely to lead to confusion
+				// because people might not realize the line was truncated.
+				// Emit a message indicating that the output was truncated
+				// This is intended for the LLM so it knows that it is working with a truncated output.
+				sb.WriteString(truncationMessage)
+			} else {
+				sb.WriteString(textData)
+			}
+
 			sb.WriteString("\n```\n")
 		}
 	}
@@ -60,7 +79,7 @@ func BlocksToMarkdown(blocks []*v1alpha1.Block) string {
 	sb := strings.Builder{}
 
 	for _, block := range blocks {
-		writeBlockMarkdown(&sb, block)
+		writeBlockMarkdown(&sb, block, -1)
 	}
 
 	return sb.String()

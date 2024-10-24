@@ -55,14 +55,39 @@ func Test_Tailer(t *testing.T) {
 			MaxChars: 12,
 			Expected: "Cell2\nCell3\n",
 		},
+		{
+			name: "truncate-outputs",
+			Doc: &v1alpha1.Doc{
+				Blocks: []*v1alpha1.Block{
+					{
+						Kind:     v1alpha1.BlockKind_CODE,
+						Contents: "Cell1",
+						Outputs: []*v1alpha1.BlockOutput{
+							{
+								Items: []*v1alpha1.BlockOutputItem{
+									{
+										TextData: "Output1\nOutput2\nOutput3",
+										Mime:     VSCodeNotebookStdOutMimeType,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			MaxChars: 12,
+			Expected: "Cell1\n```output\nOutput1<...stdout was truncated...>\n```\n",
+		},
 	}
 
 	for _, c := range cases {
-		tailer := NewTailer(context.Background(), c.Doc.Blocks, c.MaxChars)
-		actual := tailer.Text()
-		if d := cmp.Diff(c.Expected, actual); d != "" {
-			t.Fatalf("Expected text to be %s but got %s; diff:\n%v", c.Expected, tailer.Text(), d)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			tailer := NewTailer(context.Background(), c.Doc.Blocks, c.MaxChars)
+			actual := tailer.Text()
+			if d := cmp.Diff(c.Expected, actual); d != "" {
+				t.Fatalf("Unexpected diff:\n%v", d)
+			}
+		})
 	}
 }
 
