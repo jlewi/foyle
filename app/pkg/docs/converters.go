@@ -1,6 +1,7 @@
 package docs
 
 import (
+	"math"
 	"strings"
 
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
@@ -12,27 +13,64 @@ import (
 )
 
 const (
-	truncationMessage = "<...stdout was truncated...>"
+	codeTruncationMessage = "<...code was truncated...>"
+	truncationMessage     = "<...stdout was truncated...>"
 )
 
 // BlockToMarkdown converts a block to markdown
-// maxOutputLength is the maximum length of the output to include. A value of <= 0 means no truncation.
-func BlockToMarkdown(block *v1alpha1.Block, maxOutputLength int) string {
+// maxLength is a maximum length for the generated markdown. This is a soft limit and may be exceeded slightly
+// because we don't account for some characters like the outputLength and the truncation message
+// A value <=0 means no limit.
+func BlockToMarkdown(block *v1alpha1.Block, maxLength int) string {
 	sb := strings.Builder{}
-	writeBlockMarkdown(&sb, block, maxOutputLength)
+	writeBlockMarkdown(&sb, block, maxLength)
 	return sb.String()
 }
 
-func writeBlockMarkdown(sb *strings.Builder, block *v1alpha1.Block, maxOutputLength int) {
+func writeBlockMarkdown(sb *strings.Builder, block *v1alpha1.Block, maxLength int) {
+
+	maxInputLength := -1
+	maxOutputLength := -1
+
+	if maxLength > 0 {
+		// Allocate 50% of the max length for input and output
+		// This is crude. Arguably we could be dynamic e.g. if the output is < .5 maxLength we should allocate
+		// the unused capacity for inputs. But for simplicity we don't do that. We do allocate unused input capacity
+		// to the output. In practice outputs tend to be much longer than inputs. Inputs are human authored
+		// whereas outputs are more likely to be produced by a machine (e.g. log output) and therefore very long
+		maxInputLength = int(math.Floor(0.5*float64(maxLength)) + 1)
+		maxOutputLength = maxInputLength
+	}
+
 	switch block.GetKind() {
 	case v1alpha1.BlockKind_CODE:
 		// Code just gets written as a code block
 		sb.WriteString("```" + BASHLANG + "\n")
-		sb.WriteString(block.GetContents())
+
+		data := block.GetContents()
+		if len(data) > maxInputLength && maxInputLength > 0 {
+			data = tailLines(data, maxInputLength)
+			data = codeTruncationMessage + "\n" + data
+
+			remaining := maxLength - len(data)
+			if remaining > 0 {
+				maxOutputLength += remaining
+			}
+		}
+		sb.WriteString(data)
 		sb.WriteString("\n```\n")
 	default:
 		// Otherwise assume its a markdown block
-		sb.WriteString(block.GetContents() + "\n")
+
+		data := block.GetContents()
+		if len(data) > maxInputLength && maxInputLength > 0 {
+			data = tailLines(data, maxInputLength)
+			remaining := maxLength - len(data)
+			if remaining > 0 {
+				maxOutputLength += remaining
+			}
+		}
+		sb.WriteString(data + "\n")
 	}
 
 	// Handle the outputs

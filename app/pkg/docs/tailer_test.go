@@ -76,7 +76,7 @@ func Test_Tailer(t *testing.T) {
 				},
 			},
 			MaxChars: 12,
-			Expected: "Cell1\n```output\nOutput1<...stdout was truncated...>\n```\n",
+			Expected: "```bash\nCell1\n```\n```output\nOutput1<...stdout was truncated...>\n```\n",
 		},
 	}
 

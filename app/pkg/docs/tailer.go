@@ -2,7 +2,6 @@ package docs
 
 import (
 	"context"
-	"math"
 	"strings"
 
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -30,7 +29,6 @@ func NewTailer(ctx context.Context, blocks []*v1alpha1.Block, maxCharLen int) *T
 	log := logs.FromContext(ctx)
 	mdBlocks := make([]string, len(blocks))
 
-	length := 0
 	firstBlock := len(blocks) - 1
 
 	assertion := &v1alpha1.Assertion{
@@ -40,32 +38,17 @@ func NewTailer(ctx context.Context, blocks []*v1alpha1.Block, maxCharLen int) *T
 		Id:     ulid.GenerateID(),
 	}
 
-	// Maximum length of output to include
-	// .5 is just a rough heuristic.
-	maxOutput := math.Floor(.5*float64(maxCharLen)) + 1
-
-	for ; firstBlock >= 0; firstBlock-- {
+	numBlocks := 0
+	for ; firstBlock >= 0 && maxCharLen > 0; firstBlock-- {
 		block := blocks[firstBlock]
-
-		md := BlockToMarkdown(block, int(maxOutput))
-		if length+len(md) > maxCharLen {
-			if length > 0 {
-				// If adding the block would exceed the max length and we already have at least one block then, break
-				break
-			} else {
-				// Since we haven't added any blocks yet, we need to add a truncated version of the last block
-				// N.B. Since the cell output should have been truncated to .5 of the max length, we should
-				// be able to safely assume that tailLines(md, maxCharlen) will include the codeblock for the output
-				// and some of the markup.
-				assertion.Result = v1alpha1.AssertResult_FAILED
-				// N.B. we add len(truncationMessage) and numCodeBlockChars because we don't want them to count
-				// against maxCharLen because we want to make sure we include the opening and closing quotation
-				// marks of the code block. This really only matters for testing with small maxCharLen.
-				// In production maxCharLen should be at least 1K and it shouldn't matter
-				md = tailLines(md, maxCharLen+len(truncationMessage)+numCodeBlockChars)
-			}
+		numBlocks += 1
+		md := BlockToMarkdown(block, maxCharLen)
+		maxCharLen = maxCharLen - len(md)
+		if maxCharLen <= 0 && numBlocks == 1 {
+			// Since this is the first block and its truncated we fail the assertion.
+			assertion.Result = v1alpha1.AssertResult_FAILED
 		}
-		length += len(md)
+
 		mdBlocks[firstBlock] = md
 	}
 
