@@ -25,7 +25,6 @@ func NewTailer(ctx context.Context, blocks []*v1alpha1.Block, maxCharLen int) *T
 	log := logs.FromContext(ctx)
 	mdBlocks := make([]string, len(blocks))
 
-	length := 0
 	firstBlock := len(blocks) - 1
 
 	assertion := &v1alpha1.Assertion{
@@ -34,20 +33,18 @@ func NewTailer(ctx context.Context, blocks []*v1alpha1.Block, maxCharLen int) *T
 		Detail: "",
 		Id:     ulid.GenerateID(),
 	}
-	for ; firstBlock >= 0; firstBlock-- {
+
+	numBlocks := 0
+	for ; firstBlock >= 0 && maxCharLen > 0; firstBlock-- {
 		block := blocks[firstBlock]
-		md := BlockToMarkdown(block)
-		if length+len(md) > maxCharLen {
-			if length > 0 {
-				// If adding the block would exceed the max length and we already have at least one block then, break
-				break
-			} else {
-				// Since we haven't added any blocks yet, we need to add a truncated version of the last block
-				assertion.Result = v1alpha1.AssertResult_FAILED
-				md = tailLines(md, maxCharLen)
-			}
+		numBlocks += 1
+		md := BlockToMarkdown(block, maxCharLen)
+		maxCharLen = maxCharLen - len(md)
+		if maxCharLen <= 0 && numBlocks == 1 {
+			// Since this is the first block and its truncated we fail the assertion.
+			assertion.Result = v1alpha1.AssertResult_FAILED
 		}
-		length += len(md)
+
 		mdBlocks[firstBlock] = md
 	}
 
@@ -85,7 +82,6 @@ func tailLines(s string, maxLen int) string {
 	lines := strings.Split(s, "\n")
 
 	startIndex := len(lines) - 1
-	//if startIndex < 0 {}
 
 	length := len(lines[len(lines)-1])
 

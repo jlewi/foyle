@@ -12,9 +12,10 @@ import (
 
 func Test_BlockToMarkdown(t *testing.T) {
 	type testCase struct {
-		name     string
-		block    *v1alpha1.Block
-		expected string
+		name      string
+		block     *v1alpha1.Block
+		maxLength int
+		expected  string
 	}
 
 	testCases := []testCase{
@@ -69,10 +70,28 @@ func Test_BlockToMarkdown(t *testing.T) {
 			},
 			expected: "```bash\necho \"something something\"\n```\n```output\nShould be included\n```\n",
 		},
+		{
+			name: "truncate-output",
+			block: &v1alpha1.Block{
+				Kind:     v1alpha1.BlockKind_CODE,
+				Contents: "echo line1\nline2",
+				Outputs: []*v1alpha1.BlockOutput{
+					{
+						Items: []*v1alpha1.BlockOutputItem{
+							{
+								TextData: "some really long output",
+							},
+						},
+					},
+				},
+			},
+			maxLength: 10,
+			expected:  "```bash\n<...code was truncated...>\nline2\n```\n```output\nsome r<...stdout was truncated...>\n```\n",
+		},
 	}
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
-			actual := BlockToMarkdown(c.block)
+			actual := BlockToMarkdown(c.block, c.maxLength)
 			if d := cmp.Diff(c.expected, actual); d != "" {
 				t.Errorf("Unexpected diff:\n%s", d)
 			}
