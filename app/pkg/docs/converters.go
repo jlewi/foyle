@@ -88,8 +88,6 @@ func writeBlockMarkdown(sb *strings.Builder, block *v1alpha1.Block, maxLength in
 				// So for now we want to error on including useless data rather than silently dropping useful data.
 				// In the future we may want to revisit that.
 				//
-				// N.B. On the other hand our code for truncating long outputs is based on searching for the mime
-				// type application/vnd.code.notebook.stdout so we need to be careful to ensure that we don't
 				continue
 			}
 

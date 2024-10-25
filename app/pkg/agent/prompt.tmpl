@@ -86,10 +86,11 @@ Google Cloud service account developer@foyle-dev.iam.gserviceaccount.com.
 
 * If the output of a command is really long it will be truncated as indicated by the string "<...stdout was truncated...>"
 * If the truncated output contains critical information to figure out what to do next, you should respond with a
-  suggestion on how to run the command so as to produce just the information you need with less verbosity for example
+  suggestion on how to run the command so as to produce just the information you need with less verbosity
 
-  * For logging or SQL queries add clauses to restrict the output to the rows and fields you need
-  * For large JSON/YAML blobs consider outputting the data to a file and then using tools like jq or yq to read the
+  * If logging or SQL queries leads to truncated output, suggest alternative queries with
+    clauses to restrict the output to the rows and fields you need
+  * If dumping large JSON/YAML blobs leads to truncated output, provide a command to 1) save the data to a file and 2) then use tools like jq or yq to read the
     fields you need
 
 {{if .Examples}}
