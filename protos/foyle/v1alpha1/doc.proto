@@ -37,6 +37,9 @@ message Block {
 
   // ID of the block.
   string id = 7;
+
+  // Additional metadata
+  map<string, string> metadata = 8;
 }
 
 enum BlockKind {
