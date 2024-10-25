@@ -10,10 +10,6 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 )
 
-const (
-	numCodeBlockChars = len("```" + OUTPUTLANG + "\n" + "```\n")
-)
-
 // Tailer is a helper for building a markdown representation of the tail end of a document.
 // It is intended to be stateful and used to iteratively find a suffix of a document that fits within a certain length
 // (i.e. the context length of the model).
