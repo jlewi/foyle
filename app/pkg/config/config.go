@@ -225,6 +225,7 @@ func (c *Config) GetModel() string {
 	return c.Agent.Model
 }
 
+// GetAgentName returns the name of the agent from the configuration.
 func (c *Config) GetAgentName() string {
 	if c.Metadata.Name == "" {
 		return ""
