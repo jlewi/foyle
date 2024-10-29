@@ -76,6 +76,8 @@ type Config struct {
 
 	// configFile is the configuration file used. It is
 	configFile string
+
+	Metadata api.Metadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
 
 type LearnerConfig struct {
@@ -221,6 +223,14 @@ func (c *Config) GetModel() string {
 	}
 
 	return c.Agent.Model
+}
+
+// GetAgentName returns the name of the agent from the configuration.
+func (c *Config) GetAgentName() string {
+	if c.Metadata.Name == "" {
+		return ""
+	}
+	return c.Metadata.Name
 }
 
 func (c *Config) GetLogDir() string {

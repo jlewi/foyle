@@ -251,8 +251,8 @@ func (a *App) SetupLogging(logToFile bool) error {
 	newLogger := zap.New(core)
 	// Record the caller of the log message
 	newLogger = newLogger.WithOptions(zap.AddCaller())
+	newLogger = newLogger.With(zap.String("agentName", a.Config.Metadata.Name))
 	zap.ReplaceGlobals(newLogger)
-
 	return nil
 }
 
