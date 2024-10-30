@@ -143,7 +143,7 @@ func (a *Agent) Generate(ctx context.Context, req *v1alpha1.GenerateRequest) (*v
 func (a *Agent) completeWithRetries(ctx context.Context, req *v1alpha1.GenerateRequest, examples []*v1alpha1.Example) ([]*v1alpha1.Block, error) {
 	log := logs.FromContext(ctx)
 
-	cells := preprocessDoc(req)
+	cells := docs.PreprocessDoc(req)
 	t := docs.NewTailer(ctx, cells, MaxDocChars)
 
 	exampleArgs := make([]Example, 0, len(examples))
@@ -684,13 +684,6 @@ func dropResponse(response *v1alpha1.StreamGenerateResponse) bool {
 		return true
 	}
 	return false
-}
-
-// preprocessDoc does some preprocessing of the doc.
-func preprocessDoc(req *v1alpha1.GenerateRequest) []*v1alpha1.Block {
-	// We want to remove all cells after the selected cell because our prompt doesn't know how to take them into account.
-	cells := req.Doc.Blocks[:req.SelectedIndex+1]
-	return cells
 }
 
 // assertRequestResponse runs some assertions that depend on the generateRequest and the response.
