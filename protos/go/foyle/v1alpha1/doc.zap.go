@@ -84,6 +84,16 @@ func (m *Block) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncoder) erro
 	keyName = "id" // field id = 7
 	enc.AddString(keyName, m.Id)
 
+	keyName = "metadata" // field metadata = 8
+	enc.AddObject(keyName, go_uber_org_zap_zapcore.ObjectMarshalerFunc(func(enc go_uber_org_zap_zapcore.ObjectEncoder) error {
+		for mk, mv := range m.Metadata {
+			key := mk
+			_ = key
+			enc.AddString(key, mv)
+		}
+		return nil
+	}))
+
 	return nil
 }
 

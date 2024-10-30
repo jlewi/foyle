@@ -39,16 +39,20 @@ func BlockToCell(block *v1alpha1.Block) (*parserv1.Cell, error) {
 		}
 		cellOutputs = append(cellOutputs, cOutput)
 	}
+	metadata := block.Metadata
+	// If the metadata is nil, initialize it
+	if metadata == nil {
+		metadata = make(map[string]string)
+	}
 
+	metadata[IdField] = block.Id
 	cellKind := BlockKindToCellKind(block.Kind)
 	cell := &parserv1.Cell{
 		LanguageId: block.Language,
 		Value:      block.Contents,
 		Kind:       cellKind,
 		Outputs:    cellOutputs,
-		Metadata: map[string]string{
-			IdField: block.Id,
-		},
+		Metadata:   metadata,
 	}
 	return cell, nil
 }

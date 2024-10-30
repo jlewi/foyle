@@ -60,6 +60,7 @@ func CellToBlock(cell *parserv1.Cell) (*v1alpha1.Block, error) {
 		Contents: cell.Value,
 		Kind:     blockKind,
 		Outputs:  blockOutputs,
+		Metadata: cell.Metadata,
 	}, nil
 }
 

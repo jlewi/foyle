@@ -135,6 +135,7 @@ func Test_DockToMarkdown(t *testing.T) {
 		})
 	}
 }
+
 func Test_MarkdownToBlocks(t *testing.T) {
 	type testCase struct {
 		name     string
@@ -149,27 +150,38 @@ func Test_MarkdownToBlocks(t *testing.T) {
 			expected: []*v1alpha1.Block{
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
+					Metadata: make(map[string]string),
 					Contents: "# Section 1",
 					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
+					Metadata: make(map[string]string),
 					Contents: "This is section 1",
 					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
-					Kind:     v1alpha1.BlockKind_CODE,
+					Kind: v1alpha1.BlockKind_CODE,
+					Metadata: map[string]string{
+						"runme.dev/name":          "package-main",
+						"runme.dev/nameGenerated": "true",
+					},
 					Language: "go",
 					Contents: "package main\n\nfunc main() {\n...\n}",
 					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
+					Metadata: make(map[string]string),
 					Contents: "Breaking text",
 					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
-					Kind:     v1alpha1.BlockKind_CODE,
+					Kind: v1alpha1.BlockKind_CODE,
+					Metadata: map[string]string{
+						"runme.dev/name":          "echo-hello",
+						"runme.dev/nameGenerated": "true",
+					},
 					Language: "bash",
 					Contents: "echo \"Hello, World!\"",
 					Outputs: []*v1alpha1.BlockOutput{
@@ -183,6 +195,7 @@ func Test_MarkdownToBlocks(t *testing.T) {
 				},
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
+					Metadata: make(map[string]string),
 					Contents: "## Subsection",
 					Outputs:  []*v1alpha1.BlockOutput{},
 				},
@@ -194,27 +207,38 @@ func Test_MarkdownToBlocks(t *testing.T) {
 			expected: []*v1alpha1.Block{
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
+					Metadata: make(map[string]string),
 					Contents: "Test code blocks nested in a list",
 					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
+					Metadata: make(map[string]string),
 					Contents: "1. First command",
 					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
-					Kind:     v1alpha1.BlockKind_CODE,
+					Kind: v1alpha1.BlockKind_CODE,
+					Metadata: map[string]string{
+						"runme.dev/name":          "echo-1",
+						"runme.dev/nameGenerated": "true",
+					},
 					Language: "bash",
 					Contents: "echo 1",
 					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
 					Kind:     v1alpha1.BlockKind_MARKUP,
+					Metadata: make(map[string]string),
 					Contents: "2. Second command",
 					Outputs:  []*v1alpha1.BlockOutput{},
 				},
 				{
-					Kind:     v1alpha1.BlockKind_CODE,
+					Kind: v1alpha1.BlockKind_CODE,
+					Metadata: map[string]string{
+						"runme.dev/name":          "echo-2",
+						"runme.dev/nameGenerated": "true",
+					},
 					Language: "bash",
 					Contents: "echo 2",
 					Outputs:  []*v1alpha1.BlockOutput{},

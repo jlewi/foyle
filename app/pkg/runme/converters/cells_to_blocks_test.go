@@ -49,7 +49,11 @@ var (
 						Id:       "1234",
 						Language: "python",
 						Contents: "print('Hello World')",
-						Kind:     v1alpha1.BlockKind_CODE,
+						Metadata: map[string]string{
+							"id":          "1234",
+							"interactive": "false",
+						},
+						Kind: v1alpha1.BlockKind_CODE,
 						Outputs: []*v1alpha1.BlockOutput{
 							{
 								Items: []*v1alpha1.BlockOutputItem{
