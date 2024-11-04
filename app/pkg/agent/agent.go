@@ -288,12 +288,20 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 				}
 
 				log.V(logs.Debug).Info("Sending response", zap.Object("response", response))
-				if err := stream.Send(response); err != nil {
-					log.Error(err, "Failed to send response")
-					// TODO(jeremy): Should we be using connect codes and routines? e.g.
-					// connect.NewError(
-					statusChan <- status.Newf(codes.Internal, "failed to send response; %v", err)
+
+				select {
+				case <-ctx.Done():
+					log.Info("Context cancelled before AI Response returned")
+					statusChan <- status.New(codes.Canceled, "Stream context canceled")
 					return
+				default:
+					if err := stream.Send(response); err != nil {
+						log.Error(err, "Failed to send response")
+						// TODO(jeremy): Should we be using connect codes and routines? e.g.
+						// connect.NewError(
+						statusChan <- status.Newf(codes.Internal, "failed to send response; %v", err)
+						return
+					}
 				}
 
 			case <-ctx.Done():
