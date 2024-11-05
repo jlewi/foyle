@@ -417,6 +417,26 @@ func (a *Agent) StreamGenerate(ctx context.Context, stream *connect.BidiStream[v
 					doc.Blocks[selectedCell] = block
 				}
 
+				if req.Trigger == v1alpha1.StreamGenerateRequest_CELL_EXECUTE {
+					stdOutLength := 0
+					for _, o := range doc.Blocks[selectedCell].Outputs {
+						for _, item := range o.Items {
+							if item.Mime == docs.VSCodeNotebookStdOutMimeType {
+								if item.GetTextData() != "" {
+									stdOutLength = len(item.GetTextData())
+									break
+								}
+							}
+						}
+					}
+
+					if stdOutLength == 0 {
+						// N.B.This is to help debug https://github.com/jlewi/foyle/issues/309
+						// This will create false positives in the event the command produces no output
+						log.Info("Empty stdout", logs.ZapProto("request", req), "doc", doc, "selectedCell", selectedCell)
+					}
+				}
+
 				if req.GetContextId() != state.getContextID() {
 					return status.Errorf(codes.InvalidArgument, "ContextId doesn't match current value; expected %s; got %s", state.getContextID(), req.GetContextId())
 				}

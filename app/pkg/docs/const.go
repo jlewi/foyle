@@ -14,5 +14,5 @@ const (
 	//    https://github.com/jlewi/foyle/issues/286
 	StatefulRunmeOutputItemsMimeType = "stateful.runme/output-items"
 	StatefulRunmeTerminalMimeType    = "stateful.runme/terminal"
-	VSCodeNotebookStdOutMimeType     = "application/vnd.code.notebook.stdout "
+	VSCodeNotebookStdOutMimeType     = "application/vnd.code.notebook.stdout"
 )
