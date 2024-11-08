@@ -54,11 +54,14 @@ to provide the frontend.
    ```
 
 1. Inside VSCode configure RunMe to use Foyle
-   1. Open the VSCode setting palette
+   1. Open the VSCode settings palette
+   1. Search for `Runme > Experiments: Ai Auto Cell`
+      * Check the box to set the option to true
    1. Search for `Runme: Ai Base URL`
    1. Set the address to `http://localhost:${HTTP_PORT}/api`
       * The default port is 8877
       * If you set a non default value then it will be the value of `server.httpPort`
+
 
 ## Try it out!
 

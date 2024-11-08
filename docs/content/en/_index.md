@@ -37,7 +37,7 @@ We do a [Pull Request](https://github.com/jlewi/foyle/pulls) contributions workf
 {{% /blocks/feature %}}
 
 
-{{% blocks/feature icon="fab fa-twitter" title="Follow us on Twitter!" url="https://twitter.com/jeremylewi" %}}
+{{% blocks/feature icon="bluesky_logo" title="Follow us on Bluesky!" url="https://bsky.app/profile/jeremy.lewi.us" %}}
 For announcement of latest features etc.
 {{% /blocks/feature %}}
 
