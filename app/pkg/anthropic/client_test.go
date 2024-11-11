@@ -2,11 +2,12 @@ package anthropic
 
 import (
 	"context"
+	"os"
+	"testing"
+
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/liushuangls/go-anthropic/v2"
 	"google.golang.org/protobuf/proto"
-	"os"
-	"testing"
 )
 
 func Test_AnthropicClient(t *testing.T) {
@@ -49,5 +50,8 @@ func Test_AnthropicClient(t *testing.T) {
 		System:      "You are a helper",
 	}
 
-	client.CreateMessages(context.Background(), request)
+	_, err = client.CreateMessages(context.Background(), request)
+	if err != nil {
+		t.Logf("Error: %+v", err)
+	}
 }
