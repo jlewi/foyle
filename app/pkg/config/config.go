@@ -130,6 +130,9 @@ type OpenAIConfig struct {
 type AnthropicConfig struct {
 	// APIKeyFile is the path to the file containing the API key
 	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
+
+	// BaseURL is the baseURL for the API.
+	BaseURL string `json:"baseURL" yaml:"baseURL"`
 }
 
 type ReplicateConfig struct {

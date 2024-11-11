@@ -48,7 +48,14 @@ func NewClient(cfg config.Config) (*anthropic.Client, error) {
 		return nil, err
 	}
 
-	client := anthropic.NewClient(apiKey, anthropic.WithHTTPClient(httpClient))
+	opts := make([]anthropic.ClientOption, 0)
+
+	if cfg.Anthropic.BaseURL != "" {
+		log.Info("Using custom Anthropic base URL", "baseURL", cfg.Anthropic.BaseURL)
+		opts = append(opts, anthropic.WithBaseURL(cfg.Anthropic.BaseURL))
+	}
+	opts = append(opts, anthropic.WithHTTPClient(httpClient))
+	client := anthropic.NewClient(apiKey, opts...)
 	return client, nil
 }
 
