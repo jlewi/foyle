@@ -36,7 +36,7 @@ func NewServeCmd() *cobra.Command {
 			}()
 
 			if err != nil {
-				fmt.Printf("Error running request;\n %+v\n", err)
+				fmt.Printf("Error; unable to start the foyle server. The cause is:\n %+v\n", err)
 				os.Exit(1)
 			}
 		},
