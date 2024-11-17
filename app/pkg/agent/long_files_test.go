@@ -93,7 +93,7 @@ func run() error {
 	//	return
 	//}
 	for _, p := range patches {
-		fmt.Printf("Patch:\n%v\n", p)
+		fmt.Printf("Patch:\n%v\n", p.String())
 	}
 	return nil
 }
