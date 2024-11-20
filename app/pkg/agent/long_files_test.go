@@ -95,6 +95,13 @@ func run() error {
 	for _, p := range patches {
 		fmt.Printf("Patch:\n%v\n", p.String())
 	}
+
+	// TODO(jeremy): How do we adjust the patch to be relative to the original file?
+	// Maybe we should just replace the original lines with the output lines.
+	// if we wanted to we could then compute a diff between the modified and aligned file.
+	// So our patch format should be a start and end line that will be replaced with our fragment.
+	// This is human readable.
+
 	return nil
 }
 
