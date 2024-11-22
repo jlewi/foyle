@@ -66,7 +66,7 @@ func (db *SessionsManager) Get(ctx context.Context, contextID string) (*logspb.S
 
 	// Read the record
 	sessRow, err := queries.GetSession(ctx, contextID)
-
+	
 	if err != nil {
 		return nil, err
 	}
