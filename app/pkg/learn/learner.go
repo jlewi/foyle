@@ -3,6 +3,10 @@ package learn
 import (
 	"context"
 	"fmt"
+	"github.com/jlewi/foyle/app/pkg/analyze"
+	"github.com/jlewi/foyle/app/pkg/runme/converters"
+	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
 	"io"
 	"strings"
 	"sync"
@@ -15,10 +19,7 @@ import (
 	"github.com/jlewi/monogo/files"
 	"github.com/jlewi/monogo/helpers"
 
-	"github.com/jlewi/foyle/app/pkg/dbutil"
 	"k8s.io/client-go/util/workqueue"
-
-	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -39,10 +40,10 @@ var (
 		Help: "Total number of enqueued blocks",
 	})
 
-	cellsProcessed = promauto.NewCounterVec(
+	sessProcessed = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "learner_blocks_processed",
-			Help: "Number of blocks processed by the learner",
+			Name: "learner_sessions_processed",
+			Help: "Number of sessions processed by the learner",
 		},
 		[]string{"status"},
 	)
@@ -54,7 +55,7 @@ var (
 type Learner struct {
 	Config          config.Config
 	client          *openai.Client
-	blocksDB        *dbutil.LockingDB[*logspb.BlockLog]
+	sessions        *analyze.SessionsManager
 	queue           workqueue.DelayingInterface
 	postFunc        PostLearnEvent
 	eventLoopIsDone sync.WaitGroup
@@ -62,16 +63,20 @@ type Learner struct {
 	vectorizer      *oai.Vectorizer
 }
 
-func NewLearner(cfg config.Config, client *openai.Client, blocksDB *dbutil.LockingDB[*logspb.BlockLog]) (*Learner, error) {
+func NewLearner(cfg config.Config, client *openai.Client, sessions *analyze.SessionsManager) (*Learner, error) {
 	if client == nil {
 		return nil, errors.New("OpenAI client is required")
+	}
+
+	if sessions == nil {
+		return nil, errors.New("SessionsManager is required")
 	}
 
 	vectorizer := oai.NewVectorizer(client)
 	return &Learner{
 		Config:     cfg,
 		client:     client,
-		blocksDB:   blocksDB,
+		sessions:   sessions,
 		queue:      workqueue.NewDelayingQueue(),
 		factory:    &files.Factory{},
 		vectorizer: vectorizer,
@@ -142,87 +147,133 @@ func (l *Learner) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// Reconcile learns from the block with the given id
+// Reconcile learns from the session with the given id
 func (l *Learner) Reconcile(ctx context.Context, id string) error {
 	log := logs.FromContext(ctx)
 
-	b, err := l.blocksDB.Get(id)
+	session, err := l.sessions.Get(ctx, id)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to retrieve block %s", id)
+		sessProcessed.WithLabelValues("nosession").Inc()
+		return errors.Wrapf(err, "Unable to learn from session %s; failed to retrieve session", id)
 	}
 
-	if b.ExecutedBlock == nil {
-		// Skip unexecuted block
-		cellsProcessed.WithLabelValues("unexecuted").Inc()
+	// Make sure there is a cell execution log event.
+	// Right now we rely on the cell execution log event to get the actual cell content.
+	// So we can't learn from sessions without cell execution events. TN013 has some ideas for how we could
+	// learn in the event of non cell execution events.
+	var execEvent *v1alpha1.LogEvent
+	for _, event := range session.LogEvents {
+		if event.GetType() != v1alpha1.LogEventType_EXECUTE {
+			continue
+		}
+
+		// We don't want to learn from failed events.
+		if event.ExecuteStatus != v1alpha1.LogEvent_SUCCEEDED {
+			continue
+		}
+
+		// We want to learn from the final successful event.
+		execEvent = event
+	}
+
+	if execEvent == nil {
+		// Since the cell wasn't successfully executed we don't learn from it
+		sessProcessed.WithLabelValues("noexec").Inc()
 		return nil
 	}
 
-	if b.GeneratedBlock == nil {
-		// Block wasn't the result of AI generation
-		cellsProcessed.WithLabelValues("notgenerated").Inc()
+	if session.GetFullContext() == nil {
+		sessProcessed.WithLabelValues("nocontext").Inc()
+		return errors.Errorf("Unable to learn from session %s; session has no context", session.GetContextId())
+	}
+
+	if session.GetFullContext().GetNotebook() == nil {
+		sessProcessed.WithLabelValues("nonotebook").Inc()
+		return errors.Errorf("Unable to learn from session %s; session has no notebook", session.GetContextId())
+	}
+
+	if session.GetFullContext().GetSelected() == 0 {
+		// If its the first cell we can't learn from it because what would we use as context to predict it?
+		sessProcessed.WithLabelValues("firstcell").Inc()
 		return nil
 	}
 
-	if b.EvalMode {
-		log.V(logs.Debug).Info("Skipping block which was created as part of an eval", "id", b.GetId())
-		cellsProcessed.WithLabelValues("eval").Inc()
-		return nil
-	}
+	sessProcessed.WithLabelValues("learn").Inc()
+	expectedFiles := l.getExampleFiles(session.GetContextId())
 
-	// TODO(jeremy): Should we use some sort of distance metric? e.g. edit distance? We could potentially
-	// Use the metric used for eval.
-	if strings.TrimSpace(b.ExecutedBlock.GetContents()) == strings.TrimSpace(b.GeneratedBlock.GetContents()) {
-		log.V(logs.Debug).Info("Skipping executed block which matches generated block", "id", b.GetId())
-		cellsProcessed.WithLabelValues("nochange").Inc()
-		return nil
-	}
-
-	cellsProcessed.WithLabelValues("learn").Inc()
-	expectedFiles := l.getExampleFiles(b.GetId())
-
-	log.Info("Found new training example", "blockId", b.GetId())
+	log.Info("Found new training example", "sessionId", session.GetContextId())
 
 	if len(expectedFiles) == 0 {
-		cellsProcessed.WithLabelValues("noExampleFiles").Inc()
-		log.Error(err, "No training files found", "blockId", b.GetId())
-		return errors.Wrapf(err, "No training files found for example %s", b.GetId())
+		sessProcessed.WithLabelValues("noExampleFiles").Inc()
+		log.Error(err, "No training files found", "sessionId", session.GetContextId())
+		return errors.Wrapf(err, "No training files found for example %s", session.GetContextId())
 	}
 
-	// TODO(jeremy): Should we take into account execution status when looking for mistakes?
-
-	// Deep copy the original message
-	newBlock := proto.Clone(b.ExecutedBlock).(*v1alpha1.Block)
-	answer := []*v1alpha1.Block{newBlock}
-
-	req := &v1alpha1.GenerateRequest{
-		Doc:           b.Doc,
-		SelectedIndex: int32(len(b.Doc.Blocks) - 1),
+	var executedCell *parserv1.Cell
+	var execID string
+	for _, c := range execEvent.Cells {
+		execID = converters.GetCellID(c)
+		if execID == "" {
+			// I don't think this should happen
+			sessProcessed.WithLabelValues("cellnoid").Inc()
+			continue
+		}
+		if execID == execEvent.GetSelectedId() {
+			executedCell = c
+		}
 	}
+
+	if executedCell == nil {
+		sessProcessed.WithLabelValues("noexeccell").Inc()
+		return errors.Errorf("Could not learn from session %s; the executed cell couldn't be found in the session", session.GetContextId())
+	}
+
+	executedBlock, err := converters.CellToBlock(executedCell)
+	if err != nil {
+		log.Error(err, "Failed to convert cell to block", "sessionId", session.GetContextId(), "cellId", execID)
+		return errors.Wrapf(err, "Could not learn from session: %s; Could not convert cell to block", session.GetContextId())
+	}
+
+	// Make sure the executed block is not the empty string
+	executedBlock.Contents = strings.TrimSpace(executedBlock.Contents)
+
+	if executedBlock.Contents == "" {
+		sessProcessed.WithLabelValues("emptyblock").Inc()
+		return errors.Errorf("Could not learn from session %s; the executed block is empty", session.GetContextId())
+	}
+
+	req, err := sessionToQuery(session)
+	if err != nil {
+		return errors.Wrapf(err, "Could not learn from session %s; Could not convert session to query", session.GetContextId())
+	}
+
 	queryBlocks, err := docs.CreateQuery(ctx, req)
+
+	if err != nil {
+		log.Error(err, "Failed to create query", "exampleId", session.GetContextId())
+		return errors.Wrapf(err, "Failed to create query for example %s", session.GetContextId())
+	}
 
 	newDoc := &v1alpha1.Doc{
 		Blocks: queryBlocks,
 	}
 
-	if err != nil {
-		log.Error(err, "Failed to create query", "exampleId", b.GetId())
-		return errors.Wrapf(err, "Failed to create query for example %s", b.GetId())
+	example := &v1alpha1.Example{
+		Id:     session.GetContextId(),
+		Query:  newDoc,
+		Answer: []*v1alpha1.Block{executedBlock},
 	}
 
-	example := &v1alpha1.Example{
-		Id:     b.GetId(),
-		Query:  newDoc,
-		Answer: answer,
-	}
+	exampleId := session.GetContextId()
 
 	if err := l.computeEmbeddings(ctx, example); err != nil {
-		return errors.Wrapf(err, "Failed to compute embeddings for example %s", b.GetId())
+		return errors.Wrapf(err, "Failed to compute embeddings for example %s", exampleId)
 	}
 
 	encoded, err := proto.Marshal(example)
 	if err != nil {
-		log.Error(err, "Failed to serialize doc", "id", b.GetId())
-		return errors.Wrapf(err, "Failed to serialize doc %s", b.GetId())
+		log.Error(err, "Failed to serialize doc", "id", exampleId)
+		return errors.Wrapf(err, "Failed to serialize doc %s", exampleId)
 	}
 
 	writeErrors := &helpers.ListOfErrors{}
@@ -237,27 +288,27 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 			}
 			w, err := helper.NewWriter(expectedFile)
 			if err != nil {
-				return errors.Wrapf(err, "Failed to create writer for example %s; to file %s", b.GetId(), expectedFile)
+				return errors.Wrapf(err, "Failed to create writer for example %s; to file %s", exampleId, expectedFile)
 			}
 			if closer, ok := w.(io.Closer); ok {
 				defer closer.Close()
 			}
 
 			if _, err := w.Write(encoded); err != nil {
-				return errors.Wrapf(err, "Failed to write example %s; to file %s", b.GetId(), expectedFile)
+				return errors.Wrapf(err, "Failed to write example %s; to file %s", exampleId, expectedFile)
 			}
 			return nil
 		}()
 		if writeErr != nil {
 			// We need to log the individual error here so that its stack trace gets logged
-			log.Error(err, "Failed to write example", "id", b.GetId(), "file", expectedFile)
+			log.Error(err, "Failed to write example", "id", exampleId, "file", expectedFile)
 			writeErrors.AddCause(writeErr)
 			continue
 		}
 		// All post a single file because we don't need to read it multiple times
 		if !posted && l.postFunc != nil {
 			if err := l.postFunc(expectedFile); err != nil {
-				return errors.Wrapf(err, "Failed to post learn event for example %s", b.GetId())
+				return errors.Wrapf(err, "Failed to post learn event for example %s", exampleId)
 			}
 			posted = true
 		}
@@ -276,7 +327,7 @@ func (l *Learner) getExampleFiles(id string) []string {
 	for _, d := range l.Config.GetTrainingDirs() {
 		h, err := l.factory.GetDirHelper(d)
 		if err != nil {
-			log.Error(err, "Unable to DirHelper", "dir", d)
+			log.Error(err, "Unable to get DirHelper", "dir", d)
 			continue
 		}
 		paths = append(paths, h.Join(d, fmt.Sprintf("%s%s", id, fileSuffix)))
@@ -306,4 +357,34 @@ func (l *Learner) computeEmbeddings(ctx context.Context, example *v1alpha1.Examp
 
 	example.Embedding = qVec
 	return nil
+}
+
+func sessionToQuery(session *logspb.Session) (*v1alpha1.GenerateRequest, error) {
+	if session.GetFullContext() == nil {
+		return nil, errors.Errorf("Unable to learn from session %s; session has no context", session.GetContextId())
+	}
+	if session.GetFullContext().GetNotebook() == nil {
+		return nil, errors.Errorf("Unable to learn from session %s; session has no notebook", session.GetContextId())
+	}
+
+	doc, err := converters.NotebookToDoc(session.GetFullContext().GetNotebook())
+	if err != nil {
+		return nil, errors.Wrapf(err, "Could not learn from session %s; Could not convert notebook to doc", session.GetContextId())
+	}
+
+	// We need to truncate the doc to only include the blocks up to the selected index
+	if session.GetFullContext().GetSelected() == 0 {
+		return nil, errors.Errorf("Unable to learn from session %s; because the selected cell is the first in the doc", session.GetContextId())
+	}
+
+	// We need to remove the last block from the doc. Because the last block in the doc i.e. the selected block
+	// is actually what we want to predict
+	doc.Blocks = doc.Blocks[:session.GetFullContext().GetSelected()]
+	selectedIndex := len(doc.Blocks) - 1
+	req := &v1alpha1.GenerateRequest{
+		Doc:           doc,
+		SelectedIndex: int32(selectedIndex),
+	}
+
+	return req, nil
 }

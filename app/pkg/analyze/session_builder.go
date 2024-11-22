@@ -29,12 +29,12 @@ func NewSessionBuilder(sessions *SessionsManager) (*sessionBuilder, error) {
 
 // n.b. processLogEntry doesn't return a error because we expect errors to be ignored and for processing to continue.
 // I'm not sure that's a good idea but we'll see.
-func (p *sessionBuilder) processLogEntry(entry *api.LogEntry) {
+func (p *sessionBuilder) processLogEntry(entry *api.LogEntry, notifier PostSessionEvent) {
 	// We need to use HasPrefix because the logging statement is nested inside an anonymous function so there
 	// will be a suffix like "func1"
 	if matchers.IsLogEvent(entry.Function()) {
 		// TODO(Jeremy): There is also Analyzer.processLogEvent
-		p.processLogEvent(entry)
+		p.processLogEvent(entry, notifier)
 	}
 
 	if matchers.IsLLMUsage(entry.Function()) {
@@ -50,7 +50,7 @@ func (p *sessionBuilder) processLogEntry(entry *api.LogEntry) {
 	}
 }
 
-func (p *sessionBuilder) processLogEvent(entry *api.LogEntry) {
+func (p *sessionBuilder) processLogEvent(entry *api.LogEntry, notifier PostSessionEvent) {
 	log := zapr.NewLogger(zap.L())
 	event := &v1alpha1.LogEvent{}
 
@@ -71,6 +71,13 @@ func (p *sessionBuilder) processLogEvent(entry *api.LogEntry) {
 
 	if err := p.sessions.Update(context.Background(), event.GetContextId(), updateFunc); err != nil {
 		log.Error(err, "Failed to update session", "event", event)
+		return
+	}
+
+	if event.Type == v1alpha1.LogEventType_SESSION_END {
+		if err := notifier(event.GetContextId()); err != nil {
+			log.Error(err, "Failed to send session process event")
+		}
 	}
 }
 

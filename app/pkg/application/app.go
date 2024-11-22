@@ -411,7 +411,7 @@ func (a *App) SetupLearner() (*learn.Learner, error) {
 	if err != nil {
 		return nil, err
 	}
-	return learn.NewLearner(*a.Config, client, a.LockingBlocksDB)
+	return learn.NewLearner(*a.Config, client, a.sessionsManager)
 }
 
 func (a *App) createComponents() error {
