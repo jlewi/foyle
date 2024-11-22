@@ -67,7 +67,7 @@ type Analyzer struct {
 
 	watcher *fsnotify.Watcher
 
-	learnNotifier PostBlockEvent
+	learnNotifier PostSessionEvent
 
 	handleLogFileIsDone sync.WaitGroup
 	handleBlocksIsDone  sync.WaitGroup
@@ -152,13 +152,13 @@ type blockItem struct {
 	id string
 }
 
-// PostBlockEvent interface for functions to post block events.
-type PostBlockEvent func(id string) error
+// PostSessionEvent interface for functions to post session events.
+type PostSessionEvent func(id string) error
 
 // Run runs the analyzer; continually processing logs.
 // learnNotifier is an optional function that will be called when a block is updated.
 // This should be non blocking.
-func (a *Analyzer) Run(ctx context.Context, logDirs []string, learnNotifier PostBlockEvent) error {
+func (a *Analyzer) Run(ctx context.Context, logDirs []string, learnNotifier PostSessionEvent) error {
 	a.learnNotifier = learnNotifier
 	// Find all the current files
 	jsonFiles, err := findLogFilesInDirs(ctx, logDirs)
@@ -276,7 +276,7 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 			}
 
 			// Add the entry to a session if it should be.
-			a.sessBuilder.processLogEntry(entry)
+			a.sessBuilder.processLogEntry(entry, a.learnNotifier)
 
 			if matchers.IsLogEvent(entry.Function()) {
 				a.processLogEvent(ctx, entry)

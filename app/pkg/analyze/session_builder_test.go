@@ -3,6 +3,7 @@ package analyze
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,6 +71,12 @@ func setup() (testTuple, error) {
 	}, nil
 }
 
+// Process the log entry
+func testNotifier(contextId string) error {
+	fmt.Printf("Received session end event for context: %v", contextId)
+	return nil
+}
+
 func Test_ProcessLogEvent(t *testing.T) {
 	tuple, err := setup()
 	if err != nil {
@@ -101,8 +108,7 @@ func Test_ProcessLogEvent(t *testing.T) {
 		"event":     logs.ZapProto("event", event).Interface,
 	}
 
-	// Process the log entry
-	tuple.p.processLogEvent(entry)
+	tuple.p.processLogEvent(entry, testNotifier)
 
 	s, err := tuple.sessions.Get(context.Background(), event.GetContextId())
 	if err != nil {
@@ -154,7 +160,7 @@ func Test_ProcessStreamGenerate(t *testing.T) {
 	}
 
 	// Process the log entry
-	tuple.p.processLogEntry(entry)
+	tuple.p.processLogEntry(entry, testNotifier)
 
 	s, err := tuple.sessions.Get(context.Background(), contextId)
 	if err != nil {
