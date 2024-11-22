@@ -3,13 +3,14 @@ package learn
 import (
 	"context"
 	"fmt"
+	"io"
+	"strings"
+	"sync"
+
 	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	"io"
-	"strings"
-	"sync"
 
 	"github.com/jlewi/foyle/app/pkg/docs"
 

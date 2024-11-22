@@ -3,6 +3,9 @@ package learn
 import (
 	"context"
 	"database/sql"
+	"os"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jlewi/foyle/app/pkg/testutil"
@@ -10,8 +13,6 @@ import (
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1"
 	"github.com/jlewi/monogo/helpers"
 	parserv1 "github.com/stateful/runme/v3/pkg/api/gen/proto/go/runme/parser/v1"
-	"os"
-	"testing"
 
 	"github.com/jlewi/foyle/app/pkg/analyze"
 
