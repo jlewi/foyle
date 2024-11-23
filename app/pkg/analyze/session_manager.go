@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"os"
 	"path/filepath"
 
@@ -26,6 +28,16 @@ var ddl string
 
 const (
 	SQLLiteDriver = "sqlite"
+)
+
+var (
+	sessCounter = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "session_updates",
+			Help: "Number of sessions updated",
+		},
+		[]string{"status"},
+	)
 )
 
 // GetDDL return the DDL for the database.
@@ -66,7 +78,7 @@ func (db *SessionsManager) Get(ctx context.Context, contextID string) (*logspb.S
 
 	// Read the record
 	sessRow, err := queries.GetSession(ctx, contextID)
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -92,79 +104,79 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	}
 	log = log.WithValues("contextId", contextID)
 
+	sessCounter.WithLabelValues("start").Inc()
+
 	tx, err := db.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "Failed to start transaction")
 	}
 
-	queries := db.queries.WithTx(tx)
-	// Read the record
-	sessRow, err := queries.GetSession(ctx, contextID)
+	err = func() error {
+		queries := db.queries.WithTx(tx)
+		// Read the record
+		sessRow, err := queries.GetSession(ctx, contextID)
 
-	// If the session doesn't exist then we do nothing because session is initializeed to empty session
-	session := &logspb.Session{
-		ContextId: contextID,
-	}
-	if err != nil {
-		if err != sql.ErrNoRows {
-			if txErr := tx.Rollback(); txErr != nil {
-				log.Error(txErr, "Failed to rollback transaction")
-			}
-			return errors.Wrapf(err, "Failed to get session with id %v", contextID)
+		// If the session doesn't exist then we do nothing because session is initializeed to empty session
+		session := &logspb.Session{
+			ContextId: contextID,
 		}
+		if err != nil {
+			if err != sql.ErrNoRows {
+				return errors.Wrapf(err, "Failed to get session with id %v", contextID)
+			}
+		} else {
+			// Deserialize the proto
+			if err := proto.Unmarshal(sessRow.Proto, session); err != nil {
+				return errors.Wrapf(err, "Failed to deserialize session")
+			}
+		}
+
+		if err := updateFunc(session); err != nil {
+			return errors.Wrapf(err, "Failed to update session")
+		}
+
+		newRow, err := protoToRow(session)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to convert session proto to table row")
+		}
+
+		if newRow.Contextid != contextID {
+			return errors.WithStack(errors.Errorf("contextID in session doesn't match contextID. Update was called with contextID: %v but session has contextID: %v", contextID, newRow.Contextid))
+		}
+
+		update := fsql.UpdateSessionParams{
+			Contextid:         contextID,
+			Proto:             newRow.Proto,
+			Starttime:         newRow.Starttime,
+			Endtime:           newRow.Endtime,
+			Selectedid:        newRow.Selectedid,
+			Selectedkind:      newRow.Selectedkind,
+			TotalInputTokens:  newRow.TotalInputTokens,
+			TotalOutputTokens: newRow.TotalOutputTokens,
+			NumGenerateTraces: newRow.NumGenerateTraces,
+		}
+
+		if err := queries.UpdateSession(ctx, update); err != nil {
+
+			return errors.Wrapf(err, "Failed to update session")
+		}
+		return nil
+	}()
+
+	if err == nil {
+		if err := tx.Commit(); err != nil {
+			log.Error(err, "Failed to commit transaction", "sessionId", contextID)
+			sessCounter.WithLabelValues("commitfail").Inc()
+			return errors.Wrapf(err, "Failed to commit transaction")
+		}
+		sessCounter.WithLabelValues("success").Inc()
 	} else {
-		// Deserialize the proto
-		if err := proto.Unmarshal(sessRow.Proto, session); err != nil {
-			if txErr := tx.Rollback(); txErr != nil {
-				log.Error(txErr, "Failed to rollback transaction")
-			}
-			return errors.Wrapf(err, "Failed to deserialize session")
-		}
-	}
-
-	if err := updateFunc(session); err != nil {
+		sessCounter.WithLabelValues("fail").Inc()
+		log.Error(err, "Failed to update session", "sessionId", contextID)
 		if txErr := tx.Rollback(); txErr != nil {
 			log.Error(txErr, "Failed to rollback transaction")
 		}
-		return errors.Wrapf(err, "Failed to update session")
-	}
-
-	newRow, err := protoToRow(session)
-	if err != nil {
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Error(txErr, "Failed to rollback transaction")
-		}
-		return errors.Wrapf(err, "Failed to convert session proto to table row")
-	}
-
-	if newRow.Contextid != contextID {
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Error(txErr, "Failed to rollback transaction")
-		}
-		return errors.WithStack(errors.Errorf("contextID in session doesn't match contextID. Update was called with contextID: %v but session has contextID: %v", contextID, newRow.Contextid))
-	}
-
-	update := fsql.UpdateSessionParams{
-		Contextid:         contextID,
-		Proto:             newRow.Proto,
-		Starttime:         newRow.Starttime,
-		Endtime:           newRow.Endtime,
-		Selectedid:        newRow.Selectedid,
-		Selectedkind:      newRow.Selectedkind,
-		TotalInputTokens:  newRow.TotalInputTokens,
-		TotalOutputTokens: newRow.TotalOutputTokens,
-		NumGenerateTraces: newRow.NumGenerateTraces,
-	}
-
-	if err := queries.UpdateSession(ctx, update); err != nil {
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Error(txErr, "Failed to rollback transaction")
-		}
-		return errors.Wrapf(err, "Failed to update session")
-	}
-
-	if err := tx.Commit(); err != nil {
-		return errors.Wrapf(err, "Failed to commit transaction")
+		return err
 	}
 
 	return nil
