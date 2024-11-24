@@ -3,11 +3,12 @@ package learn
 import (
 	"context"
 	"fmt"
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
 	"io"
 	"strings"
 	"sync"
+
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
 	"github.com/jlewi/foyle/app/pkg/analyze"
 	"github.com/jlewi/foyle/app/pkg/runme/converters"

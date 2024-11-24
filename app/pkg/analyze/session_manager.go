@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"os"
 	"path/filepath"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/logs"

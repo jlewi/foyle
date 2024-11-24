@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"context"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
 	"github.com/jlewi/foyle/app/pkg/logs"
