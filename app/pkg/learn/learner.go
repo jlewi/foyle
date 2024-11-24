@@ -3,6 +3,8 @@ package learn
 import (
 	"context"
 	"fmt"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 	"io"
 	"strings"
 	"sync"
@@ -101,6 +103,8 @@ func (l *Learner) Enqueue(id string) error {
 	if l.queue.ShuttingDown() {
 		return errors.New("Queue is shutting down; can't enqueue anymore items")
 	}
+	log := zapr.NewLogger(zap.L())
+	log.V(logs.Debug).Info("Enqueue example", "contextId", id)
 	l.queue.Add(id)
 	enqueuedCounter.Inc()
 	return nil

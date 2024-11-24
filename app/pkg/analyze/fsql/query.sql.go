@@ -29,6 +29,7 @@ func (q *Queries) GetSession(ctx context.Context, contextid string) (Session, er
 		&i.NumGenerateTraces,
 		&i.Proto,
 	)
+
 	return i, err
 }
 
