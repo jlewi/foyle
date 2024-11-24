@@ -40,7 +40,7 @@ You can use the session ID to track whether learning occured.
 
 ```bash
 CONTEXTID=01J7S3QZMS5F742JFPWZDCTVRG
-curl -s -X POST https://localhost:8877/foyle.logs.SessionsService/GetSession -H "Content-Type: application/json" -d "{\"contextId\": \"${CONTEXTID}\"}" | jq.
+curl -s -X POST http://localhost:8877/api/GetSession -H "Content-Type: application/json" -d "{\"contextId\": \"${CONTEXTID}\"}" | jq .
 ```
 
 * If this returns not found then no log was created for this sessions and there is a problem with Log Processing
