@@ -99,13 +99,20 @@ func (l *Learner) Start(ctx context.Context, postFunc PostLearnEvent) error {
 }
 
 // Enqueue adds an example id to be reconciled
-func (l *Learner) Enqueue(id string) error {
+func (l *Learner) Enqueue(session *logspb.Session) error {
 	if l.queue.ShuttingDown() {
 		return errors.New("Queue is shutting down; can't enqueue anymore items")
 	}
+
+	if !isLearnable(session) {
+		// Filter out the sessions that aren't learnable
+		// We don't want to enqueue them because that will put unnecessary load on the DB
+		return nil
+	}
+
 	log := zapr.NewLogger(zap.L())
-	log.V(logs.Debug).Info("Enqueue example", "contextId", id)
-	l.queue.Add(id)
+	log.V(logs.Debug).Info("Enqueue example", "contextId", session.GetContextId())
+	l.queue.Add(session.GetContextId())
 	enqueuedCounter.Inc()
 	return nil
 }
@@ -162,48 +169,16 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 		return errors.Wrapf(err, "Unable to learn from session %s; failed to retrieve session", id)
 	}
 
-	// Make sure there is a cell execution log event.
-	// Right now we rely on the cell execution log event to get the actual cell content.
-	// So we can't learn from sessions without cell execution events. TN013 has some ideas for how we could
-	// learn in the event of non cell execution events.
-	var execEvent *v1alpha1.LogEvent
-	for _, event := range session.LogEvents {
-		if event.GetType() != v1alpha1.LogEventType_EXECUTE {
-			continue
-		}
-
-		// We don't want to learn from failed events.
-		if event.ExecuteStatus != v1alpha1.LogEvent_SUCCEEDED {
-			continue
-		}
-
-		// We want to learn from the final successful event.
-		execEvent = event
-	}
-
-	if execEvent == nil {
-		// Since the cell wasn't successfully executed we don't learn from it
-		sessProcessed.WithLabelValues("noexec").Inc()
-		return nil
-	}
-
-	if session.GetFullContext() == nil {
-		sessProcessed.WithLabelValues("nocontext").Inc()
-		return errors.Errorf("Unable to learn from session %s; session has no context", session.GetContextId())
-	}
-
-	if session.GetFullContext().GetNotebook() == nil {
-		sessProcessed.WithLabelValues("nonotebook").Inc()
-		return errors.Errorf("Unable to learn from session %s; session has no notebook", session.GetContextId())
-	}
-
-	if session.GetFullContext().GetSelected() == 0 {
-		// If its the first cell we can't learn from it because what would we use as context to predict it?
-		sessProcessed.WithLabelValues("firstcell").Inc()
+	// N.B. isLearnable should be called in enQueue and the item should be filtered out if we can't learn from it
+	// But we call it here just in case.
+	if !isLearnable(session) {
+		// N.B. This shouldn't happen because the session shouldn't have been enequed if it isn't learnable
+		log.Info("Session is not learnable", "sessionId", id)
 		return nil
 	}
 
 	sessProcessed.WithLabelValues("learn").Inc()
+
 	expectedFiles := l.getExampleFiles(session.GetContextId())
 
 	log.Info("Found new training example", "sessionId", session.GetContextId())
@@ -214,6 +189,7 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 		return errors.Wrapf(err, "No training files found for example %s", session.GetContextId())
 	}
 
+	execEvent := getLastExecEvent(session)
 	var executedCell *parserv1.Cell
 	var execID string
 	for _, c := range execEvent.Cells {
@@ -392,4 +368,63 @@ func sessionToQuery(session *logspb.Session) (*v1alpha1.GenerateRequest, error) 
 	}
 
 	return req, nil
+}
+
+// isLearnable returns true if the session is eligible for learning and false otherwise
+func isLearnable(session *logspb.Session) bool {
+	// Make sure there is a cell execution log event.
+	// Right now we rely on the cell execution log event to get the actual cell content.
+	// So we can't learn from sessions without cell execution events. TN013 has some ideas for how we could
+	// learn in the event of non cell execution events.
+	execEvent := getLastExecEvent(session)
+
+	if execEvent == nil {
+		// Since the cell wasn't successfully executed we don't learn from it
+		sessProcessed.WithLabelValues("noexec").Inc()
+		return false
+	}
+
+	log := zapr.NewLogger(zap.L())
+	if session.GetFullContext() == nil {
+		sessProcessed.WithLabelValues("nocontext").Inc()
+		log.Error(errors.New("Session missing fullcontext"), "contextId", session.GetContextId())
+		return false
+	}
+
+	if session.GetFullContext().GetNotebook() == nil {
+		sessProcessed.WithLabelValues("nonotebook").Inc()
+		log.Error(errors.New("Session missing notebook"), "contextId", session.GetContextId())
+		return false
+	}
+
+	if session.GetFullContext().GetSelected() == 0 {
+		// If its the first cell we can't learn from it because what would we use as context to predict it?
+		sessProcessed.WithLabelValues("firstcell").Inc()
+		return false
+	}
+	return true
+}
+
+// getLasExecEvent returns the last successful execution event in the session
+// or null if there isn't one.
+func getLastExecEvent(session *logspb.Session) *v1alpha1.LogEvent {
+	// Make sure there is a cell execution log event.
+	// Right now we rely on the cell execution log event to get the actual cell content.
+	// So we can't learn from sessions without cell execution events. TN013 has some ideas for how we could
+	// learn in the event of non cell execution events.
+	var execEvent *v1alpha1.LogEvent
+	for _, event := range session.LogEvents {
+		if event.GetType() != v1alpha1.LogEventType_EXECUTE {
+			continue
+		}
+
+		// We don't want to learn from failed events.
+		if event.ExecuteStatus != v1alpha1.LogEvent_SUCCEEDED {
+			continue
+		}
+
+		// We want to learn from the final successful event.
+		execEvent = event
+	}
+	return execEvent
 }

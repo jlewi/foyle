@@ -65,8 +65,12 @@ func (p *sessionBuilder) processLogEvent(entry *api.LogEntry, notifier PostSessi
 		return
 	}
 
+	var session *logspb.Session
 	updateFunc := func(s *logspb.Session) error {
-		return updateSessionFromEvent(event, entry.Time(), s)
+		err := updateSessionFromEvent(event, entry.Time(), s)
+		// Make a copy of the updated session because we will process it down below
+		session = s
+		return err
 	}
 
 	if err := p.sessions.Update(context.Background(), event.GetContextId(), updateFunc); err != nil {
@@ -75,7 +79,7 @@ func (p *sessionBuilder) processLogEvent(entry *api.LogEntry, notifier PostSessi
 	}
 
 	if event.Type == v1alpha1.LogEventType_SESSION_END {
-		if err := notifier(event.GetContextId()); err != nil {
+		if err := notifier(session); err != nil {
 			log.Error(err, "Failed to send session process event", "contextId", event.GetContextId())
 		}
 	}
