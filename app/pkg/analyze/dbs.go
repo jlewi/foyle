@@ -1,9 +1,14 @@
 package analyze
 
 import (
+	"context"
 	"github.com/cockroachdb/pebble"
 	"github.com/jlewi/foyle/app/pkg/dbutil"
+	"github.com/jlewi/foyle/app/pkg/logs"
 	logspb "github.com/jlewi/foyle/protos/go/foyle/logs"
+	"github.com/pkg/errors"
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // NewLockingBlocksDB helper function to create a new LockingDB for BlockLog.
@@ -38,4 +43,15 @@ func getLogEntriesVersion(m *logspb.LogEntries) string {
 
 func setLogEntriesVersion(m *logspb.LogEntries, version string) {
 	m.ResourceVersion = version
+}
+
+func logDBErrors(ctx context.Context, err error) {
+	log := logs.FromContext(ctx)
+	var sqlLiteErr *sqlite.Error
+	if errors.As(err, &sqlLiteErr) {
+		if sqlLiteErr.Code() == sqlite3.SQLITE_BUSY {
+			sqlLiteBusyErrs.Inc()
+			log.Error(err, "SQLITE_BUSY")
+		}
+	}
 }

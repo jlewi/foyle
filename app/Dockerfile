@@ -29,4 +29,5 @@ FROM ${RUNTIME_IMAGE}
 
 COPY --from=builder /workspace/app/foyle /
 
-ENTRYPOINT ["/foyle", "serve"]
+# N.B. Don't set any arguments because we want to be compatible with the images ko builds
+ENTRYPOINT ["/foyle"]

@@ -38,6 +38,11 @@ var (
 		},
 		[]string{"status"},
 	)
+
+	sqlLiteBusyErrs = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "sqlite_busy",
+		Help: "Number of operations that failed because sqlite was busy",
+	})
 )
 
 // GetDDL return the DDL for the database.
@@ -80,6 +85,7 @@ func (db *SessionsManager) Get(ctx context.Context, contextID string) (*logspb.S
 	sessRow, err := queries.GetSession(ctx, contextID)
 
 	if err != nil {
+		logDBErrors(ctx, err)
 		return nil, err
 	}
 
@@ -108,6 +114,8 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 
 	tx, err := db.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
+		// DO NOT COMMIT
+		sessCounter.WithLabelValues("failedstart").Inc()
 		return errors.Wrapf(err, "Failed to start transaction")
 	}
 
@@ -121,15 +129,22 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 			ContextId: contextID,
 		}
 		if err != nil {
+			logDBErrors(ctx, err)
 			if err != sql.ErrNoRows {
+				// DO NOT COMMIT
+				sessCounter.WithLabelValues("failedget").Inc()
 				return errors.Wrapf(err, "Failed to get session with id %v", contextID)
 			}
+			// ErrNoRows means the session doesn't exist so we just continue with the empty session
 		} else {
 			// Deserialize the proto
 			if err := proto.Unmarshal(sessRow.Proto, session); err != nil {
 				return errors.Wrapf(err, "Failed to deserialize session")
 			}
 		}
+
+		// DO NOT COMMIT
+		sessCounter.WithLabelValues("callupdatefunc").Inc()
 
 		if err := updateFunc(session); err != nil {
 			return errors.Wrapf(err, "Failed to update session")
@@ -156,8 +171,10 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 			NumGenerateTraces: newRow.NumGenerateTraces,
 		}
 
+		// DO NOT COMMIT
+		sessCounter.WithLabelValues("callupdatesession").Inc()
 		if err := queries.UpdateSession(ctx, update); err != nil {
-
+			logDBErrors(ctx, err)
 			return errors.Wrapf(err, "Failed to update session")
 		}
 		return nil
@@ -179,6 +196,8 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 		return err
 	}
 
+	// DO NOT COMMIT
+	sessCounter.WithLabelValues("done").Inc()
 	return nil
 }
 
