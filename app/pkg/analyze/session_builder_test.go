@@ -72,8 +72,8 @@ func setup() (testTuple, error) {
 }
 
 // Process the log entry
-func testNotifier(contextId string) error {
-	fmt.Printf("Received session end event for context: %v", contextId)
+func testNotifier(session *logspb.Session) error {
+	fmt.Printf("Received session end event for context: %v", session.GetContextId())
 	return nil
 }
 

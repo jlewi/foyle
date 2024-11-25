@@ -174,15 +174,15 @@ type fakeNotifier struct {
 	counts map[string]int
 }
 
-func (f *fakeNotifier) PostBlockEvent(blockID string) error {
+func (f *fakeNotifier) PostSession(session *logspb.Session) error {
 	if f.counts == nil {
 		f.counts = make(map[string]int)
 	}
-	if _, ok := f.counts[blockID]; !ok {
-		f.counts[blockID] = 0
+	if _, ok := f.counts[session.GetContextId()]; !ok {
+		f.counts[session.GetContextId()] = 0
 
 	}
-	f.counts[blockID] += 1
+	f.counts[session.GetContextId()] += 1
 	return nil
 }
 
@@ -276,7 +276,7 @@ func Test_Analyzer(t *testing.T) {
 	a.signalBlockDone = blockProccessed
 
 	fakeNotifier := &fakeNotifier{}
-	if err := a.Run(context.Background(), []string{rawDir}, fakeNotifier.PostBlockEvent); err != nil {
+	if err := a.Run(context.Background(), []string{rawDir}, fakeNotifier.PostSession); err != nil {
 		t.Fatalf("Analyze failed: %v", err)
 	}
 
@@ -321,11 +321,6 @@ func Test_Analyzer(t *testing.T) {
 	}
 	if block.ExecutedBlock == nil {
 		t.Errorf("Expected ExecutedBlock to be set")
-	}
-
-	// Check the block notifier was called twice; once after the generated block and once after the executed block
-	if fakeNotifier.counts[expectedBlockID] != 2 {
-		t.Errorf("Expected block notifier to be called twice but got %d", fakeNotifier.counts[expectedBlockID])
 	}
 
 	// Now append some logs to the logFile and see that they get processed

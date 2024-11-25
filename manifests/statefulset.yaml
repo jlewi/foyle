@@ -38,6 +38,7 @@ spec:
       - name: foyle
         image: ghcr.io/jlewi/foyle:latest
         args:
+        - serve
         - --config=/config/foyle.yaml
         resources:
           requests:
