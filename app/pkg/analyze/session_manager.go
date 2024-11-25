@@ -81,9 +81,6 @@ func NewSessionsManager(db *sql.DB) (*SessionsManager, error) {
 // Get retrieves a session with the given contextID.
 func (db *SessionsManager) Get(ctx context.Context, contextID string) (*logspb.Session, error) {
 	queries := db.queries
-	// TODO(https://github.com/jlewi/foyle/issues/345): Change logging to avoid duplicating session ID
-	log := logs.FromContext(ctx)
-	log = log.WithValues("contextId", contextID)
 
 	// Read the record
 	sessRow, err := queries.GetSession(ctx, contextID)
