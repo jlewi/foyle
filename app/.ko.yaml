@@ -1,0 +1,15 @@
+# https://ko.build/configuration/#setting-build-flags-and-ldflags
+defaultFlags:
+  # https://ko.build/configuration/#naming-images
+  # --base-import-paths removes the md5hash from the image name
+  # but it appends to the repo path a name based on the path of the module which in this case is "app"
+  # TODO(jeremy): This doesn't seem to be working I still have to set the flag when I run ko
+  - --base-import-paths
+builds:
+  - id: foyle
+    ldflags:
+      - -s
+      - -w
+      - -X 'github.com/jlewi/foyle/app/cmd.date={{.Date}}'
+      - -X 'github.com/jlewi/foyle/app/cmd.version=dev'
+      - -X 'github.com/jlewi/foyle/app/cmd.commit={{.Git.ShortCommit}}'

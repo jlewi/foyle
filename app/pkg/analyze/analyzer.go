@@ -153,7 +153,7 @@ type blockItem struct {
 }
 
 // PostSessionEvent interface for functions to post session events.
-type PostSessionEvent func(id string) error
+type PostSessionEvent func(session *logspb.Session) error
 
 // Run runs the analyzer; continually processing logs.
 // learnNotifier is an optional function that will be called when a block is updated.
@@ -466,14 +466,6 @@ func (a *Analyzer) processLogEvent(ctx context.Context, entry *api.LogEntry) {
 		}); err != nil {
 			log.Error(err, "Failed to update block with execution", "blockId", bid)
 		}
-		// We need to enqueue the block for processing since it was executed.
-		// The learner will decide whether the blockLog has all the information it needs otherwise it will
-		// disregard the block item and wait for further events.
-		if a.learnNotifier != nil {
-			if err := a.learnNotifier(bid); err != nil {
-				log.Error(err, "Error notifying block event", "blockId", bid)
-			}
-		}
 	case v1alpha1.LogEventType_ACCEPTED:
 		fallthrough
 	case v1alpha1.LogEventType_REJECTED:
@@ -665,14 +657,6 @@ func (a *Analyzer) handleBlockEvents(ctx context.Context) {
 			})
 			if err != nil {
 				log.Error(err, "Error processing block", "blockId", blockItem.id)
-			}
-			// We need to enqueue the block for processing since it was executed.
-			// The learner will decide whether the blockLog has all the information it needs otherwise it will
-			// disregard the block item and wait for further events.
-			if a.learnNotifier != nil {
-				if err := a.learnNotifier(blockItem.id); err != nil {
-					log.Error(err, "Error notifying block event", "blockId", blockItem.id)
-				}
 			}
 			if a.signalBlockDone != nil {
 				a.signalBlockDone <- blockItem.id

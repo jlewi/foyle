@@ -65,18 +65,22 @@ func (p *sessionBuilder) processLogEvent(entry *api.LogEntry, notifier PostSessi
 		return
 	}
 
+	var session *logspb.Session
 	updateFunc := func(s *logspb.Session) error {
-		return updateSessionFromEvent(event, entry.Time(), s)
+		err := updateSessionFromEvent(event, entry.Time(), s)
+		// Make a copy of the updated session because we will process it down below
+		session = s
+		return err
 	}
 
 	if err := p.sessions.Update(context.Background(), event.GetContextId(), updateFunc); err != nil {
-		log.Error(err, "Failed to update session", "event", event)
+		log.Error(err, "Failed to update session", "event", event, "contextId", event.GetContextId())
 		return
 	}
 
 	if event.Type == v1alpha1.LogEventType_SESSION_END {
-		if err := notifier(event.GetContextId()); err != nil {
-			log.Error(err, "Failed to send session process event")
+		if err := notifier(session); err != nil {
+			log.Error(err, "Failed to send session process event", "contextId", event.GetContextId())
 		}
 	}
 }
@@ -90,7 +94,7 @@ func (p *sessionBuilder) processLLMUsage(entry *api.LogEntry) {
 	}
 	contextId, ok := entry.GetString("contextId")
 	if !ok {
-		log.Error(errors.New("Failed to handle LLMUsage log entry"), "LLMUsage is missing contextId", "entry", entry)
+		log.Error(errors.New("Failed to handle LLMUsage log entry"), "LLMUsage is missing contextId", "entry", entry, "contextId", contextId)
 		return
 	}
 
@@ -99,7 +103,7 @@ func (p *sessionBuilder) processLLMUsage(entry *api.LogEntry) {
 	}
 
 	if err := p.sessions.Update(context.Background(), contextId, updateFunc); err != nil {
-		log.Error(err, "Failed to update session", "usage", usage)
+		log.Error(err, "Failed to update session", "usage", usage, "contextId", contextId)
 	}
 }
 
