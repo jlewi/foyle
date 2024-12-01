@@ -280,9 +280,27 @@ func (a *App) createCoreForConsole(paths []string) (zapcore.Core, error) {
 
 	// Use the keys used by cloud logging
 	// https://cloud.google.com/logging/docs/structured-logging
-	c.LevelKey = "severity"
-	c.TimeKey = "time"
-	c.MessageKey = "message"
+	logFields := a.Config.Logging.LogFields
+	if logFields == nil {
+		logFields = &config.LogFields{}
+	}
+	if logFields.Level != "" {
+		c.LevelKey = logFields.Level
+	} else {
+		c.LevelKey = "severity"
+	}
+
+	if logFields.Time != "" {
+		c.TimeKey = logFields.Time
+	} else {
+		c.TimeKey = "time"
+	}
+
+	if logFields.Message != "" {
+		c.MessageKey = logFields.Message
+	} else {
+		c.MessageKey = "message"
+	}
 
 	lvl := a.Config.GetLogLevel()
 	zapLvl := zap.NewAtomicLevel()
@@ -333,11 +351,27 @@ func (a *App) createJSONCoreLogger(paths []string) (zapcore.Core, error) {
 	c := zap.NewProductionEncoderConfig()
 	// Use the keys used by cloud logging
 	// https://cloud.google.com/logging/docs/structured-logging
-	c.LevelKey = "severity"
-	c.TimeKey = "time"
-	c.MessageKey = "message"
-	// We attach the function key to the logs because that is useful for identifying the function that generated the log.
-	c.FunctionKey = "function"
+	logFields := a.Config.Logging.LogFields
+	if logFields == nil {
+		logFields = &config.LogFields{}
+	}
+	if logFields.Level != "" {
+		c.LevelKey = logFields.Level
+	} else {
+		c.LevelKey = "severity"
+	}
+
+	if logFields.Time != "" {
+		c.TimeKey = logFields.Time
+	} else {
+		c.TimeKey = "time"
+	}
+
+	if logFields.Message != "" {
+		c.MessageKey = logFields.Message
+	} else {
+		c.MessageKey = "message"
+	}
 
 	jsonEncoder := zapcore.NewJSONEncoder(c)
 

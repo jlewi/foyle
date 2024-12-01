@@ -51,6 +51,14 @@ var (
 		},
 		[]string{"status"},
 	)
+
+	learnedCounter = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "learned_examples_total",
+			Help: "Number of examples learned",
+		},
+		[]string{"status"},
+	)
 )
 
 // Learner handles the learn loop to learn from past mistakes.
@@ -298,7 +306,10 @@ func (l *Learner) Reconcile(ctx context.Context, id string) error {
 
 	if len(writeErrors.Causes) > 0 {
 		writeErrors.Final = errors.New("Not all examples could be successfully reconciled")
+		learnedCounter.WithLabelValues("error").Inc()
 		return writeErrors
+	} else {
+		learnedCounter.WithLabelValues("success").Inc()
 	}
 	return nil
 }

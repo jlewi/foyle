@@ -127,13 +127,17 @@ func (s *Server) createGinEngine() error {
 
 	apiPrefix := s.config.APIPrefix()
 
-	// Set  up the connect-rpc handlers for the EvalServer
+	// Set  up the connect-rpc handlers
+
+	// Create the OTEL interceptor
 	otelInterceptor, err := otelconnect.NewInterceptor()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to create otel interceptor")
 	}
 
-	path, handler := v1alpha1connect.NewEvalServiceHandler(s.evalServer, connect.WithInterceptors(otelInterceptor))
+	interceptors := []connect.Interceptor{otelInterceptor}
+
+	path, handler := v1alpha1connect.NewEvalServiceHandler(s.evalServer, connect.WithInterceptors(interceptors...))
 
 	log.Info("Setting up eval service", "path", path)
 	// Since we want to add the prefix apiPrefix we need to strip it before passing it to the connect-rpc handler
@@ -141,19 +145,19 @@ func (s *Server) createGinEngine() error {
 	// support prefixes.
 	router.Any(apiPrefix+"/"+path+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, handler)))
 
-	generatePath, generateHandler := v1alpha1connect.NewGenerateServiceHandler(s, connect.WithInterceptors(otelInterceptor))
+	generatePath, generateHandler := v1alpha1connect.NewGenerateServiceHandler(s, connect.WithInterceptors(interceptors...))
 	log.Info("Setting up generate service", "path", apiPrefix+"/"+generatePath)
 	router.Any(apiPrefix+"/"+generatePath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, generateHandler)))
 
-	aiSvcPath, aiSvcHandler := v1alpha1connect.NewAIServiceHandler(s.agent, connect.WithInterceptors(otelInterceptor))
+	aiSvcPath, aiSvcHandler := v1alpha1connect.NewAIServiceHandler(s.agent, connect.WithInterceptors(interceptors...))
 	log.Info("Setting up AI service", "path", apiPrefix+"/"+aiSvcPath)
 	router.Any(apiPrefix+"/"+aiSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, aiSvcHandler)))
 
-	logsSvcPath, logsSvcHandler := logspbconnect.NewLogsServiceHandler(s.logsCrud, connect.WithInterceptors(otelInterceptor))
+	logsSvcPath, logsSvcHandler := logspbconnect.NewLogsServiceHandler(s.logsCrud, connect.WithInterceptors(interceptors...))
 	log.Info("Setting up logs service", "path", apiPrefix+"/"+logsSvcPath)
 	router.Any(apiPrefix+"/"+logsSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, logsSvcHandler)))
 
-	sessSvcPath, sessSvcHandler := logspbconnect.NewSessionsServiceHandler(s.sessManager, connect.WithInterceptors(otelInterceptor))
+	sessSvcPath, sessSvcHandler := logspbconnect.NewSessionsServiceHandler(s.sessManager, connect.WithInterceptors(interceptors...))
 	log.Info("Setting up sessions service", "path", apiPrefix+"/"+sessSvcPath)
 	router.Any(apiPrefix+"/"+sessSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, sessSvcHandler)))
 
@@ -161,7 +165,7 @@ func (s *Server) createGinEngine() error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to create ConvertersService")
 	}
-	cvtSvcPath, cvtSvcHandler := logspbconnect.NewConversionServiceHandler(cSvc, connect.WithInterceptors(otelInterceptor))
+	cvtSvcPath, cvtSvcHandler := logspbconnect.NewConversionServiceHandler(cSvc, connect.WithInterceptors(interceptors...))
 	log.Info("Setting up conversion service", "path", apiPrefix+"/"+cvtSvcPath)
 	router.Any(apiPrefix+"/"+cvtSvcPath+"*any", gin.WrapH(http.StripPrefix("/"+apiPrefix, cvtSvcHandler)))
 
