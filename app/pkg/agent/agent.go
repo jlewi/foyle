@@ -643,6 +643,7 @@ func (a *Agent) LogEvents(ctx context.Context, req *connect.Request[v1alpha1.Log
 
 			switch event.GetType() {
 			case v1alpha1.LogEventType_ACCEPTED:
+
 				acceptedCounter.Inc()
 			case v1alpha1.LogEventType_EXECUTE:
 				executedCounter.WithLabelValues(event.GetExecuteStatus().String()).Inc()
