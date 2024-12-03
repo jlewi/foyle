@@ -41,8 +41,16 @@ const (
 var (
 	enqueuedCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "learner_enqueued_total",
-		Help: "Total number of enqueued blocks",
+		Help: "Total number of enqueued sessions for learning",
 	})
+
+	sessFiltered = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "learner_not_learnable",
+			Help: "Number of sessions that aren't learnable",
+		},
+		[]string{"status"},
+	)
 
 	sessProcessed = promauto.NewCounterVec(
 		prometheus.CounterOpts{
@@ -392,26 +400,26 @@ func isLearnable(session *logspb.Session) bool {
 
 	if execEvent == nil {
 		// Since the cell wasn't successfully executed we don't learn from it
-		sessProcessed.WithLabelValues("noexec").Inc()
+		sessFiltered.WithLabelValues("noexec").Inc()
 		return false
 	}
 
 	log := zapr.NewLogger(zap.L())
 	if session.GetFullContext() == nil {
-		sessProcessed.WithLabelValues("nocontext").Inc()
+		sessFiltered.WithLabelValues("nocontext").Inc()
 		log.Error(errors.New("Session missing fullcontext"), "contextId", session.GetContextId())
 		return false
 	}
 
 	if session.GetFullContext().GetNotebook() == nil {
-		sessProcessed.WithLabelValues("nonotebook").Inc()
+		sessFiltered.WithLabelValues("nonotebook").Inc()
 		log.Error(errors.New("Session missing notebook"), "contextId", session.GetContextId())
 		return false
 	}
 
 	if session.GetFullContext().GetSelected() == 0 {
 		// If its the first cell we can't learn from it because what would we use as context to predict it?
-		sessProcessed.WithLabelValues("firstcell").Inc()
+		sessFiltered.WithLabelValues("firstcell").Inc()
 		return false
 	}
 	return true

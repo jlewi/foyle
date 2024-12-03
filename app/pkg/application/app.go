@@ -378,7 +378,7 @@ func (a *App) createJSONCoreLogger(paths []string) (zapcore.Core, error) {
 	// why we don't allow it to be customized to match the field expected by a logging backend like Datadog
 	// or Cloud Logging
 	c.FunctionKey = "function"
-
+	
 	jsonEncoder := zapcore.NewJSONEncoder(c)
 
 	fmt.Fprintf(os.Stdout, "Writing JSON logs to %s\n", paths)
