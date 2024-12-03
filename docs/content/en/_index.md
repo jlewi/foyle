@@ -37,9 +37,14 @@ We do a [Pull Request](https://github.com/jlewi/foyle/pulls) contributions workf
 {{% /blocks/feature %}}
 
 
-{{% blocks/feature icon="bluesky_logo" title="Follow us on Bluesky!" url="https://bsky.app/profile/jeremy.lewi.us" %}}
+{{% blocks/feature icon="fab fa-bluesky" title="Follow us on Bluesky!" url="https://bsky.app/profile/jeremy.lewi.us" %}}
 For announcement of latest features etc.
+<style>
+  .fab.fa-bluesky {
+    color: #1DA1F2; /* Blue color */
+  }
+</style>
+
 {{% /blocks/feature %}}
-
-
 {{% /blocks/section %}}
+
