@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 	"os"
 	"path/filepath"
 
@@ -68,6 +70,15 @@ func NewSessionsManager(db *sql.DB) (*SessionsManager, error) {
 	if _, err := db.ExecContext(context.TODO(), ddl); err != nil {
 		return nil, err
 	}
+
+	// Set busy_timeout using PRAGMA. This is to deal with frequent sqlite busy errors when deployed on
+	// Azure.
+	// This is in milliseconds
+	if _, err := db.Exec("PRAGMA busy_timeout = 10000;"); err != nil {
+		return nil, errors.Wrapf(err, "Failed to set busy timeout for the database")
+	}
+	log := zapr.NewLogger(zap.L())
+	log.Info("sqlite busy_timeout set", "timeout", 5000)
 
 	// Create the dbtx from the actual database
 	queries := fsql.New(db)
