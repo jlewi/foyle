@@ -6,6 +6,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+
 	"github.com/jlewi/foyle/app/pkg/runme/ulid"
 
 	"github.com/jlewi/foyle/protos/go/foyle/v1alpha1/v1alpha1connect"
@@ -47,6 +50,19 @@ const (
 	// (https://platform.openai.com/docs/models/gpt-3-5-turbo)
 	MaxDocChars = 1110
 	temperature = 0.9
+)
+
+var (
+	executedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "cells_executed_total",
+		Help: "Total number of executed cells broken down by status"},
+		[]string{"status"},
+	)
+
+	acceptedCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "cells_accepted_total",
+		Help: "Total number of suggested cells accepted broken down by type"},
+	)
 )
 
 // Agent is the agent.
@@ -625,6 +641,14 @@ func (a *Agent) LogEvents(ctx context.Context, req *connect.Request[v1alpha1.Log
 		func() {
 			_, span := tp.Start(ctx, "LogEvent", trace.WithAttributes(attribute.String("eventType", event.Type.String()), attribute.String("contextId", event.ContextId), attribute.String("selectedCellId", event.SelectedId)))
 			defer span.End()
+
+			switch event.GetType() {
+			case v1alpha1.LogEventType_ACCEPTED:
+
+				acceptedCounter.Inc()
+			case v1alpha1.LogEventType_EXECUTE:
+				executedCounter.WithLabelValues(event.GetExecuteStatus().String()).Inc()
+			}
 			// N.B we can't use zap.Object to log the event because it contains runme protos which don't have the zap marshaler bindings.
 			log.Info("LogEvent", "eventId", event.GetEventId(), "eventType", event.Type, "contextId", event.ContextId, "selectedCellId", event.SelectedId, logs.ZapProto("event", event))
 		}()

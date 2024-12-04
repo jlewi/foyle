@@ -8,6 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -69,6 +72,15 @@ func NewSessionsManager(db *sql.DB) (*SessionsManager, error) {
 		return nil, err
 	}
 
+	// Set busy_timeout using PRAGMA. This is to deal with frequent sqlite busy errors when deployed on
+	// Azure.
+	// This is in milliseconds
+	if _, err := db.Exec("PRAGMA busy_timeout = 10000;"); err != nil {
+		return nil, errors.Wrapf(err, "Failed to set busy timeout for the database")
+	}
+	log := zapr.NewLogger(zap.L())
+	log.Info("sqlite busy_timeout set", "timeout", 5000)
+
 	// Create the dbtx from the actual database
 	queries := fsql.New(db)
 
@@ -115,7 +127,6 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 
 	tx, err := db.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
-		// DO NOT COMMIT
 		sessCounter.WithLabelValues("failedstart").Inc()
 		return errors.Wrapf(err, "Failed to start transaction")
 	}
@@ -132,7 +143,6 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 		if err != nil {
 			logDBErrors(ctx, err)
 			if err != sql.ErrNoRows {
-				// DO NOT COMMIT
 				sessCounter.WithLabelValues("failedget").Inc()
 				return errors.Wrapf(err, "Failed to get session with id %v", contextID)
 			}
@@ -144,7 +154,6 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 			}
 		}
 
-		// DO NOT COMMIT
 		sessCounter.WithLabelValues("callupdatefunc").Inc()
 
 		if err := updateFunc(session); err != nil {
@@ -172,7 +181,6 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 			NumGenerateTraces: newRow.NumGenerateTraces,
 		}
 
-		// DO NOT COMMIT
 		sessCounter.WithLabelValues("callupdatesession").Inc()
 		if err := queries.UpdateSession(ctx, update); err != nil {
 			logDBErrors(ctx, err)
@@ -199,7 +207,6 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 		return err
 	}
 
-	// DO NOT COMMIT
 	sessCounter.WithLabelValues("done").Inc()
 	return nil
 }

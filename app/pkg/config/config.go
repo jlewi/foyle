@@ -201,6 +201,15 @@ type Logging struct {
 
 	// MaxDelaySeconds is the maximum delay in seconds to wait before processing the logs.
 	MaxDelaySeconds int `json:"maxDelaySeconds,omitempty" yaml:"maxDelaySeconds,omitempty"`
+
+	LogFields *LogFields `json:"logFields,omitempty" yaml:"logFields,omitempty"`
+}
+
+// LogFields is the fields to use when logging to structured logging
+type LogFields struct {
+	Level   string `json:"level,omitempty" yaml:"level,omitempty"`
+	Time    string `json:"time,omitempty" yaml:"time,omitempty"`
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
 }
 
 type LogSink struct {
