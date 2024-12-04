@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
 	"os"
 	"path/filepath"
+
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
