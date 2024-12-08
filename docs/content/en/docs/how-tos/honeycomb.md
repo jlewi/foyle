@@ -20,7 +20,7 @@ Using Foyle and RunMe you can
   Your browser does not support the video tag.
 </video>
 
-## How to integrate Honeycomb with RunMe
+## How to integrate Honeycomb with Runne
 
 This section explains how to integrate executing Honeycomb queries from RunMe.
 
