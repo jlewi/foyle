@@ -53,9 +53,19 @@ and typescript see [blog](https://buf.build/blog/protobuf-es-the-protocol-buffer
 
 More documentation can be found [here](https://github.com/bufbuild/protobuf-es/blob/main/docs/generated_code.md)
 
-## GRPC-Gateway
+```bash {"id":"01JEVJYRQKKF8Q8DX7SSX6KGW0"}
+# To confirm the installation of the required packages and plugins, run the following commands:
+npm list @bufbuild/protobuf @bufbuild/protoc-gen-es @bufbuild/buf
+npm list -g @bufbuild/protoc-gen-connect-es
+```
 
-We [grpc-gateway](https://grpc-ecosystem.github.io/grpc-gateway/) to generate RESTful services from our grpc services.
+# GoLang
+
+* Install the plugin below to get `protoc-gen-go` 
+
+```bash
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+```
 
 ## connect-go
 

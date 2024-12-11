@@ -7,7 +7,9 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/golang/protobuf/proto"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
 	go_uber_org_zap_zapcore "go.uber.org/zap/zapcore"
+	github_com_golang_protobuf_ptypes "github.com/golang/protobuf/ptypes"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -28,6 +30,11 @@ func (m *LogsWaterMark) MarshalLogObject(enc go_uber_org_zap_zapcore.ObjectEncod
 
 	keyName = "offset" // field offset = 2
 	enc.AddInt64(keyName, m.Offset)
+
+	keyName = "last_log_timestamp" // field last_log_timestamp = 4
+	if t, err := github_com_golang_protobuf_ptypes.Timestamp(m.LastLogTimestamp); err == nil {
+		enc.AddTime(keyName, t)
+	}
 
 	return nil
 }
@@ -58,6 +65,9 @@ func (m *GetLogsStatusResponse) MarshalLogObject(enc go_uber_org_zap_zapcore.Obj
 			enc.AddObject(keyName, marshaler)
 		}
 	}
+
+	keyName = "last_log_timestamp_human" // field last_log_timestamp_human = 2
+	enc.AddString(keyName, m.LastLogTimestampHuman)
 
 	return nil
 }
