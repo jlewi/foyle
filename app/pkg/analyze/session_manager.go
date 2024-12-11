@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
+	"time"
 
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
@@ -47,6 +49,11 @@ var (
 		Name: "sqlite_busy",
 		Help: "Number of operations that failed because sqlite was busy",
 	})
+
+	activeUpdatesGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "session_manager_active_updates", // Metric name
+		Help: "Number of active updates",       // Metric description
+	})
 )
 
 // GetDDL return the DDL for the database.
@@ -63,6 +70,9 @@ type SessionUpdater func(session *logspb.Session) error
 type SessionsManager struct {
 	queries *fsql.Queries
 	db      *sql.DB
+	// Keep track of the number of concurrent calls to Update.
+	// This is intended to try to track down why SQLITE_BUSY errors is so frequent.
+	activeUpdates atomic.Int32
 }
 
 func NewSessionsManager(db *sql.DB) (*SessionsManager, error) {
@@ -117,98 +127,122 @@ func (db *SessionsManager) Get(ctx context.Context, contextID string) (*logspb.S
 // inserted if the updateFunc returns nil. If the session already exists then the session is passed to updateFunc
 // and the updated value is then written to the database
 func (db *SessionsManager) Update(ctx context.Context, contextID string, updateFunc SessionUpdater) error {
+	// Increment the counter when entering the function
+	numActive := db.activeUpdates.Add(1)
+	defer func() {
+		// Decrement the counter when leaving the function
+		db.activeUpdates.Add(-1)
+	}()
+
 	log := logs.FromContext(ctx)
 	if contextID == "" {
 		return errors.WithStack(errors.New("contextID must be non-empty"))
 	}
 	log = log.WithValues("contextId", contextID)
 
-	sessCounter.WithLabelValues("start").Inc()
-
-	tx, err := db.db.BeginTx(ctx, &sql.TxOptions{})
-	if err != nil {
-		sessCounter.WithLabelValues("failedstart").Inc()
-		return errors.Wrapf(err, "Failed to start transaction")
+	// Intended to track whether SQLITE_BUSY errors are correlated with the number of concurrent calls to Update.
+	if numActive > 1 {
+		log.Info("Concurrent Session Updates", "numActive", numActive)
 	}
 
-	err = func() error {
-		queries := db.queries.WithTx(tx)
-		// Read the record
-		sessRow, err := queries.GetSession(ctx, contextID)
+	activeUpdatesGauge.Set(float64(numActive))
+	sessCounter.WithLabelValues("start").Inc()
 
-		// If the session doesn't exist then we do nothing because session is initializeed to empty session
-		session := &logspb.Session{
-			ContextId: contextID,
-		}
-		if err != nil {
-			logDBErrors(ctx, err)
-			if err != sql.ErrNoRows {
-				sessCounter.WithLabelValues("failedget").Inc()
-				return errors.Wrapf(err, "Failed to get session with id %v", contextID)
+	// Wrap the updates in a retry loop. This is intended to deal with SQLITE_BUSY errors.
+	endTime := time.Now().Add(3 * time.Minute)
+
+	for time.Now().Before(endTime) {
+		err := func() error {
+			tx, err := db.db.BeginTx(ctx, &sql.TxOptions{})
+			if err != nil {
+				// See https://go.dev/doc/database/execute-transactions We do not to issue a rollback if BeginTx fails
+				sessCounter.WithLabelValues("failedstart").Inc()
+				return errors.Wrapf(err, "Failed to start transaction")
 			}
-			// ErrNoRows means the session doesn't exist so we just continue with the empty session
-		} else {
-			// Deserialize the proto
-			if err := proto.Unmarshal(sessRow.Proto, session); err != nil {
-				return errors.Wrapf(err, "Failed to deserialize session")
+
+			// Ensure Rollback gets called.
+			// This is a null op if the transaction has already been committed or rolled back.
+			defer func() {
+				if err := tx.Rollback(); err != nil {
+					log.Error(err, "Failed to rollback transaction")
+				}
+			}()
+
+			queries := db.queries.WithTx(tx)
+			// Read the record
+			sessRow, err := queries.GetSession(ctx, contextID)
+
+			// If the session doesn't exist then we do nothing because session is initializeed to empty session
+			session := &logspb.Session{
+				ContextId: contextID,
 			}
-		}
+			if err != nil {
+				logDBErrors(ctx, err)
+				if err != sql.ErrNoRows {
+					sessCounter.WithLabelValues("failedget").Inc()
+					return errors.Wrapf(err, "Failed to get session with id %v", contextID)
+				}
+				// ErrNoRows means the session doesn't exist so we just continue with the empty session
+			} else {
+				// Deserialize the proto
+				if err := proto.Unmarshal(sessRow.Proto, session); err != nil {
+					return errors.Wrapf(err, "Failed to deserialize session")
+				}
+			}
 
-		sessCounter.WithLabelValues("callupdatefunc").Inc()
+			sessCounter.WithLabelValues("callupdatefunc").Inc()
 
-		if err := updateFunc(session); err != nil {
-			return errors.Wrapf(err, "Failed to update session")
-		}
+			if err := updateFunc(session); err != nil {
+				return errors.Wrapf(err, "Failed to update session")
+			}
 
-		newRow, err := protoToRow(session)
-		if err != nil {
-			return errors.Wrapf(err, "Failed to convert session proto to table row")
-		}
+			newRow, err := protoToRow(session)
+			if err != nil {
+				return errors.Wrapf(err, "Failed to convert session proto to table row")
+			}
 
-		if newRow.Contextid != contextID {
-			return errors.WithStack(errors.Errorf("contextID in session doesn't match contextID. Update was called with contextID: %v but session has contextID: %v", contextID, newRow.Contextid))
-		}
+			if newRow.Contextid != contextID {
+				return errors.WithStack(errors.Errorf("contextID in session doesn't match contextID. Update was called with contextID: %v but session has contextID: %v", contextID, newRow.Contextid))
+			}
 
-		update := fsql.UpdateSessionParams{
-			Contextid:         contextID,
-			Proto:             newRow.Proto,
-			Starttime:         newRow.Starttime,
-			Endtime:           newRow.Endtime,
-			Selectedid:        newRow.Selectedid,
-			Selectedkind:      newRow.Selectedkind,
-			TotalInputTokens:  newRow.TotalInputTokens,
-			TotalOutputTokens: newRow.TotalOutputTokens,
-			NumGenerateTraces: newRow.NumGenerateTraces,
-		}
+			update := fsql.UpdateSessionParams{
+				Contextid:         contextID,
+				Proto:             newRow.Proto,
+				Starttime:         newRow.Starttime,
+				Endtime:           newRow.Endtime,
+				Selectedid:        newRow.Selectedid,
+				Selectedkind:      newRow.Selectedkind,
+				TotalInputTokens:  newRow.TotalInputTokens,
+				TotalOutputTokens: newRow.TotalOutputTokens,
+				NumGenerateTraces: newRow.NumGenerateTraces,
+			}
 
-		sessCounter.WithLabelValues("callupdatesession").Inc()
-		if err := queries.UpdateSession(ctx, update); err != nil {
-			logDBErrors(ctx, err)
-			return errors.Wrapf(err, "Failed to update session")
-		}
-		return nil
-	}()
+			sessCounter.WithLabelValues("callupdatesession").Inc()
+			if err := queries.UpdateSession(ctx, update); err != nil {
+				logDBErrors(ctx, err)
+				return errors.Wrapf(err, "Failed to update session")
+			}
 
-	if err == nil {
-		if err := tx.Commit(); err != nil {
-			logDBErrors(ctx, err)
-			log.Error(err, "Failed to commit transaction")
-			sessCounter.WithLabelValues("commitfail").Inc()
-			return errors.Wrapf(err, "Failed to commit transaction")
+			if err := tx.Commit(); err != nil {
+				logDBErrors(ctx, err)
+				log.Error(err, "Failed to commit transaction")
+				sessCounter.WithLabelValues("commitfail").Inc()
+				return errors.Wrapf(err, "Failed to commit transaction")
+			}
+			sessCounter.WithLabelValues("success").Inc()
+			return nil
+		}()
+
+		if err == nil {
+			sessCounter.WithLabelValues("done").Inc()
+			return nil
 		}
-		sessCounter.WithLabelValues("success").Inc()
-	} else {
-		logDBErrors(ctx, err)
-		sessCounter.WithLabelValues("fail").Inc()
-		log.Error(err, "Failed to update session")
-		if txErr := tx.Rollback(); txErr != nil {
-			log.Error(txErr, "Failed to rollback transaction")
-		}
-		return err
 	}
 
 	sessCounter.WithLabelValues("done").Inc()
-	return nil
+	err := errors.Errorf("Failed to update session for contextId %s", contextID)
+	log.Error(err, "Failed to update session")
+	return err
 }
 
 func (m *SessionsManager) GetSession(ctx context.Context, request *connect.Request[logspb.GetSessionRequest]) (*connect.Response[logspb.GetSessionResponse], error) {
