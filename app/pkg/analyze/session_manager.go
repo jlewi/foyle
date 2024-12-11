@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
-	"github.com/cenkalti/backoff/v4"
 	"os"
 	"path/filepath"
 	"sync/atomic"
 	"time"
+
+	"github.com/cenkalti/backoff/v4"
 
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
