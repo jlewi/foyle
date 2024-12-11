@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"github.com/cenkalti/backoff/v4"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -50,7 +51,7 @@ var (
 		Help: "Number of operations that failed because sqlite was busy",
 	})
 
-	activeUpdatesGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+	activeUpdatesGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "session_manager_active_updates", // Metric name
 		Help: "Number of active updates",       // Metric description
 	})
@@ -131,7 +132,8 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	numActive := db.activeUpdates.Add(1)
 	defer func() {
 		// Decrement the counter when leaving the function
-		db.activeUpdates.Add(-1)
+		value := db.activeUpdates.Add(-1)
+		activeUpdatesGauge.Set(float64(value))
 	}()
 
 	log := logs.FromContext(ctx)
@@ -148,10 +150,10 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 	activeUpdatesGauge.Set(float64(numActive))
 	sessCounter.WithLabelValues("start").Inc()
 
-	// Wrap the updates in a retry loop. This is intended to deal with SQLITE_BUSY errors.
-	endTime := time.Now().Add(3 * time.Minute)
-
-	for time.Now().Before(endTime) {
+	// Wrap the updates in a retry loop. This is intended to deal with SQLITE_BUSY errors and other possible sources
+	// of contention
+	b := backoff.NewExponentialBackOff(backoff.WithMaxElapsedTime(5*time.Minute), backoff.WithMaxInterval(30*time.Second))
+	for {
 		err := func() error {
 			tx, err := db.db.BeginTx(ctx, &sql.TxOptions{})
 			if err != nil {
@@ -237,12 +239,16 @@ func (db *SessionsManager) Update(ctx context.Context, contextID string, updateF
 			sessCounter.WithLabelValues("done").Inc()
 			return nil
 		}
-	}
 
-	sessCounter.WithLabelValues("done").Inc()
-	err := errors.Errorf("Failed to update session for contextId %s", contextID)
-	log.Error(err, "Failed to update session")
-	return err
+		wait := b.NextBackOff()
+		if wait == backoff.Stop {
+			sessCounter.WithLabelValues("done").Inc()
+			err := errors.Errorf("Failed to update session for contextId %s", contextID)
+			log.Error(err, "Failed to update session")
+			return err
+		}
+		time.Sleep(wait)
+	}
 }
 
 func (m *SessionsManager) GetSession(ctx context.Context, request *connect.Request[logspb.GetSessionRequest]) (*connect.Response[logspb.GetSessionResponse], error) {
