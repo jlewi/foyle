@@ -3,6 +3,7 @@ package analyze
 import (
 	"context"
 	"sort"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/jlewi/foyle/app/pkg/logs"
@@ -22,14 +23,21 @@ type CrudHandler struct {
 	blocksDB *pebble.DB
 	tracesDB *pebble.DB
 	analyzer *Analyzer
+	location *time.Location
 }
 
 func NewCrudHandler(cfg config.Config, blocksDB *pebble.DB, tracesDB *pebble.DB, analyzer *Analyzer) (*CrudHandler, error) {
+	// Load the PST time zone
+	location, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to load location America/Los_Angeles")
+	}
 	return &CrudHandler{
 		cfg:      cfg,
 		blocksDB: blocksDB,
 		tracesDB: tracesDB,
 		analyzer: analyzer,
+		location: location,
 	}, nil
 }
 
@@ -112,5 +120,9 @@ func (h *CrudHandler) Status(ctx context.Context, request *connect.Request[logsp
 		Watermark: h.analyzer.GetWatermark(),
 	}
 
+	lastTime := response.GetWatermark().GetLastLogTimestamp().AsTime()
+	lastTime = lastTime.In(h.location)
+	formattedTime := lastTime.Format("2006-01-02 3:04:05 PM MST")
+	response.LastLogTimestampHuman = formattedTime
 	return connect.NewResponse(response), nil
 }

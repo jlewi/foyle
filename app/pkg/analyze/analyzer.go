@@ -11,6 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+
 	"github.com/jlewi/foyle/app/pkg/logs/matchers"
 
 	"github.com/jlewi/foyle/app/pkg/runme/converters"
@@ -32,6 +35,13 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 	"k8s.io/client-go/util/workqueue"
+)
+
+var (
+	lagGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "analyzer_logs_lag_seconds",                                            // Metric name
+		Help: "Lag in seconds between the current time and last processed log entry", // Metric description
+	})
 )
 
 const (
@@ -264,6 +274,8 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 
 		traceIDs := make(map[string]bool)
 
+		lastLogTime := time.Time{}
+
 		// We read the lines line by line. We keep track of all the traceIDs mentioned in those lines. We
 		// Then do a combineAndCheckpoint for all the traceIDs mentioned. Lines are also persisted in a KV store
 		// keyed by traceID. So if on the next iteration we get a new line for a given traceId and need to reprocess
@@ -274,6 +286,8 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 				log.Error(err, "Error decoding log entry", "path", path, "line", line)
 				continue
 			}
+
+			lastLogTime = entry.Time()
 
 			// Add the entry to a session if it should be.
 			a.sessBuilder.processLogEntry(entry, a.learnNotifier)
@@ -312,7 +326,7 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 		}
 
 		// Now run a combineAndCheckpoint
-		a.combineAndCheckpoint(ctx, path, offset, traceIDs)
+		a.combineAndCheckpoint(ctx, path, offset, lastLogTime, traceIDs)
 
 		// If we are shutting down we don't want to keep processing the file.
 		// By aborting shutdown here as opposed to here we are blocking shutdown for as least as long it takes
@@ -326,7 +340,7 @@ func (a *Analyzer) processLogFile(ctx context.Context, path string) error {
 
 // combineAndCheckpoint runs a combine operation for all the traceIDs listed in the map.
 // Progress is then checkpointed.
-func (a *Analyzer) combineAndCheckpoint(ctx context.Context, path string, offset int64, traceIDs map[string]bool) {
+func (a *Analyzer) combineAndCheckpoint(ctx context.Context, path string, offset int64, lastLogTime time.Time, traceIDs map[string]bool) {
 	log := logs.FromContext(ctx)
 	// Combine the entries for each trace that we saw.
 	// N.B. We could potentially make this more efficient by checking if the log message is the final message
@@ -337,7 +351,11 @@ func (a *Analyzer) combineAndCheckpoint(ctx context.Context, path string, offset
 		}
 	}
 	// Update the offset
-	a.setLogFileOffset(path, offset)
+	a.setLogFileOffset(path, offset, lastLogTime)
+
+	// Update the lag
+	lag := time.Since(lastLogTime)
+	lagGauge.Set(lag.Seconds())
 }
 
 func (a *Analyzer) GetWatermark() *logspb.LogsWaterMark {
@@ -362,13 +380,15 @@ func (a *Analyzer) getLogFileOffset(path string) int64 {
 	return a.logFileOffsets.Offset
 }
 
-func (a *Analyzer) setLogFileOffset(path string, offset int64) {
+func (a *Analyzer) setLogFileOffset(path string, offset int64, lastTimestamp time.Time) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	lastTime := timestamppb.New(lastTimestamp)
 	oldWatermark := a.logFileOffsets
 	a.logFileOffsets = &logspb.LogsWaterMark{
-		File:   path,
-		Offset: offset,
+		File:             path,
+		Offset:           offset,
+		LastLogTimestamp: lastTime,
 	}
 
 	log := logs.NewLogger()

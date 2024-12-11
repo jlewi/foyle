@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 package foyle.logs;
 
 option go_package = "github.com/jlewi/foyle/protos/go/foyle/logs;logspb";
@@ -10,6 +12,9 @@ message LogsWaterMark {
 	string file = 1;
   // The offset is the offset in the file that is associated with the watermark
   int64 offset = 2;
+
+  // last_log_timestamp is the timestamp of the last log entry processed
+  google.protobuf.Timestamp  last_log_timestamp = 4;
 }
 
 message GetLogsStatusRequest {
@@ -17,4 +22,9 @@ message GetLogsStatusRequest {
 
 message GetLogsStatusResponse {
   LogsWaterMark watermark = 1;
+
+  // last_log_message will be a human readable string for the timestamp of the last processed log message
+  // This is useful for debugging and monitoring purposes by inspection (i.e. curl by human). For programmatic
+  // access use watermark.last_log_timestamp
+  string last_log_timestamp_human = 2;
 }
