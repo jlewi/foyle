@@ -92,6 +92,20 @@ func NewSessionsManager(db *sql.DB) (*SessionsManager, error) {
 	log := zapr.NewLogger(zap.L())
 	log.Info("sqlite busy_timeout set", "timeout", 5000)
 
+	if _, err := db.Exec("PRAGMA busy_timeout = 10000;"); err != nil {
+		return nil, errors.Wrapf(err, "Failed to set busy timeout for the database")
+	}
+
+	// Activate WAL mode. This hopefully helps with SQLITE_BUSY errors and contention by using a separate file
+	// to log writes.
+	// https://www.sqlite.org/wal.html#:~:text=One%20has%20merely%20to%20run,set%20on%20any%20one%20connection.
+	// This mode is supposedly persistent the next time the application opens it will still be doing this
+	output, err := db.Exec("PRAGMA journal_mode=WAL;")
+	log.Info("Set journal mode to WAL", "output", output)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to set journal mode to WAL")
+	}
+
 	// Create the dbtx from the actual database
 	queries := fsql.New(db)
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,6 +34,13 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 	"k8s.io/client-go/util/workqueue"
+)
+
+var (
+	lagGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "analyzer_logs_lag_seconds",                                            // Metric name
+		Help: "Lag in seconds between the current time and last processed log entry", // Metric description
+	})
 )
 
 const (
@@ -342,6 +351,10 @@ func (a *Analyzer) combineAndCheckpoint(ctx context.Context, path string, offset
 	}
 	// Update the offset
 	a.setLogFileOffset(path, offset, lastLogTime)
+
+	// Update the lag
+	lag := time.Since(lastLogTime)
+	lagGauge.Set(lag.Seconds())
 }
 
 func (a *Analyzer) GetWatermark() *logspb.LogsWaterMark {
