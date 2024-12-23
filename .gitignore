@@ -14,3 +14,4 @@ dist/
 **/cover.out
 **/*.wasm
 experiments/runs/**
+tools/stripmetadata/stripmetadata
