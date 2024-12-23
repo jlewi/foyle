@@ -6,6 +6,7 @@ import (
 	"fmt"
 	markdownfmt "github.com/Kunde21/markdownfmt/v3/markdown"
 	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,18 +76,7 @@ func processFile(ctx context.Context, path string) error {
 	return nil
 }
 
-func run() error {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return errors.Wrapf(err, "Error getting current working directory")
-	}
-
-	rootDir, err := filepath.Abs(filepath.Join(cwd, "..", ".."))
-	if err != nil {
-		return errors.Wrapf(err, "Error getting root directory")
-	}
-	docsDir := filepath.Join(rootDir, "docs", "content")
-
+func run(docsDir string) error {
 	mdFiles, err := findMDFiles(context.Background(), docsDir)
 	if err != nil {
 		return errors.Wrapf(err, "Error finding markdown files")
@@ -101,10 +91,24 @@ func run() error {
 }
 
 func main() {
-	if err := run(); err != nil {
-		fmt.Println("Error processing markdown: %+v", err)
-		os.Exit(1)
+	var docsDir string
+	var rootCmd = &cobra.Command{
+		Use:   "markdown-processor",
+		Short: "Process markdown files to remove metadata from code blocks",
+		Run: func(cmd *cobra.Command, args []string) {
+			run(docsDir)
+		},
 	}
 
-	fmt.Println("Markdown processed successfully!")
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current working directory: %v\n", err)
+		cwd = "."
+	}
+	rootCmd.Flags().StringVarP(&docsDir, "path", "p", cwd, "Path to the directory containing markdown files")
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
 }
