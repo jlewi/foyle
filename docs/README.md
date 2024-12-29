@@ -2,7 +2,7 @@
 
 ## Hugo Version
 
-* The site currently seems to build with hugo v0.117.0
+* The site currently seems to build with hugo [v0.117.0](https://github.com/gohugoio/hugo/releases/tag/v0.117.0)
 * With v0.131 we get errors with the template
 * See https://github.com/jlewi/foyle/issues/227
 
