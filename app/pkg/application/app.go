@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jlewi/foyle/app/api/oaiapi"
 	"io"
 	"net/http"
 	"os"
@@ -268,6 +269,14 @@ func (a *App) SetupRegistry() error {
 		return err
 	}
 	if err := a.Registry.Register(api.ExperimentGVK, evaluator); err != nil {
+		return err
+	}
+
+	vs, err := oai.NewVSController(*a.Config)
+	if err != nil {
+		return err
+	}
+	if err := a.Registry.Register(oaiapi.VectorStoreGVK, vs); err != nil {
 		return err
 	}
 
