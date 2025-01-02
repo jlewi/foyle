@@ -390,6 +390,8 @@ github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 h1:BQSFePA1RWJOlocH6Fxy8MmwDt+yVQYULKfN0RoTN8A=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99/go.mod h1:1lJo3i6rXxKeerYnT8Nvf0QmHCRC1n8sfWVwXF2Frvo=
+github.com/jlewi/go-openai v0.0.0-20250102163401-3f27fc7109d1 h1:+YZfNrujCqjwWmfBxU0x/d0MpZb5tP5oCyVhBbZVS9I=
+github.com/jlewi/go-openai v0.0.0-20250102163401-3f27fc7109d1/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
 github.com/jlewi/hydros v0.0.7-0.20240503183011-8f99ead373fb h1:2G2k606S3Qcg40czr7gnkeIG5KgQ2wXJ1BMxAuC+P3I=
 github.com/jlewi/hydros v0.0.7-0.20240503183011-8f99ead373fb/go.mod h1:4fV+JUCnexPY2ZbKzdfV/RsyrfralN832MsUSq/7FqE=
 github.com/jlewi/monogo v0.0.0-20240123191147-401afe194d74 h1:pbOw/rOMs0AZ494bGnI6DieGKwqoJQEjHWaJZrvxsJo=
