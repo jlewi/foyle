@@ -280,6 +280,21 @@ func (a *App) SetupRegistry() error {
 		return err
 	}
 
+	fileSyncer, err := oai.NewFileSyncer(*a.Config)
+	if err != nil {
+		return err
+	}
+	if err := a.Registry.Register(oaiapi.FileSyncGVK, fileSyncer); err != nil {
+		return err
+	}
+
+	assistant, err := oai.NewAssistantController(*a.Config)
+	if err != nil {
+		return err
+	}
+	if err := a.Registry.Register(oaiapi.AssistantGVK, assistant); err != nil {
+		return err
+	}
 	return nil
 }
 

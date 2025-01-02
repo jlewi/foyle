@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	VectorStoreGVK = schema.FromAPIVersionAndKind(api.Group+"/"+api.Version, "VectorStore")
+	VectorStoreGVK = schema.FromAPIVersionAndKind(OAIGroup+"/"+api.Version, "VectorStore")
 )
 
 // VectorStore based off https://platform.openai.com/docs/api-reference/vector-stores/create

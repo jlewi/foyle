@@ -34,7 +34,7 @@ func (v *VSController) ReconcileNode(ctx context.Context, node *yaml.RNode) erro
 
 func (v *VSController) Apply(ctx context.Context, s *oaiapi.VectorStore) error {
 	log := logs.FromContext(ctx)
-
+	
 	if v.client == nil {
 		client, err := NewClient(v.cfg)
 		if err != nil {
