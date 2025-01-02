@@ -5,9 +5,13 @@ import (
 	"github.com/jlewi/foyle/app/api/oaiapi"
 	"github.com/jlewi/foyle/app/pkg/config"
 	"github.com/jlewi/foyle/app/pkg/logs"
+	"github.com/jlewi/monogo/files"
+	openaico "github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
 	"github.com/pkg/errors"
 	"github.com/sashabaranov/go-openai"
 	"os"
+	"path"
 	"path/filepath"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 	"strings"
@@ -18,6 +22,8 @@ import (
 type FileSyncer struct {
 	cfg    config.Config
 	client *openai.Client
+
+	oClient *openaico.Client
 }
 
 // NewFileSyncer creates a new controller for OpenAI file sync
@@ -44,6 +50,15 @@ func (f *FileSyncer) Apply(ctx context.Context, s *oaiapi.FileSync) error {
 			return errors.Wrap(err, "Failed to create OpenAI client")
 		}
 		f.client = client
+	}
+
+	if f.oClient == nil {
+		apiKey, err := files.Read(f.cfg.OpenAI.APIKeyFile)
+		if err != nil {
+			return errors.Wrap(err, "Failed to read OpenAI API key")
+		}
+		oClient := openaico.NewClient(option.WithAPIKey(string(apiKey)))
+		f.oClient = oClient
 	}
 	// TODO(jeremy): We shouldn't assume we only want to match markdown files.
 	// How can we support a suitable glob like syntax?
@@ -72,22 +87,36 @@ func (f *FileSyncer) Apply(ctx context.Context, s *oaiapi.FileSync) error {
 			errors.Wrapf(err, "Failed to get relative path for %v", mdFile)
 		}
 
-		if fid, ok := alreadyUploaded[relPath]; ok {
-			log.Info("File already uploaded", "file", relPath, "id", fid)
+		relativeUrl := convertFilePathToHugoURL(relPath)
+
+		fileName := s.Spec.BaseURL + relativeUrl
+
+		if fid, ok := alreadyUploaded[fileName]; ok {
+			log.Info("File already uploaded", "path", relPath, "fileName", fileName, "id", fid)
 			fileIDs = append(fileIDs, fid)
 			continue
 		}
 
-		req := &openai.FileRequest{
-			FileName: relPath,
-			FilePath: mdFile,
-			Purpose:  string(openai.PurposeAssistants),
+		fileData, err := os.ReadFile(mdFile)
+		if err != nil {
+			errors.Wrapf(err, "Failed to read file %v", mdFile)
 		}
-		newFile, err := f.client.CreateFile(ctx, *req)
+		req := &openai.FileBytesRequest{
+			Name:    fileName,
+			Bytes:   fileData,
+			Purpose: openai.PurposeAssistants,
+		}
+		// N.B. We don't use CreateFile because that sets FileName to the path of the file and we don't want to do
+		// that.
+		body := openaico.FileNewParams{
+			Purpose: "assistants",
+		}
+		f.oClient.Files.New(ctx, body)
+		newFile, err := f.client.CreateFileBytes(ctx, *req)
 		if err != nil {
 			errors.Wrapf(err, "Failed to create file %v", mdFile)
 		}
-		log.Info("Uploaded file", "file", mdFile, "id", newFile.ID)
+		log.Info("Uploaded file", "path", mdFile, "id", newFile.ID, "fileName", newFile.FileName)
 		fileIDs = append(fileIDs, newFile.ID)
 	}
 
@@ -120,4 +149,30 @@ func findMarkdownFiles(dir string) ([]string, error) {
 	})
 
 	return markdownFiles, err
+}
+
+// convertFilePathToHugoURL takes a file path and converts it into a URL for a Hugo static site
+func convertFilePathToHugoURL(filePath string) string {
+	// Extract the directory and filename without the extension
+	dir, file := path.Split(filePath)
+	ext := path.Ext(file)
+	fileName := strings.TrimSuffix(file, ext)
+
+	// Replace spaces with hyphens and convert to lowercase
+	sanitizedFileName := strings.ReplaceAll(strings.ToLower(fileName), " ", "-")
+	sanitizedDir := strings.ReplaceAll(strings.ToLower(dir), " ", "-")
+
+	// _index.md files should be treated as directories
+	if sanitizedFileName == "_index" {
+		sanitizedFileName = ""
+	}
+
+	// Construct the URL path
+	urlPath := path.Join(sanitizedDir, sanitizedFileName)
+
+	// There should be a trailing slash if its not empty
+	if urlPath != "" {
+		urlPath += "/"
+	}
+	return urlPath
 }

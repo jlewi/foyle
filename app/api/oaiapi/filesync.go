@@ -21,4 +21,5 @@ type FileSyncSpec struct {
 	// VectorStoreID is the ID of the vector store to sync the files to
 	VectorStoreID   string `json:"vectorStoreID" yaml:"vectorStoreID"`
 	VectorStoreName string `json:"vectorStoreName" yaml:"vectorStoreName"`
+	BaseURL         string `json:"baseURL" yaml:"baseURL"`
 }
