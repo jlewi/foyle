@@ -4,9 +4,10 @@ go 1.22.1
 
 replace (
 	github.com/jlewi/foyle/protos/go => ../protos/go
+	// TODO(jeremy): Remove this if https://github.com/sashabaranov/go-openai/pull/919 ever gets merged
+	github.com/sashabaranov/go-openai => github.com/jlewi/go-openai v0.0.0-20250102163401-3f27fc7109d1
 	// TODO(jeremy): We can get rid of this replace; we should no longer need to use a jlewi branch.
 	github.com/stateful/runme/v3 => github.com/jlewi/runme/v3 v3.0.0-20240524044247-2657f0b08e0f
-
 	k8s.io/client-go => k8s.io/client-go v0.27.3
 )
 
@@ -37,7 +38,7 @@ require (
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/pkg/errors v0.9.1
-	github.com/sashabaranov/go-openai v1.30.3
+	github.com/sashabaranov/go-openai v1.36.1
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	github.com/stateful/runme/v3 v3.3.1-0.20240515132033-7fd1591498c6
@@ -157,6 +158,7 @@ require (
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
+	github.com/openai/openai-go v0.1.0-alpha.41 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
@@ -184,6 +186,10 @@ require (
 	github.com/spf13/cast v1.6.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
+	github.com/tidwall/gjson v1.14.4 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/timtadh/data-structures v0.6.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.13 // indirect
 	github.com/tklauser/numcpus v0.7.0 // indirect
