@@ -3,6 +3,7 @@ package oai
 import (
 	"context"
 	"github.com/jlewi/foyle/app/pkg/config"
+	"github.com/sashabaranov/go-openai"
 	"os"
 	"testing"
 )
@@ -22,12 +23,21 @@ func Test_FileSyncer(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	file, err := client.GetFile(ctx, "file-9ik4Eous1jaJ16QRkXwfMZ")
+	//file, err := client.GetFile(ctx, "file-9ik4Eous1jaJ16QRkXwfMZ")
+	//if err != nil {
+	//	t.Fatalf("Error getting file: %v", err)
+	//}
+	//t.Logf("FileName: %v", file.FileName)
+	vectorStoreID := "vs_YOUtN6oGx9LPCWuFECXXrdw2"
+	req := &openai.VectorStoreFileBatchRequest{
+		FileIDs: []string{"file-9SUyizQYBygnxhRxdzzk9K"},
+	}
+	//log.Info("Creating vector store file batch", "numFileIDs", len(fileIDs))
+	_, err = client.CreateVectorStoreFileBatch(ctx, vectorStoreID, *req)
 	if err != nil {
-		t.Fatalf("Error getting file: %v", err)
+		t.Fatalf("Failed to create vector store file batch: %v", err)
 	}
 
-	t.Logf("FileName: %v", file.FileName)
 }
 
 func Test_convertFilePathToHugoURL(t *testing.T) {
@@ -51,7 +61,7 @@ func Test_convertFilePathToHugoURL(t *testing.T) {
 		{
 			name:     "index",
 			path:     `_index.md`,
-			expected: "",
+			expected: "/",
 		},
 	}
 

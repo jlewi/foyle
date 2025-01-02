@@ -87,9 +87,10 @@ func (f *FileSyncer) Apply(ctx context.Context, s *oaiapi.FileSync) error {
 			errors.Wrapf(err, "Failed to get relative path for %v", mdFile)
 		}
 
-		relativeUrl := convertFilePathToHugoURL(relPath)
-
-		fileName := s.Spec.BaseURL + relativeUrl
+		// N.B. We don't use the Hugo Link because we need the file extension
+		// relativeUrl := convertFilePathToHugoURL(relPath)
+		// fileName := s.Spec.BaseURL + relativeUrl
+		fileName := s.Spec.BaseURL + relPath
 
 		if fid, ok := alreadyUploaded[fileName]; ok {
 			log.Info("File already uploaded", "path", relPath, "fileName", fileName, "id", fid)
@@ -98,20 +99,20 @@ func (f *FileSyncer) Apply(ctx context.Context, s *oaiapi.FileSync) error {
 		}
 
 		fileData, err := os.ReadFile(mdFile)
-		if err != nil {
-			errors.Wrapf(err, "Failed to read file %v", mdFile)
-		}
+		//if err != nil {
+		//	errors.Wrapf(err, "Failed to read file %v", mdFile)
+		//}
 		req := &openai.FileBytesRequest{
 			Name:    fileName,
 			Bytes:   fileData,
 			Purpose: openai.PurposeAssistants,
 		}
-		// N.B. We don't use CreateFile because that sets FileName to the path of the file and we don't want to do
-		// that.
-		body := openaico.FileNewParams{
-			Purpose: "assistants",
-		}
-		f.oClient.Files.New(ctx, body)
+		//// N.B. We don't use CreateFile because that sets FileName to the path of the file and we don't want to do
+		//// that.
+		////body := openaico.FileNewParams{
+		////	Purpose: "assistants",
+		////}
+		////f.oClient.Files.New(ctx, body)
 		newFile, err := f.client.CreateFileBytes(ctx, *req)
 		if err != nil {
 			errors.Wrapf(err, "Failed to create file %v", mdFile)
@@ -128,9 +129,12 @@ func (f *FileSyncer) Apply(ctx context.Context, s *oaiapi.FileSync) error {
 		FileIDs: fileIDs,
 	}
 	log.Info("Creating vector store file batch", "numFileIDs", len(fileIDs))
-	if _, err := client.CreateVectorStoreFileBatch(ctx, s.Spec.VectorStoreID, *req); err != nil {
+	resp, err := client.CreateVectorStoreFileBatch(ctx, s.Spec.VectorStoreID, *req)
+	if err != nil {
 		errors.Wrapf(err, "Failed to create vector store file batch")
 	}
+
+	log.Info("Created vector store file batch", "id", resp.ID, "numFileIDs", len(fileIDs))
 
 	return nil
 }
