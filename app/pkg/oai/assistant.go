@@ -67,3 +67,21 @@ func (a *AssistantController) Apply(ctx context.Context, s *oaiapi.Assistant) er
 	log.Info("Created assistant", "name", s.Metadata.Name, "id", resp.ID)
 	return nil
 }
+
+type Assistant struct {
+	cfg    config.Config
+	client *openai.Client
+}
+
+func (a *Assistant) Assist(ctx context.Context) error {
+	if a.client == nil {
+		client, err := NewClient(a.cfg)
+		if err != nil {
+			return errors.Wrap(err, "Failed to create OpenAI client")
+		}
+		a.client = client
+	}
+
+	client := a.client
+	client.CreateThreadAndRun()
+}

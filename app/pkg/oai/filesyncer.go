@@ -81,6 +81,10 @@ func (f *FileSyncer) Apply(ctx context.Context, s *oaiapi.FileSync) error {
 
 	fileIDs := make([]string, 0, len(mdFiles))
 
+	// Files that should be in the vector store
+	// We use this to remove files that are no longer in the vector store
+	expectedIDS := make(map[string]string)
+
 	for _, mdFile := range mdFiles {
 		relPath, err := filepath.Rel(s.Spec.Source, mdFile)
 		if err != nil {
@@ -95,6 +99,7 @@ func (f *FileSyncer) Apply(ctx context.Context, s *oaiapi.FileSync) error {
 		if fid, ok := alreadyUploaded[fileName]; ok {
 			log.Info("File already uploaded", "path", relPath, "fileName", fileName, "id", fid)
 			fileIDs = append(fileIDs, fid)
+			expectedIDS[fid] = fileName
 			continue
 		}
 
@@ -107,18 +112,14 @@ func (f *FileSyncer) Apply(ctx context.Context, s *oaiapi.FileSync) error {
 			Bytes:   fileData,
 			Purpose: openai.PurposeAssistants,
 		}
-		//// N.B. We don't use CreateFile because that sets FileName to the path of the file and we don't want to do
-		//// that.
-		////body := openaico.FileNewParams{
-		////	Purpose: "assistants",
-		////}
-		////f.oClient.Files.New(ctx, body)
+
 		newFile, err := f.client.CreateFileBytes(ctx, *req)
 		if err != nil {
 			errors.Wrapf(err, "Failed to create file %v", mdFile)
 		}
 		log.Info("Uploaded file", "path", mdFile, "id", newFile.ID, "fileName", newFile.FileName)
 		fileIDs = append(fileIDs, newFile.ID)
+		expectedIDS[newFile.ID] = fileName
 	}
 
 	if err != nil {
@@ -136,6 +137,44 @@ func (f *FileSyncer) Apply(ctx context.Context, s *oaiapi.FileSync) error {
 
 	log.Info("Created vector store file batch", "id", resp.ID, "numFileIDs", len(fileIDs))
 
+	f.pruneFilesInVectorStore(ctx, s.Spec.VectorStoreID, expectedIDS)
+	return nil
+}
+
+func (f *FileSyncer) pruneFilesInVectorStore(ctx context.Context, vectorStoreID string, expectedIDS map[string]string) error {
+	log := logs.FromContext(ctx)
+	client := f.client
+	limit := 100
+	pagination := openai.Pagination{
+		Limit: &limit,
+	}
+
+	totalFiles := 0
+	numPruned := 0
+	for {
+		fList, err := client.ListVectorStoreFiles(ctx, vectorStoreID, pagination)
+		if err != nil {
+			errors.Wrap(err, "Failed to list files")
+		}
+
+		totalFiles += len(fList.VectorStoreFiles)
+		for _, f := range fList.VectorStoreFiles {
+			if fileName, ok := expectedIDS[f.ID]; !ok {
+				log.Info("Removing file from vector store", "id", f.ID, "fileName", fileName)
+				err := client.DeleteVectorStoreFile(ctx, vectorStoreID, f.ID)
+				if err != nil {
+					log.Error(err, "Failed to remove file %v from vector store", f.ID)
+				}
+				numPruned++
+			}
+		}
+		if !fList.HasMore {
+			log.Info("Pruned vector store files", "numFiles", totalFiles, "numPruned", numPruned)
+			return nil
+		}
+
+		pagination.After = fList.LastID
+	}
 	return nil
 }
 
