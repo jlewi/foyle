@@ -6,5 +6,5 @@ import (
 )
 
 func tracer() trace.Tracer {
-	return otel.Tracer("github.com/jlewi/foyle/app/pkg/oai")
+	return otel.Tracer("github.com/jlewi/foyle/app/pkg/oaiapi")
 }

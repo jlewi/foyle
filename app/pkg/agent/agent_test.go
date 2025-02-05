@@ -182,7 +182,7 @@ func Test_StreamingClient(t *testing.T) {
 	log := zapr.NewLogger(newLog)
 	// This is code to help us test streaming with the connect protocol
 	addr := "http://127.0.0.1:8877/api"
-	//addr := "http://127.0.0.1:9977/api"
+	//addr :=x "http://127.0.0.1:9977/api"
 
 	log.Info("Server started")
 	if err := runClient(addr); err != nil {

@@ -1,5 +1,5 @@
 // package test is a hacky way to avoid circular imports in the test.
-// The test imports some packages (e.g. anthropic/oai) that also import matchers
+// The test imports some packages (e.g. anthropic/oaiapi) that also import matchers
 // so if we don't use a separate package we end up with a circular import.
 package test
 
