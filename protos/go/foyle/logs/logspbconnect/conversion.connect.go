@@ -38,12 +38,6 @@ const (
 	ConversionServiceConvertDocProcedure = "/foyle.logs.ConversionService/ConvertDoc"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	conversionServiceServiceDescriptor          = logs.File_foyle_logs_conversion_proto.Services().ByName("ConversionService")
-	conversionServiceConvertDocMethodDescriptor = conversionServiceServiceDescriptor.Methods().ByName("ConvertDoc")
-)
-
 // ConversionServiceClient is a client for the foyle.logs.ConversionService service.
 type ConversionServiceClient interface {
 	// ConvertDoc converts a doc representation of a notebook into markdown or HTML
@@ -59,11 +53,12 @@ type ConversionServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewConversionServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConversionServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	conversionServiceMethods := logs.File_foyle_logs_conversion_proto.Services().ByName("ConversionService").Methods()
 	return &conversionServiceClient{
 		convertDoc: connect.NewClient[logs.ConvertDocRequest, logs.ConvertDocResponse](
 			httpClient,
 			baseURL+ConversionServiceConvertDocProcedure,
-			connect.WithSchema(conversionServiceConvertDocMethodDescriptor),
+			connect.WithSchema(conversionServiceMethods.ByName("ConvertDoc")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -91,10 +86,11 @@ type ConversionServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewConversionServiceHandler(svc ConversionServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	conversionServiceMethods := logs.File_foyle_logs_conversion_proto.Services().ByName("ConversionService").Methods()
 	conversionServiceConvertDocHandler := connect.NewUnaryHandler(
 		ConversionServiceConvertDocProcedure,
 		svc.ConvertDoc,
-		connect.WithSchema(conversionServiceConvertDocMethodDescriptor),
+		connect.WithSchema(conversionServiceMethods.ByName("ConvertDoc")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/foyle.logs.ConversionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

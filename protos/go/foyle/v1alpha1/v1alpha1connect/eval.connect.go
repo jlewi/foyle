@@ -43,14 +43,6 @@ const (
 	EvalServiceGetEvalResultProcedure = "/EvalService/GetEvalResult"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	evalServiceServiceDescriptor              = v1alpha1.File_foyle_v1alpha1_eval_proto.Services().ByName("EvalService")
-	evalServiceListMethodDescriptor           = evalServiceServiceDescriptor.Methods().ByName("List")
-	evalServiceAssertionTableMethodDescriptor = evalServiceServiceDescriptor.Methods().ByName("AssertionTable")
-	evalServiceGetEvalResultMethodDescriptor  = evalServiceServiceDescriptor.Methods().ByName("GetEvalResult")
-)
-
 // EvalServiceClient is a client for the EvalService service.
 type EvalServiceClient interface {
 	List(context.Context, *connect.Request[v1alpha1.EvalResultListRequest]) (*connect.Response[v1alpha1.EvalResultListResponse], error)
@@ -67,23 +59,24 @@ type EvalServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewEvalServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) EvalServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	evalServiceMethods := v1alpha1.File_foyle_v1alpha1_eval_proto.Services().ByName("EvalService").Methods()
 	return &evalServiceClient{
 		list: connect.NewClient[v1alpha1.EvalResultListRequest, v1alpha1.EvalResultListResponse](
 			httpClient,
 			baseURL+EvalServiceListProcedure,
-			connect.WithSchema(evalServiceListMethodDescriptor),
+			connect.WithSchema(evalServiceMethods.ByName("List")),
 			connect.WithClientOptions(opts...),
 		),
 		assertionTable: connect.NewClient[v1alpha1.AssertionTableRequest, v1alpha1.AssertionTableResponse](
 			httpClient,
 			baseURL+EvalServiceAssertionTableProcedure,
-			connect.WithSchema(evalServiceAssertionTableMethodDescriptor),
+			connect.WithSchema(evalServiceMethods.ByName("AssertionTable")),
 			connect.WithClientOptions(opts...),
 		),
 		getEvalResult: connect.NewClient[v1alpha1.GetEvalResultRequest, v1alpha1.GetEvalResultResponse](
 			httpClient,
 			baseURL+EvalServiceGetEvalResultProcedure,
-			connect.WithSchema(evalServiceGetEvalResultMethodDescriptor),
+			connect.WithSchema(evalServiceMethods.ByName("GetEvalResult")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -124,22 +117,23 @@ type EvalServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewEvalServiceHandler(svc EvalServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	evalServiceMethods := v1alpha1.File_foyle_v1alpha1_eval_proto.Services().ByName("EvalService").Methods()
 	evalServiceListHandler := connect.NewUnaryHandler(
 		EvalServiceListProcedure,
 		svc.List,
-		connect.WithSchema(evalServiceListMethodDescriptor),
+		connect.WithSchema(evalServiceMethods.ByName("List")),
 		connect.WithHandlerOptions(opts...),
 	)
 	evalServiceAssertionTableHandler := connect.NewUnaryHandler(
 		EvalServiceAssertionTableProcedure,
 		svc.AssertionTable,
-		connect.WithSchema(evalServiceAssertionTableMethodDescriptor),
+		connect.WithSchema(evalServiceMethods.ByName("AssertionTable")),
 		connect.WithHandlerOptions(opts...),
 	)
 	evalServiceGetEvalResultHandler := connect.NewUnaryHandler(
 		EvalServiceGetEvalResultProcedure,
 		svc.GetEvalResult,
-		connect.WithSchema(evalServiceGetEvalResultMethodDescriptor),
+		connect.WithSchema(evalServiceMethods.ByName("GetEvalResult")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/EvalService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

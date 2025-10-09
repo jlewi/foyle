@@ -15,6 +15,7 @@ plugins:
   - local: protoc-gen-zap-marshaler
     out: go/
     opt: paths=source_relative
-  - local: protoc-gen-connect-go
+  # Remote plugin. You can switch to a local one by using "go".
+  - remote: buf.build/connectrpc/go
     out: go/
     opt: paths=source_relative

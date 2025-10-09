@@ -43,15 +43,6 @@ const (
 	LogsServiceStatusProcedure = "/foyle.logs.LogsService/Status"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	logsServiceServiceDescriptor           = logs.File_foyle_logs_traces_proto.Services().ByName("LogsService")
-	logsServiceGetTraceMethodDescriptor    = logsServiceServiceDescriptor.Methods().ByName("GetTrace")
-	logsServiceGetBlockLogMethodDescriptor = logsServiceServiceDescriptor.Methods().ByName("GetBlockLog")
-	logsServiceGetLLMLogsMethodDescriptor  = logsServiceServiceDescriptor.Methods().ByName("GetLLMLogs")
-	logsServiceStatusMethodDescriptor      = logsServiceServiceDescriptor.Methods().ByName("Status")
-)
-
 // LogsServiceClient is a client for the foyle.logs.LogsService service.
 type LogsServiceClient interface {
 	GetTrace(context.Context, *connect.Request[logs.GetTraceRequest]) (*connect.Response[logs.GetTraceResponse], error)
@@ -73,29 +64,30 @@ type LogsServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewLogsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) LogsServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	logsServiceMethods := logs.File_foyle_logs_traces_proto.Services().ByName("LogsService").Methods()
 	return &logsServiceClient{
 		getTrace: connect.NewClient[logs.GetTraceRequest, logs.GetTraceResponse](
 			httpClient,
 			baseURL+LogsServiceGetTraceProcedure,
-			connect.WithSchema(logsServiceGetTraceMethodDescriptor),
+			connect.WithSchema(logsServiceMethods.ByName("GetTrace")),
 			connect.WithClientOptions(opts...),
 		),
 		getBlockLog: connect.NewClient[logs.GetBlockLogRequest, logs.GetBlockLogResponse](
 			httpClient,
 			baseURL+LogsServiceGetBlockLogProcedure,
-			connect.WithSchema(logsServiceGetBlockLogMethodDescriptor),
+			connect.WithSchema(logsServiceMethods.ByName("GetBlockLog")),
 			connect.WithClientOptions(opts...),
 		),
 		getLLMLogs: connect.NewClient[logs.GetLLMLogsRequest, logs.GetLLMLogsResponse](
 			httpClient,
 			baseURL+LogsServiceGetLLMLogsProcedure,
-			connect.WithSchema(logsServiceGetLLMLogsMethodDescriptor),
+			connect.WithSchema(logsServiceMethods.ByName("GetLLMLogs")),
 			connect.WithClientOptions(opts...),
 		),
 		status: connect.NewClient[logs.GetLogsStatusRequest, logs.GetLogsStatusResponse](
 			httpClient,
 			baseURL+LogsServiceStatusProcedure,
-			connect.WithSchema(logsServiceStatusMethodDescriptor),
+			connect.WithSchema(logsServiceMethods.ByName("Status")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -147,28 +139,29 @@ type LogsServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewLogsServiceHandler(svc LogsServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	logsServiceMethods := logs.File_foyle_logs_traces_proto.Services().ByName("LogsService").Methods()
 	logsServiceGetTraceHandler := connect.NewUnaryHandler(
 		LogsServiceGetTraceProcedure,
 		svc.GetTrace,
-		connect.WithSchema(logsServiceGetTraceMethodDescriptor),
+		connect.WithSchema(logsServiceMethods.ByName("GetTrace")),
 		connect.WithHandlerOptions(opts...),
 	)
 	logsServiceGetBlockLogHandler := connect.NewUnaryHandler(
 		LogsServiceGetBlockLogProcedure,
 		svc.GetBlockLog,
-		connect.WithSchema(logsServiceGetBlockLogMethodDescriptor),
+		connect.WithSchema(logsServiceMethods.ByName("GetBlockLog")),
 		connect.WithHandlerOptions(opts...),
 	)
 	logsServiceGetLLMLogsHandler := connect.NewUnaryHandler(
 		LogsServiceGetLLMLogsProcedure,
 		svc.GetLLMLogs,
-		connect.WithSchema(logsServiceGetLLMLogsMethodDescriptor),
+		connect.WithSchema(logsServiceMethods.ByName("GetLLMLogs")),
 		connect.WithHandlerOptions(opts...),
 	)
 	logsServiceStatusHandler := connect.NewUnaryHandler(
 		LogsServiceStatusProcedure,
 		svc.Status,
-		connect.WithSchema(logsServiceStatusMethodDescriptor),
+		connect.WithSchema(logsServiceMethods.ByName("Status")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/foyle.logs.LogsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

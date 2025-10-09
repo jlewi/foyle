@@ -55,20 +55,6 @@ const (
 	AIServiceStatusProcedure = "/AIService/Status"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	generateServiceServiceDescriptor        = v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("GenerateService")
-	generateServiceGenerateMethodDescriptor = generateServiceServiceDescriptor.Methods().ByName("Generate")
-	executeServiceServiceDescriptor         = v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("ExecuteService")
-	executeServiceExecuteMethodDescriptor   = executeServiceServiceDescriptor.Methods().ByName("Execute")
-	aIServiceServiceDescriptor              = v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("AIService")
-	aIServiceStreamGenerateMethodDescriptor = aIServiceServiceDescriptor.Methods().ByName("StreamGenerate")
-	aIServiceGenerateCellsMethodDescriptor  = aIServiceServiceDescriptor.Methods().ByName("GenerateCells")
-	aIServiceGetExampleMethodDescriptor     = aIServiceServiceDescriptor.Methods().ByName("GetExample")
-	aIServiceLogEventsMethodDescriptor      = aIServiceServiceDescriptor.Methods().ByName("LogEvents")
-	aIServiceStatusMethodDescriptor         = aIServiceServiceDescriptor.Methods().ByName("Status")
-)
-
 // GenerateServiceClient is a client for the GenerateService service.
 type GenerateServiceClient interface {
 	// Generate generates new cells given an existing document.
@@ -84,11 +70,12 @@ type GenerateServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewGenerateServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) GenerateServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	generateServiceMethods := v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("GenerateService").Methods()
 	return &generateServiceClient{
 		generate: connect.NewClient[v1alpha1.GenerateRequest, v1alpha1.GenerateResponse](
 			httpClient,
 			baseURL+GenerateServiceGenerateProcedure,
-			connect.WithSchema(generateServiceGenerateMethodDescriptor),
+			connect.WithSchema(generateServiceMethods.ByName("Generate")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -116,10 +103,11 @@ type GenerateServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewGenerateServiceHandler(svc GenerateServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	generateServiceMethods := v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("GenerateService").Methods()
 	generateServiceGenerateHandler := connect.NewUnaryHandler(
 		GenerateServiceGenerateProcedure,
 		svc.Generate,
-		connect.WithSchema(generateServiceGenerateMethodDescriptor),
+		connect.WithSchema(generateServiceMethods.ByName("Generate")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/GenerateService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -154,11 +142,12 @@ type ExecuteServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewExecuteServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ExecuteServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	executeServiceMethods := v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("ExecuteService").Methods()
 	return &executeServiceClient{
 		execute: connect.NewClient[v1alpha1.ExecuteRequest, v1alpha1.ExecuteResponse](
 			httpClient,
 			baseURL+ExecuteServiceExecuteProcedure,
-			connect.WithSchema(executeServiceExecuteMethodDescriptor),
+			connect.WithSchema(executeServiceMethods.ByName("Execute")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -186,10 +175,11 @@ type ExecuteServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewExecuteServiceHandler(svc ExecuteServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	executeServiceMethods := v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("ExecuteService").Methods()
 	executeServiceExecuteHandler := connect.NewUnaryHandler(
 		ExecuteServiceExecuteProcedure,
 		svc.Execute,
-		connect.WithSchema(executeServiceExecuteMethodDescriptor),
+		connect.WithSchema(executeServiceMethods.ByName("Execute")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/ExecuteService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -234,35 +224,36 @@ type AIServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) AIServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	aIServiceMethods := v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("AIService").Methods()
 	return &aIServiceClient{
 		streamGenerate: connect.NewClient[v1alpha1.StreamGenerateRequest, v1alpha1.StreamGenerateResponse](
 			httpClient,
 			baseURL+AIServiceStreamGenerateProcedure,
-			connect.WithSchema(aIServiceStreamGenerateMethodDescriptor),
+			connect.WithSchema(aIServiceMethods.ByName("StreamGenerate")),
 			connect.WithClientOptions(opts...),
 		),
 		generateCells: connect.NewClient[v1alpha1.GenerateCellsRequest, v1alpha1.GenerateCellsResponse](
 			httpClient,
 			baseURL+AIServiceGenerateCellsProcedure,
-			connect.WithSchema(aIServiceGenerateCellsMethodDescriptor),
+			connect.WithSchema(aIServiceMethods.ByName("GenerateCells")),
 			connect.WithClientOptions(opts...),
 		),
 		getExample: connect.NewClient[v1alpha1.GetExampleRequest, v1alpha1.GetExampleResponse](
 			httpClient,
 			baseURL+AIServiceGetExampleProcedure,
-			connect.WithSchema(aIServiceGetExampleMethodDescriptor),
+			connect.WithSchema(aIServiceMethods.ByName("GetExample")),
 			connect.WithClientOptions(opts...),
 		),
 		logEvents: connect.NewClient[v1alpha1.LogEventsRequest, v1alpha1.LogEventsResponse](
 			httpClient,
 			baseURL+AIServiceLogEventsProcedure,
-			connect.WithSchema(aIServiceLogEventsMethodDescriptor),
+			connect.WithSchema(aIServiceMethods.ByName("LogEvents")),
 			connect.WithClientOptions(opts...),
 		),
 		status: connect.NewClient[v1alpha1.StatusRequest, v1alpha1.StatusResponse](
 			httpClient,
 			baseURL+AIServiceStatusProcedure,
-			connect.WithSchema(aIServiceStatusMethodDescriptor),
+			connect.WithSchema(aIServiceMethods.ByName("Status")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -324,34 +315,35 @@ type AIServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	aIServiceMethods := v1alpha1.File_foyle_v1alpha1_agent_proto.Services().ByName("AIService").Methods()
 	aIServiceStreamGenerateHandler := connect.NewBidiStreamHandler(
 		AIServiceStreamGenerateProcedure,
 		svc.StreamGenerate,
-		connect.WithSchema(aIServiceStreamGenerateMethodDescriptor),
+		connect.WithSchema(aIServiceMethods.ByName("StreamGenerate")),
 		connect.WithHandlerOptions(opts...),
 	)
 	aIServiceGenerateCellsHandler := connect.NewUnaryHandler(
 		AIServiceGenerateCellsProcedure,
 		svc.GenerateCells,
-		connect.WithSchema(aIServiceGenerateCellsMethodDescriptor),
+		connect.WithSchema(aIServiceMethods.ByName("GenerateCells")),
 		connect.WithHandlerOptions(opts...),
 	)
 	aIServiceGetExampleHandler := connect.NewUnaryHandler(
 		AIServiceGetExampleProcedure,
 		svc.GetExample,
-		connect.WithSchema(aIServiceGetExampleMethodDescriptor),
+		connect.WithSchema(aIServiceMethods.ByName("GetExample")),
 		connect.WithHandlerOptions(opts...),
 	)
 	aIServiceLogEventsHandler := connect.NewUnaryHandler(
 		AIServiceLogEventsProcedure,
 		svc.LogEvents,
-		connect.WithSchema(aIServiceLogEventsMethodDescriptor),
+		connect.WithSchema(aIServiceMethods.ByName("LogEvents")),
 		connect.WithHandlerOptions(opts...),
 	)
 	aIServiceStatusHandler := connect.NewUnaryHandler(
 		AIServiceStatusProcedure,
 		svc.Status,
-		connect.WithSchema(aIServiceStatusMethodDescriptor),
+		connect.WithSchema(aIServiceMethods.ByName("Status")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/AIService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -61,7 +61,7 @@ npm list -g @bufbuild/protoc-gen-connect-es
 
 # GoLang
 
-* Install the plugin below to get `protoc-gen-go` 
+* Install the plugin below to get `protoc-gen-go`
 
 ```bash
 go install google.golang.org/protobuf/cmd/protoc-gen-go@latest

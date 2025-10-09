@@ -44,14 +44,6 @@ const (
 	SessionsServiceDumpExamplesProcedure = "/foyle.logs.SessionsService/DumpExamples"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	sessionsServiceServiceDescriptor            = logs.File_foyle_logs_sessions_proto.Services().ByName("SessionsService")
-	sessionsServiceGetSessionMethodDescriptor   = sessionsServiceServiceDescriptor.Methods().ByName("GetSession")
-	sessionsServiceListSessionsMethodDescriptor = sessionsServiceServiceDescriptor.Methods().ByName("ListSessions")
-	sessionsServiceDumpExamplesMethodDescriptor = sessionsServiceServiceDescriptor.Methods().ByName("DumpExamples")
-)
-
 // SessionsServiceClient is a client for the foyle.logs.SessionsService service.
 type SessionsServiceClient interface {
 	// GetSession returns a session
@@ -71,23 +63,24 @@ type SessionsServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewSessionsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) SessionsServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	sessionsServiceMethods := logs.File_foyle_logs_sessions_proto.Services().ByName("SessionsService").Methods()
 	return &sessionsServiceClient{
 		getSession: connect.NewClient[logs.GetSessionRequest, logs.GetSessionResponse](
 			httpClient,
 			baseURL+SessionsServiceGetSessionProcedure,
-			connect.WithSchema(sessionsServiceGetSessionMethodDescriptor),
+			connect.WithSchema(sessionsServiceMethods.ByName("GetSession")),
 			connect.WithClientOptions(opts...),
 		),
 		listSessions: connect.NewClient[logs.ListSessionsRequest, logs.ListSessionsResponse](
 			httpClient,
 			baseURL+SessionsServiceListSessionsProcedure,
-			connect.WithSchema(sessionsServiceListSessionsMethodDescriptor),
+			connect.WithSchema(sessionsServiceMethods.ByName("ListSessions")),
 			connect.WithClientOptions(opts...),
 		),
 		dumpExamples: connect.NewClient[logs.DumpExamplesRequest, logs.DumpExamplesResponse](
 			httpClient,
 			baseURL+SessionsServiceDumpExamplesProcedure,
-			connect.WithSchema(sessionsServiceDumpExamplesMethodDescriptor),
+			connect.WithSchema(sessionsServiceMethods.ByName("DumpExamples")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -131,22 +124,23 @@ type SessionsServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewSessionsServiceHandler(svc SessionsServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	sessionsServiceMethods := logs.File_foyle_logs_sessions_proto.Services().ByName("SessionsService").Methods()
 	sessionsServiceGetSessionHandler := connect.NewUnaryHandler(
 		SessionsServiceGetSessionProcedure,
 		svc.GetSession,
-		connect.WithSchema(sessionsServiceGetSessionMethodDescriptor),
+		connect.WithSchema(sessionsServiceMethods.ByName("GetSession")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sessionsServiceListSessionsHandler := connect.NewUnaryHandler(
 		SessionsServiceListSessionsProcedure,
 		svc.ListSessions,
-		connect.WithSchema(sessionsServiceListSessionsMethodDescriptor),
+		connect.WithSchema(sessionsServiceMethods.ByName("ListSessions")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sessionsServiceDumpExamplesHandler := connect.NewUnaryHandler(
 		SessionsServiceDumpExamplesProcedure,
 		svc.DumpExamples,
-		connect.WithSchema(sessionsServiceDumpExamplesMethodDescriptor),
+		connect.WithSchema(sessionsServiceMethods.ByName("DumpExamples")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/foyle.logs.SessionsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
